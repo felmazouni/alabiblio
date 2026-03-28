@@ -28,7 +28,7 @@ async function main(): Promise<void> {
       "d1",
       "execute",
       getDatabaseName(target),
-      "--remote",
+      ...(target === "local" ? ["--local"] : ["--remote"]),
       "--file",
       `../../tmp/ingest-centers.${target}.sql`,
     ],

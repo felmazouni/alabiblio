@@ -2,34 +2,34 @@
 - [x] Fijar `pnpm` como package manager del monorepo
 - [x] Crear `.nvmrc` con versión LTS objetivo
 - [x] Crear `.npmrc`
-- [ ] Crear `.gitignore`
-- [ ] Crear `README.md` técnico inicial en la raíz
-- [ ] Crear `.env.example`
+- [x] Crear `.gitignore`
+- [x] Crear `README.md` técnico inicial en la raíz
+- [x] Crear `.env.example`
 - [x] Crear `package.json` raíz del monorepo
 - [x] Crear `pnpm-workspace.yaml`
-- [ ] Crear `tsconfig.base.json`
+- [x] Crear `tsconfig.base.json`
 - [x] Crear `apps/web` con Cloudflare CLI sobre React + TypeScript
 - [x] Crear `apps/web/wrangler.jsonc`
 - [x] Crear estructura `packages/*`
 - [x] Crear estructura `sql/migrations` y `sql/seeds`
 - [x] Crear estructura `scripts`
-- [ ] Crear estructura `tests/unit`, `tests/integration` y `tests/e2e`
+- [x] Crear estructura `tests/unit`, `tests/integration` y `tests/e2e`
 - [x] Definir scripts raíz `dev`, `build`, `typecheck`, `lint`, `test`
 - [x] Definir convención de entornos `local`, `staging` y `production`
 - [x] Definir estrategia de ramas con `main` y ramas cortas `feat/*`, `fix/*`, `chore/*`
-- [ ] Definir estrategia de migraciones D1 por entorno
-- [ ] Definir estrategia de seeds idempotentes por entorno
-- [ ] Definir nombres de recursos Cloudflare por entorno
-- [ ] Crear primer commit limpio de bootstrap
-- [ ] Crear repositorio GitHub `alabiblio`
-- [ ] Añadir remote `origin`
-- [ ] Subir `main`
-- [ ] Configurar workflow CI mínimo
-- [ ] Ejecutar `pnpm install` en CI
-- [ ] Ejecutar `pnpm typecheck` en CI
-- [ ] Ejecutar `pnpm lint` en CI
-- [ ] Ejecutar `pnpm test` en CI
-- [ ] Ejecutar `pnpm build` en CI
+- [x] Definir estrategia de migraciones D1 por entorno
+- [x] Definir estrategia de seeds idempotentes por entorno
+- [x] Definir nombres de recursos Cloudflare por entorno
+- [x] Crear primer commit limpio de bootstrap
+- [x] Crear repositorio GitHub `alabiblio`
+- [x] Añadir remote `origin`
+- [x] Subir `main`
+- [x] Configurar workflow CI mínimo
+- [x] Ejecutar `pnpm install` en CI
+- [x] Ejecutar `pnpm typecheck` en CI
+- [x] Ejecutar `pnpm lint` en CI
+- [x] Ejecutar `pnpm test` en CI
+- [x] Ejecutar `pnpm build` en CI
 - [x] Crear proyecto Cloudflare `alabiblio`
 - [x] Crear entorno Cloudflare `staging`
 - [x] Crear entorno Cloudflare `production`
@@ -43,9 +43,15 @@
 - [x] Configurar rutas del Worker para servir API en `/api/*`
 
 ## 2. Descubrimiento y validación de fuentes
+- [x] Registrar URL, formato, licencia y refresh mode de `study_rooms`
+- [x] Registrar URL, formato, licencia y refresh mode de `libraries`
 - [ ] Registrar URLs oficiales, formato, licencia y frecuencia de cada fuente obligatoria
-- [ ] Descargar muestras actuales de salas de estudio
-- [ ] Descargar muestras actuales de bibliotecas
+- [x] Descargar muestras actuales de salas de estudio
+- [x] Descargar muestras actuales de bibliotecas
+- [x] Inspeccionar columnas reales compartidas de ambos CSV
+- [x] Detectar anomalías iniciales de codificación, entidades HTML y campos incompletos en fuentes de centros
+- [x] Definir mapping real `study_rooms` -> `Center`
+- [x] Definir mapping real `libraries` -> `Center`
 - [ ] Descargar muestras actuales de EMT API y EMT realtime
 - [ ] Descargar muestras actuales de Bicimad
 - [ ] Descargar muestras actuales de parkings EMT
@@ -57,9 +63,11 @@
 - [ ] Registrar checklist de validación por fuente con estado `usable`, `parcial` o `bloqueada`
 
 ## 3. Diseño de modelo de datos
-- [ ] Crear migración inicial de tablas de fuentes e ingestas
-- [ ] Crear tabla `centers`
-- [ ] Crear tabla `center_source_links`
+- [x] Crear migración inicial de tablas de fuentes e ingestas
+- [x] Crear tabla `centers`
+- [x] Crear tabla `center_source_links`
+- [x] Crear seed inicial de `sources`
+- [x] Crear índices básicos para `sources`, `ingestion_runs`, `centers` y `center_source_links`
 - [ ] Crear tabla `schedule_versions`
 - [ ] Crear tablas `regular_rules`, `seasonal_rules`, `exam_extension_rules`, `holiday_closures` y `partial_day_overrides`
 - [ ] Crear tabla `schedule_parse_anomalies`
@@ -149,8 +157,9 @@
 - [x] Implementar endpoint `GET /api/health`
 - [x] Asegurar que ninguna ruta `/api/*` cae en el fallback SPA
 - [x] Servir `GET /api/health` con `cache-control: no-store`
-- [ ] Definir contratos TypeScript compartidos de request y response
-- [ ] Implementar endpoint de listado de centros
+- [x] Definir contratos TypeScript compartidos de request y response para centros
+- [x] Implementar endpoint de listado de centros
+- [x] Conectar `GET /api/centers` a D1 con datos canónicos persistidos
 - [ ] Implementar endpoint de detalle de centro
 - [ ] Implementar endpoint de horario operativo de centro
 - [ ] Implementar endpoint de movilidad de centro
@@ -258,7 +267,8 @@
 - [x] Desplegar `staging` en `https://staging.alabiblio.org`
 - [x] Desplegar `production` en `https://alabiblio.org`
 - [x] Verificar convivencia de SPA en `/` y API en `/api/*`
-- [ ] Configurar migraciones D1 por entorno
+- [x] Configurar migraciones D1 por entorno
+- [x] Ejecutar ingesta inicial de centros en `local`, `staging` y `production`
 - [ ] Configurar buckets R2 por entorno
 - [ ] Configurar namespaces KV por entorno
 - [ ] Configurar secretos por entorno
