@@ -1,118 +1,265 @@
-import { useEffect, useState } from 'react'
-import './App.css'
+import type {
+  CenterDetailItem,
+  CenterKind,
+  CenterListItem,
+} from "@alabiblio/contracts/centers";
+import {
+  startTransition,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { fetchCenterDetail, fetchCenters } from "./features/centers/api";
+import { CenterCard } from "./features/centers/components/CenterCard";
+import { CenterDetailPanel } from "./features/centers/components/CenterDetailPanel";
+import "./App.css";
 
-type HealthResponse = {
-  ok: boolean
-  env: string
-  timestamp: string
+type KindFilter = "all" | CenterKind;
+
+const PAGE_SIZE = 24;
+
+function getSelectedSlug(pathname: string): string | null {
+  if (!pathname.startsWith("/centers/")) {
+    return null;
+  }
+
+  const slug = pathname.replace("/centers/", "").trim();
+  return slug === "" ? null : decodeURIComponent(slug);
+}
+
+function navigate(pathname: string): void {
+  window.history.pushState({}, "", pathname);
+  window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
 function App() {
-  const [health, setHealth] = useState<HealthResponse | null>(null)
+  const [pathname, setPathname] = useState(window.location.pathname);
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
+  const [searchText, setSearchText] = useState("");
+  const deferredSearch = useDeferredValue(searchText.trim());
+  const [items, setItems] = useState<CenterListItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<CenterDetailItem | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  const selectedSlug = getSelectedSlug(pathname);
+  const detailLoading =
+    selectedSlug !== null &&
+    detailError === null &&
+    (detail === null || detail.slug !== selectedSlug);
 
   useEffect(() => {
-    let cancelled = false
+    const handlePopState = () => setPathname(window.location.pathname);
+    window.addEventListener("popstate", handlePopState);
 
-    void fetch('/api/health')
-      .then((response) => response.json() as Promise<HealthResponse>)
-      .then((data) => {
-        if (!cancelled) {
-          setHealth(data)
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const isFirstPage = offset === 0;
+
+    void fetchCenters(
+      {
+        kind: kindFilter === "all" ? undefined : kindFilter,
+        q: deferredSearch === "" ? undefined : deferredSearch,
+        limit: PAGE_SIZE,
+        offset,
+      },
+      controller.signal,
+    )
+      .then((response) => {
+        setItems((current) =>
+          isFirstPage ? response.items : [...current, ...response.items],
+        );
+        setTotal(response.total);
+      })
+      .catch((error: Error) => {
+        if (!controller.signal.aborted) {
+          setListError(`No se pudo cargar el listado (${error.message}).`);
         }
       })
-      .catch(() => {
-        if (!cancelled) {
-          setHealth(null)
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
         }
-      })
+      });
 
-    return () => {
-      cancelled = true
+    return () => controller.abort();
+  }, [deferredSearch, kindFilter, offset]);
+
+  useEffect(() => {
+    if (!selectedSlug) {
+      return;
     }
-  }, [])
+
+    const controller = new AbortController();
+
+    void fetchCenterDetail(selectedSlug, controller.signal)
+      .then((response) => {
+        setDetail(response.item);
+      })
+      .catch((error: Error) => {
+        if (!controller.signal.aborted) {
+          setDetailError(`No se pudo cargar el detalle (${error.message}).`);
+        }
+      });
+
+    return () => controller.abort();
+  }, [selectedSlug]);
+
+  const hasMore = items.length < total;
+  const resultsLabel = useMemo(() => {
+    if (loading) {
+      return "Cargando centros...";
+    }
+
+    return `${total} centros encontrados`;
+  }, [loading, total]);
 
   return (
-    <main className="shell">
-      <section className="hero">
-        <div className="hero__copy">
-          <span className="eyebrow">Premio reutilizacion de datos · Madrid</span>
-          <h1>Encuentra el mejor sitio para estudiar en Madrid sin perder tiempo.</h1>
-          <p className="lede">
-            Bibliotecas y salas de estudio con informacion operativa clara: abierto
-            ahora, aforo, contacto, transporte recomendado y contexto de movilidad.
+    <main className="app-shell">
+      <header className="app-header">
+        <div>
+          <a className="app-brand" href="/">
+            alabiblio
+          </a>
+          <p className="app-subtitle">
+            Bibliotecas y salas de estudio reales del Ayuntamiento de Madrid.
           </p>
-          <div className="hero__actions">
-            <a className="button button--primary" href="/api/health">
-              Ver estado de la API
-            </a>
-            <span className="status-card">
-              <strong>Estado actual</strong>
-              <span>
-                {health?.ok
-                  ? `API online · ${health.env}`
-                  : 'Conectando con el backend'}
-              </span>
-            </span>
-          </div>
+        </div>
+        <div className="app-meta">
+          <span>{resultsLabel}</span>
+          <a href="/api/centers?limit=5" target="_blank" rel="noreferrer">
+            API
+          </a>
+        </div>
+      </header>
+
+      <section className="explorer-toolbar">
+        <div className="explorer-search">
+          <label htmlFor="search">Buscar por nombre</label>
+          <input
+            id="search"
+            name="search"
+            type="search"
+            value={searchText}
+            onChange={(event) => {
+              setSearchText(event.target.value);
+              setOffset(0);
+              setItems([]);
+              setTotal(0);
+              setLoading(true);
+              setLoadingMore(false);
+              setListError(null);
+            }}
+            placeholder="Ej. Antonio Mingote o Galileo"
+          />
         </div>
 
-        <aside className="hero__panel" aria-label="Resumen operativo">
-          <div className="metric">
-            <span className="metric__label">Lo que va a mostrar la app</span>
-            <strong className="metric__value">Abierto ahora</strong>
-            <p>Horario util, aforo, telefono, como llegar y recomendaciones utiles.</p>
-          </div>
-          <div className="metric-grid">
-            <article>
-              <span>Movilidad</span>
-              <strong>EMT + Bicimad + SER</strong>
-            </article>
-            <article>
-              <span>Centros</span>
-              <strong>Bibliotecas y salas</strong>
-            </article>
-            <article>
-              <span>Valoraciones</span>
-              <strong>8 metricas estructuradas</strong>
-            </article>
-            <article>
-              <span>Backend</span>
-              <strong>{health?.env ?? 'bootstrapping'}</strong>
-            </article>
-          </div>
-        </aside>
+        <div
+          className="explorer-filters"
+          role="tablist"
+          aria-label="Tipo de centro"
+        >
+          {(["all", "library", "study_room"] as const).map((value) => (
+            <button
+              key={value}
+              className={
+                kindFilter === value
+                  ? "filter-pill filter-pill--active"
+                  : "filter-pill"
+              }
+              type="button"
+              onClick={() => {
+                setKindFilter(value);
+                setOffset(0);
+                setItems([]);
+                setTotal(0);
+                setLoading(true);
+                setLoadingMore(false);
+                setListError(null);
+              }}
+            >
+              {value === "all"
+                ? "Todos"
+                : value === "library"
+                  ? "Bibliotecas"
+                  : "Salas de estudio"}
+            </button>
+          ))}
+        </div>
       </section>
 
-      <section className="highlights" aria-label="Capacidades clave">
-        <article className="highlight-card">
-          <span className="highlight-card__index">01</span>
-          <h2>Decision inmediata</h2>
-          <p>
-            La home final priorizara estado operativo, distancia, llegada estimada y
-            servicios antes que cualquier dato secundario.
-          </p>
-        </article>
+      <section className="explorer-layout">
+        <section className="explorer-list">
+          {loading ? <div className="state-card">Cargando centros...</div> : null}
 
-        <article className="highlight-card">
-          <span className="highlight-card__index">02</span>
-          <h2>Datos oficiales unificados</h2>
-          <p>
-            Madrid Datos Abiertos, EMT, Bicimad, SER y agenda de bibliotecas quedaran
-            normalizados en un mismo dominio de consulta.
-          </p>
-        </article>
+          {!loading && listError ? (
+            <div className="state-card state-card--error">{listError}</div>
+          ) : null}
 
-        <article className="highlight-card">
-          <span className="highlight-card__index">03</span>
-          <h2>Base preparada para escalar</h2>
-          <p>
-            Cloudflare Workers, assets servidos desde el mismo dominio y API bajo
-            <code> /api</code> ya operativos.
-          </p>
-        </article>
+          {!loading && !listError && items.length === 0 ? (
+            <div className="state-card">No hay centros para ese filtro.</div>
+          ) : null}
+
+          {!loading && !listError ? (
+            <div className="center-grid">
+              {items.map((center) => (
+                <CenterCard
+                  key={center.id}
+                  center={center}
+                  isSelected={selectedSlug === center.slug}
+                  onSelect={(slug) =>
+                    startTransition(() => {
+                      setDetailError(null);
+                      navigate(`/centers/${slug}`);
+                    })
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+
+          {!loading && !listError && hasMore ? (
+            <div className="load-more">
+              <button
+                className="load-more__button"
+                type="button"
+                onClick={() => {
+                  setLoadingMore(true);
+                  setOffset(items.length);
+                }}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "Cargando mas..." : "Cargar mas"}
+              </button>
+            </div>
+          ) : null}
+        </section>
+
+        <CenterDetailPanel
+          center={
+            selectedSlug && detail?.slug === selectedSlug ? detail : null
+          }
+          error={selectedSlug ? detailError : null}
+          loading={detailLoading}
+          onClose={() =>
+            startTransition(() => {
+              setDetailError(null);
+              navigate("/");
+            })
+          }
+        />
       </section>
     </main>
-  )
+  );
 }
 
-export default App
+export default App;

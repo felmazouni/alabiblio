@@ -115,6 +115,32 @@ function buildRunSql(summary: IngestionRunSummary): string {
       raw_payload_r2_key = excluded.raw_payload_r2_key;`;
   });
 
+  const scheduleStatements = summary.records.flatMap(({ center, rawScheduleText }) => {
+    return [
+      `UPDATE schedule_versions
+      SET version_status = 'superseded'
+      WHERE center_id = ${sqlValue(center.id)}
+        AND source_id = ${sqlValue(summary.sourceCode)}
+        AND version_status = 'active';`,
+      `INSERT INTO schedule_versions (
+        center_id, source_id, run_id, version_status, raw_schedule_text, notes_raw,
+        normalized_json, parse_confidence, parse_warnings_json, open_air_flag, created_at
+      ) VALUES (
+        ${sqlValue(center.id)},
+        ${sqlValue(summary.sourceCode)},
+        ${sqlValue(summary.id)},
+        'active',
+        ${sqlValue(rawScheduleText)},
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        ${sqlValue(center.open_air_flag)},
+        ${sqlValue(summary.finishedAt)}
+      );`,
+    ];
+  });
+
   return [
     `INSERT INTO ingestion_runs (
       id, source_id, status, started_at, finished_at, row_count_raw, row_count_valid,
@@ -139,6 +165,7 @@ function buildRunSql(summary: IngestionRunSummary): string {
     ON CONFLICT(id) DO NOTHING;`,
     ...centerStatements,
     ...linkStatements,
+    ...scheduleStatements,
     `UPDATE ingestion_runs SET
       status = 'completed',
       finished_at = ${sqlValue(summary.finishedAt)},

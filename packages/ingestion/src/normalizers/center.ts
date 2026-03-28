@@ -18,7 +18,23 @@ function toNullableNumber(value: string | undefined): number | null {
     return null;
   }
 
-  const normalized = trimmed.replace(/\./g, "").replace(",", ".");
+  const compact = trimmed.replace(/\s+/g, "");
+  let normalized = compact;
+
+  if (compact.includes(",")) {
+    normalized = compact.replace(/\./g, "").replace(",", ".");
+  } else {
+    const dotCount = (compact.match(/\./g) ?? []).length;
+
+    if (dotCount > 1) {
+      const sign = compact.startsWith("-") ? "-" : "";
+      const unsigned = sign === "-" ? compact.slice(1) : compact;
+      const [integerPart, ...fractionParts] = unsigned.split(".");
+
+      normalized = `${sign}${integerPart}.${fractionParts.join("")}`;
+    }
+  }
+
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -72,6 +88,17 @@ function buildAddressLine(record: MadridCenterCsvRecord): string | null {
   return parts.length === 0 ? null : parts.join(" ");
 }
 
+function normalizeInlineText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function normalizeSearchText(value: string): string {
+  return normalizeInlineText(value)
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase();
+}
+
 function extractCapacity(equipment: string | undefined): {
   value: number | null;
   text: string | null;
@@ -82,22 +109,63 @@ function extractCapacity(equipment: string | undefined): {
     return { value: null, text: null };
   }
 
-  const match = text.match(/aforo(?: aproximado)?[: ]+([\d.]+)/i);
-  const value = match ? Number(match[1].replace(/\./g, "")) : null;
+  const normalized = normalizeInlineText(text);
+  const searchText = normalizeSearchText(text);
+  const patterns = [
+    /aforo(?: maximo| aproximado)?\s*:?\s*[\d.]+(?:\s*(?:plazas?|puestos?|personas?))?/i,
+    /puestos? de lectura(?:\s*\(aforo maximo\))?\s*:?\s*[\d.]+(?:\s*(?:plazas?|puestos?|personas?))?/i,
+    /numero de plazas\s*:?\s*[\d.]+(?:\s*(?:plazas?|puestos?|personas?))?/i,
+  ];
+
+  const matchedText = patterns
+    .map((pattern) => searchText.match(pattern)?.[0] ?? null)
+    .find((value): value is string => value !== null);
+
+  if (!matchedText) {
+    return { value: null, text: null };
+  }
+
+  const valueMatch = matchedText.match(/[\d.]+/);
+  const value = valueMatch ? Number(valueMatch[0].replace(/\./g, "")) : null;
+  const labelPattern =
+    /\b(aforo(?:\s+maximo|\s+aproximado)?|puestos?\s+de\s+lectura(?:\s*\(aforo\s+maximo\))?|numero\s+de\s+plazas)\b/i;
+  const labelMatch = labelPattern.exec(searchText);
+  let extractedText: string | null = null;
+
+  if (labelMatch) {
+    extractedText = normalized.slice(labelMatch.index, labelMatch.index + matchedText.length);
+  }
 
   return {
     value: Number.isFinite(value) ? value : null,
-    text,
+    text: extractedText ?? matchedText,
   };
 }
 
 function hasWifi(record: MadridCenterCsvRecord): boolean {
   const haystack = `${record.EQUIPAMIENTO} ${record.DESCRIPCION}`.toLowerCase();
-  return haystack.includes("wifi") || haystack.includes("wi-fi") || haystack.includes("zona wifi");
+
+  if (haystack.includes("no dispone de wifi") || haystack.includes("sin wifi")) {
+    return false;
+  }
+
+  return (
+    haystack.includes("wifi") ||
+    haystack.includes("wi-fi") ||
+    haystack.includes("zona wifi")
+  );
 }
 
 function hasSockets(record: MadridCenterCsvRecord): boolean {
   const haystack = `${record.EQUIPAMIENTO} ${record.DESCRIPCION}`.toLowerCase();
+
+  if (
+    haystack.includes("no dispone de enchufes") ||
+    haystack.includes("sin enchufes")
+  ) {
+    return false;
+  }
+
   return haystack.includes("enchufe") || haystack.includes("enchufes");
 }
 
@@ -127,7 +195,6 @@ export function normalizeMadridCenterRecord(
 
   const coordinates = normalizeCoordinates(record);
   const capacity = extractCapacity(record.EQUIPAMIENTO);
-  const now = new Date().toISOString();
 
   return {
     center: {
