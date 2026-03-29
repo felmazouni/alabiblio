@@ -1,10 +1,17 @@
 import type {
   GetCenterDetailResponse,
+  GetCenterScheduleResponse,
   ListCentersQuery,
   ListCentersResponse,
 } from "@alabiblio/contracts/centers";
 import { toCenterDetailItem, toCenterListItem } from "@alabiblio/domain/centers";
-import { getCenterBySlug, listCenters, type WorkerEnv } from "../lib/db";
+import { buildSchedulePayload } from "@alabiblio/schedule-engine/index";
+import {
+  getCenterBySlug,
+  listCenters,
+  loadActiveSchedulesByCenterIds,
+  type WorkerEnv,
+} from "../lib/db";
 
 const JSON_HEADERS = {
   "cache-control": "no-store",
@@ -35,8 +42,29 @@ function parseIntegerParam(
   return parsed;
 }
 
-function parseListCentersQuery(url: URL): Required<Pick<ListCentersQuery, "limit" | "offset">> &
-  Pick<ListCentersQuery, "kind" | "q"> {
+function parseBooleanParam(value: string | null): boolean | undefined {
+  if (value === null) {
+    return undefined;
+  }
+
+  if (value === "true" || value === "1") {
+    return true;
+  }
+
+  if (value === "false" || value === "0") {
+    return false;
+  }
+
+  throw new Error("invalid_boolean");
+}
+
+function parseListCentersQuery(
+  url: URL,
+): Required<Pick<ListCentersQuery, "limit" | "offset">> &
+  Pick<
+    ListCentersQuery,
+    "kind" | "q" | "open_now" | "has_wifi" | "accessible" | "open_air"
+  > {
   const kind = url.searchParams.get("kind");
   const q = url.searchParams.get("q")?.trim() ?? "";
   const limit = parseIntegerParam(url.searchParams.get("limit"), DEFAULT_LIMIT, {
@@ -57,6 +85,10 @@ function parseListCentersQuery(url: URL): Required<Pick<ListCentersQuery, "limit
     q: q === "" ? undefined : q,
     limit,
     offset,
+    open_now: parseBooleanParam(url.searchParams.get("open_now")),
+    has_wifi: parseBooleanParam(url.searchParams.get("has_wifi")),
+    accessible: parseBooleanParam(url.searchParams.get("accessible")),
+    open_air: parseBooleanParam(url.searchParams.get("open_air")),
   };
 }
 
@@ -69,9 +101,21 @@ export async function handleListCenters(
   try {
     const query = parseListCentersQuery(url);
     const centers = await listCenters(env.DB, query);
+    const scheduleMap = await loadActiveSchedulesByCenterIds(
+      env.DB,
+      centers.map((center) => center.id),
+    );
+    const items = centers
+      .map((center) => {
+        const schedule = buildSchedulePayload(scheduleMap.get(center.id) ?? null);
+        return toCenterListItem(center, schedule);
+      })
+      .filter((item) =>
+        query.open_now === undefined ? true : item.is_open_now === query.open_now,
+      );
     const payload: ListCentersResponse = {
-      items: centers.items.map(toCenterListItem),
-      total: centers.total,
+      items: items.slice(query.offset, query.offset + query.limit),
+      total: items.length,
       limit: query.limit,
       offset: query.offset,
     };
@@ -114,9 +158,36 @@ export async function handleGetCenterDetail(
   const payload: GetCenterDetailResponse = {
     item: toCenterDetailItem(
       record.center,
-      record.rawScheduleText,
+      buildSchedulePayload(record.schedule),
       record.sources,
     ),
+  };
+
+  return Response.json(payload, {
+    headers: JSON_HEADERS,
+  });
+}
+
+export async function handleGetCenterSchedule(
+  slug: string,
+  env: WorkerEnv,
+): Promise<Response> {
+  const record = await getCenterBySlug(env.DB, slug);
+
+  if (!record) {
+    return Response.json(
+      {
+        error: "Center not found",
+      },
+      {
+        status: 404,
+        headers: JSON_HEADERS,
+      },
+    );
+  }
+
+  const payload: GetCenterScheduleResponse = {
+    item: buildSchedulePayload(record.schedule),
   };
 
   return Response.json(payload, {

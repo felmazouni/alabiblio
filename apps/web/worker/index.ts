@@ -1,5 +1,9 @@
 import type { WorkerEnv } from "./lib/db";
-import { handleGetCenterDetail, handleListCenters } from "./routes/centers";
+import {
+  handleGetCenterDetail,
+  handleGetCenterSchedule,
+  handleListCenters,
+} from "./routes/centers";
 import { handleApiNotFound, handleHealth } from "./routes/health";
 
 export default {
@@ -15,7 +19,19 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname.startsWith("/api/centers/")) {
-      const slug = decodeURIComponent(url.pathname.replace("/api/centers/", ""));
+      const nestedPath = decodeURIComponent(url.pathname.replace("/api/centers/", ""));
+
+      if (nestedPath.endsWith("/schedule")) {
+        const slug = nestedPath.replace(/\/schedule$/, "");
+
+        if (slug === "") {
+          return handleApiNotFound(request);
+        }
+
+        return handleGetCenterSchedule(slug, env);
+      }
+
+      const slug = nestedPath;
 
       if (slug === "") {
         return handleApiNotFound(request);

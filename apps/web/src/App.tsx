@@ -16,6 +16,7 @@ import { CenterDetailPanel } from "./features/centers/components/CenterDetailPan
 import "./App.css";
 
 type KindFilter = "all" | CenterKind;
+type ServiceFilter = "open_now" | "has_wifi" | "accessible" | "open_air";
 
 const PAGE_SIZE = 24;
 
@@ -38,6 +39,10 @@ function App() {
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [searchText, setSearchText] = useState("");
   const deferredSearch = useDeferredValue(searchText.trim());
+  const [openNowOnly, setOpenNowOnly] = useState(false);
+  const [wifiOnly, setWifiOnly] = useState(false);
+  const [accessibleOnly, setAccessibleOnly] = useState(false);
+  const [openAirOnly, setOpenAirOnly] = useState(false);
   const [items, setItems] = useState<CenterListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -52,6 +57,34 @@ function App() {
     selectedSlug !== null &&
     detailError === null &&
     (detail === null || detail.slug !== selectedSlug);
+
+  function resetListState(): void {
+    setOffset(0);
+    setItems([]);
+    setTotal(0);
+    setLoading(true);
+    setLoadingMore(false);
+    setListError(null);
+  }
+
+  function toggleServiceFilter(filter: ServiceFilter): void {
+    switch (filter) {
+      case "open_now":
+        setOpenNowOnly((value) => !value);
+        break;
+      case "has_wifi":
+        setWifiOnly((value) => !value);
+        break;
+      case "accessible":
+        setAccessibleOnly((value) => !value);
+        break;
+      case "open_air":
+        setOpenAirOnly((value) => !value);
+        break;
+    }
+
+    resetListState();
+  }
 
   useEffect(() => {
     const handlePopState = () => setPathname(window.location.pathname);
@@ -70,6 +103,10 @@ function App() {
         q: deferredSearch === "" ? undefined : deferredSearch,
         limit: PAGE_SIZE,
         offset,
+        open_now: openNowOnly || undefined,
+        has_wifi: wifiOnly || undefined,
+        accessible: accessibleOnly || undefined,
+        open_air: openAirOnly || undefined,
       },
       controller.signal,
     )
@@ -92,7 +129,15 @@ function App() {
       });
 
     return () => controller.abort();
-  }, [deferredSearch, kindFilter, offset]);
+  }, [
+    accessibleOnly,
+    deferredSearch,
+    kindFilter,
+    offset,
+    openAirOnly,
+    openNowOnly,
+    wifiOnly,
+  ]);
 
   useEffect(() => {
     if (!selectedSlug) {
@@ -131,7 +176,7 @@ function App() {
             alabiblio
           </a>
           <p className="app-subtitle">
-            Bibliotecas y salas de estudio reales del Ayuntamiento de Madrid.
+            Encuentra rapido que centros estan abiertos hoy y cuando cierran.
           </p>
         </div>
         <div className="app-meta">
@@ -152,12 +197,7 @@ function App() {
             value={searchText}
             onChange={(event) => {
               setSearchText(event.target.value);
-              setOffset(0);
-              setItems([]);
-              setTotal(0);
-              setLoading(true);
-              setLoadingMore(false);
-              setListError(null);
+              resetListState();
             }}
             placeholder="Ej. Antonio Mingote o Galileo"
           />
@@ -179,12 +219,7 @@ function App() {
               type="button"
               onClick={() => {
                 setKindFilter(value);
-                setOffset(0);
-                setItems([]);
-                setTotal(0);
-                setLoading(true);
-                setLoadingMore(false);
-                setListError(null);
+                resetListState();
               }}
             >
               {value === "all"
@@ -194,6 +229,39 @@ function App() {
                   : "Salas de estudio"}
             </button>
           ))}
+        </div>
+
+        <div className="explorer-filters" aria-label="Filtros rapidos">
+          <button
+            className={openNowOnly ? "filter-pill filter-pill--active" : "filter-pill"}
+            type="button"
+            onClick={() => toggleServiceFilter("open_now")}
+          >
+            Abierto ahora
+          </button>
+          <button
+            className={wifiOnly ? "filter-pill filter-pill--active" : "filter-pill"}
+            type="button"
+            onClick={() => toggleServiceFilter("has_wifi")}
+          >
+            Wifi
+          </button>
+          <button
+            className={
+              accessibleOnly ? "filter-pill filter-pill--active" : "filter-pill"
+            }
+            type="button"
+            onClick={() => toggleServiceFilter("accessible")}
+          >
+            Accesible
+          </button>
+          <button
+            className={openAirOnly ? "filter-pill filter-pill--active" : "filter-pill"}
+            type="button"
+            onClick={() => toggleServiceFilter("open_air")}
+          >
+            Al aire libre
+          </button>
         </div>
       </section>
 
@@ -206,7 +274,9 @@ function App() {
           ) : null}
 
           {!loading && !listError && items.length === 0 ? (
-            <div className="state-card">No hay centros para ese filtro.</div>
+            <div className="state-card">
+              No hay centros para ese filtro. Prueba a quitar algun filtro rapido.
+            </div>
           ) : null}
 
           {!loading && !listError ? (
@@ -245,9 +315,7 @@ function App() {
         </section>
 
         <CenterDetailPanel
-          center={
-            selectedSlug && detail?.slug === selectedSlug ? detail : null
-          }
+          center={selectedSlug && detail?.slug === selectedSlug ? detail : null}
           error={selectedSlug ? detailError : null}
           loading={detailLoading}
           onClose={() =>

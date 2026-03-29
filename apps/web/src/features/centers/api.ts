@@ -15,6 +15,22 @@ function buildListCentersUrl(query: ListCentersQuery): string {
     url.searchParams.set("q", query.q);
   }
 
+  if (query.open_now !== undefined) {
+    url.searchParams.set("open_now", String(query.open_now));
+  }
+
+  if (query.has_wifi !== undefined) {
+    url.searchParams.set("has_wifi", String(query.has_wifi));
+  }
+
+  if (query.accessible !== undefined) {
+    url.searchParams.set("accessible", String(query.accessible));
+  }
+
+  if (query.open_air !== undefined) {
+    url.searchParams.set("open_air", String(query.open_air));
+  }
+
   if (query.limit !== undefined) {
     url.searchParams.set("limit", String(query.limit));
   }

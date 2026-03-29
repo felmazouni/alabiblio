@@ -17,6 +17,9 @@ export default defineConfig({
       "@alabiblio/ingestion": fileURLToPath(
         new URL("../../packages/ingestion/src", import.meta.url),
       ),
+      "@alabiblio/schedule-engine": fileURLToPath(
+        new URL("../../packages/schedule-engine/src", import.meta.url),
+      ),
     },
   },
 });

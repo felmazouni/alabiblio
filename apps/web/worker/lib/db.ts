@@ -2,7 +2,12 @@ import type {
   CenterRecord,
   CenterSourceSummary,
   ListCentersQuery,
+  ScheduleHolidayClosure,
+  ScheduleParseAnomaly,
+  SchedulePartialDayOverride,
+  ScheduleRegularRule,
 } from "@alabiblio/contracts/centers";
+import type { ActiveScheduleRecord } from "@alabiblio/schedule-engine/types";
 
 export type WorkerEnv = Env & {
   APP_ENV: string;
@@ -41,8 +46,28 @@ type CenterRow = {
   updated_at: string;
 };
 
-type CenterDetailRow = CenterRow & {
+type ScheduleVersionRow = {
+  schedule_version_id: number;
+  center_id: string;
   raw_schedule_text: string | null;
+  parse_confidence: number | null;
+  open_air_flag: number;
+};
+
+type RegularRuleRow = ScheduleRegularRule & {
+  schedule_version_id: number;
+};
+
+type HolidayClosureRow = ScheduleHolidayClosure & {
+  schedule_version_id: number;
+};
+
+type PartialDayOverrideRow = SchedulePartialDayOverride & {
+  schedule_version_id: number;
+};
+
+type ScheduleAnomalyRow = ScheduleParseAnomaly & {
+  schedule_version_id: number;
 };
 
 function hydrateCenter(row: CenterRow): CenterRecord {
@@ -56,12 +81,14 @@ function hydrateCenter(row: CenterRow): CenterRecord {
   };
 }
 
-function buildWhereClause(filters: Pick<ListCentersQuery, "kind" | "q">): {
+function buildWhereClause(
+  filters: Pick<ListCentersQuery, "kind" | "q" | "has_wifi" | "accessible" | "open_air">,
+): {
   clause: string;
-  bindings: string[];
+  bindings: Array<number | string>;
 } {
   const clauses = ["is_active = 1"];
-  const bindings: string[] = [];
+  const bindings: Array<number | string> = [];
 
   if (filters.kind) {
     clauses.push("kind = ?");
@@ -75,20 +102,271 @@ function buildWhereClause(filters: Pick<ListCentersQuery, "kind" | "q">): {
     bindings.push(`%${query}%`);
   }
 
+  if (filters.has_wifi) {
+    clauses.push("wifi_flag = 1");
+  }
+
+  if (filters.accessible) {
+    clauses.push("accessibility_flag = 1");
+  }
+
+  if (filters.open_air) {
+    clauses.push("open_air_flag = 1");
+  }
+
   return {
     clause: clauses.join(" AND "),
     bindings,
   };
 }
 
+function buildPlaceholders(values: string[]): string {
+  return values.map(() => "?").join(", ");
+}
+
+function chunkValues<T>(values: T[], size = 50): T[][] {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+async function loadActiveScheduleRows(
+  db: D1Database,
+  centerIds: string[],
+): Promise<ScheduleVersionRow[]> {
+  if (centerIds.length === 0) {
+    return [];
+  }
+
+  const results: ScheduleVersionRow[] = [];
+
+  for (const centerIdChunk of chunkValues(centerIds)) {
+    const placeholders = buildPlaceholders(centerIdChunk);
+    const result = await db
+      .prepare(
+        `WITH ranked AS (
+          SELECT
+            sv.id AS schedule_version_id,
+            sv.center_id,
+            sv.raw_schedule_text,
+            sv.parse_confidence,
+            sv.open_air_flag,
+            ROW_NUMBER() OVER (
+              PARTITION BY sv.center_id
+              ORDER BY CASE sv.version_status WHEN 'active' THEN 0 ELSE 1 END, sv.created_at DESC, sv.id DESC
+            ) AS row_number
+          FROM schedule_versions sv
+          WHERE sv.center_id IN (${placeholders})
+        )
+        SELECT
+          schedule_version_id,
+          center_id,
+          raw_schedule_text,
+          parse_confidence,
+          open_air_flag
+        FROM ranked
+        WHERE row_number = 1`,
+      )
+      .bind(...centerIdChunk)
+      .all<ScheduleVersionRow>();
+
+    results.push(...(result.results ?? []));
+  }
+
+  return results;
+}
+
+async function loadRegularRules(
+  db: D1Database,
+  scheduleVersionIds: number[],
+): Promise<RegularRuleRow[]> {
+  if (scheduleVersionIds.length === 0) {
+    return [];
+  }
+
+  const results: RegularRuleRow[] = [];
+
+  for (const scheduleVersionChunk of chunkValues(scheduleVersionIds)) {
+    const placeholders = scheduleVersionChunk.map(() => "?").join(", ");
+    const result = await db
+      .prepare(
+        `SELECT
+          schedule_version_id,
+          audience,
+          weekday,
+          opens_at,
+          closes_at,
+          sequence
+        FROM regular_rules
+        WHERE schedule_version_id IN (${placeholders})
+        ORDER BY weekday ASC, sequence ASC`,
+      )
+      .bind(...scheduleVersionChunk)
+      .all<RegularRuleRow>();
+
+    results.push(...(result.results ?? []));
+  }
+
+  return results;
+}
+
+async function loadHolidayClosures(
+  db: D1Database,
+  scheduleVersionIds: number[],
+): Promise<HolidayClosureRow[]> {
+  if (scheduleVersionIds.length === 0) {
+    return [];
+  }
+
+  const results: HolidayClosureRow[] = [];
+
+  for (const scheduleVersionChunk of chunkValues(scheduleVersionIds)) {
+    const placeholders = scheduleVersionChunk.map(() => "?").join(", ");
+    const result = await db
+      .prepare(
+        `SELECT
+          schedule_version_id,
+          audience,
+          month,
+          day,
+          label
+        FROM holiday_closures
+        WHERE schedule_version_id IN (${placeholders})
+        ORDER BY month ASC, day ASC`,
+      )
+      .bind(...scheduleVersionChunk)
+      .all<HolidayClosureRow>();
+
+    results.push(...(result.results ?? []));
+  }
+
+  return results;
+}
+
+async function loadPartialDayOverrides(
+  db: D1Database,
+  scheduleVersionIds: number[],
+): Promise<PartialDayOverrideRow[]> {
+  if (scheduleVersionIds.length === 0) {
+    return [];
+  }
+
+  const results: PartialDayOverrideRow[] = [];
+
+  for (const scheduleVersionChunk of chunkValues(scheduleVersionIds)) {
+    const placeholders = scheduleVersionChunk.map(() => "?").join(", ");
+    const result = await db
+      .prepare(
+        `SELECT
+          schedule_version_id,
+          audience,
+          month,
+          day,
+          opens_at,
+          closes_at,
+          sequence,
+          label
+        FROM partial_day_overrides
+        WHERE schedule_version_id IN (${placeholders})
+        ORDER BY month ASC, day ASC, sequence ASC`,
+      )
+      .bind(...scheduleVersionChunk)
+      .all<PartialDayOverrideRow>();
+
+    results.push(...(result.results ?? []));
+  }
+
+  return results;
+}
+
+async function loadScheduleAnomalies(
+  db: D1Database,
+  scheduleVersionIds: number[],
+): Promise<ScheduleAnomalyRow[]> {
+  if (scheduleVersionIds.length === 0) {
+    return [];
+  }
+
+  const results: ScheduleAnomalyRow[] = [];
+
+  for (const scheduleVersionChunk of chunkValues(scheduleVersionIds)) {
+    const placeholders = scheduleVersionChunk.map(() => "?").join(", ");
+    const result = await db
+      .prepare(
+        `SELECT
+          schedule_version_id,
+          code,
+          severity,
+          field_name,
+          raw_fragment,
+          message
+        FROM schedule_parse_anomalies
+        WHERE schedule_version_id IN (${placeholders})
+        ORDER BY id ASC`,
+      )
+      .bind(...scheduleVersionChunk)
+      .all<ScheduleAnomalyRow>();
+
+    results.push(...(result.results ?? []));
+  }
+
+  return results;
+}
+
+export async function loadActiveSchedulesByCenterIds(
+  db: D1Database,
+  centerIds: string[],
+): Promise<Map<string, ActiveScheduleRecord>> {
+  const scheduleRows = await loadActiveScheduleRows(db, centerIds);
+  const scheduleVersionIds = scheduleRows.map((row) => row.schedule_version_id);
+  const [regularRules, holidayClosures, partialOverrides, anomalies] =
+    await Promise.all([
+      loadRegularRules(db, scheduleVersionIds),
+      loadHolidayClosures(db, scheduleVersionIds),
+      loadPartialDayOverrides(db, scheduleVersionIds),
+      loadScheduleAnomalies(db, scheduleVersionIds),
+    ]);
+
+  const scheduleMap = new Map<string, ActiveScheduleRecord>();
+
+  for (const row of scheduleRows) {
+    scheduleMap.set(row.center_id, {
+      schedule_version_id: row.schedule_version_id,
+      raw_schedule_text: row.raw_schedule_text,
+      schedule_confidence: row.parse_confidence,
+      open_air_flag: row.open_air_flag === 1,
+      regular_rules: regularRules.filter(
+        (rule) => rule.schedule_version_id === row.schedule_version_id,
+      ),
+      holiday_closures: holidayClosures.filter(
+        (rule) => rule.schedule_version_id === row.schedule_version_id,
+      ),
+      partial_day_overrides: partialOverrides.filter(
+        (rule) => rule.schedule_version_id === row.schedule_version_id,
+      ),
+      warnings: anomalies.filter(
+        (rule) => rule.schedule_version_id === row.schedule_version_id,
+      ),
+    });
+  }
+
+  return scheduleMap;
+}
+
 export async function listCenters(
   db: D1Database,
-  query: Required<Pick<ListCentersQuery, "limit" | "offset">> &
-    Pick<ListCentersQuery, "kind" | "q">,
-): Promise<{ items: CenterRecord[]; total: number }> {
+  query: Pick<
+    ListCentersQuery,
+    "kind" | "q" | "has_wifi" | "accessible" | "open_air"
+  >,
+): Promise<CenterRecord[]> {
   const where = buildWhereClause(query);
 
-  const listStatement = db
+  const result = await db
     .prepare(
       `SELECT
         id, slug, kind, name, district, neighborhood, address_line, postal_code, municipality,
@@ -97,24 +375,12 @@ export async function listCenters(
         notes_raw, is_active, created_at, updated_at
       FROM centers
       WHERE ${where.clause}
-      ORDER BY name ASC, id ASC
-      LIMIT ? OFFSET ?`,
+      ORDER BY name ASC, id ASC`,
     )
-    .bind(...where.bindings, query.limit, query.offset);
+    .bind(...where.bindings)
+    .all<CenterRow>();
 
-  const totalStatement = db
-    .prepare(`SELECT COUNT(*) AS total FROM centers WHERE ${where.clause}`)
-    .bind(...where.bindings);
-
-  const [listResult, totalResult] = await Promise.all([
-    listStatement.all<CenterRow>(),
-    totalStatement.first<{ total: number }>(),
-  ]);
-
-  return {
-    items: (listResult.results ?? []).map(hydrateCenter),
-    total: totalResult?.total ?? 0,
-  };
+  return (result.results ?? []).map(hydrateCenter);
 }
 
 export async function getCenterBySlug(
@@ -122,52 +388,48 @@ export async function getCenterBySlug(
   slug: string,
 ): Promise<{
   center: CenterRecord;
-  rawScheduleText: string | null;
+  schedule: ActiveScheduleRecord | null;
   sources: CenterSourceSummary[];
 } | null> {
   const detailResult = await db
     .prepare(
       `SELECT
-        c.id, c.slug, c.kind, c.name, c.district, c.neighborhood, c.address_line, c.postal_code,
-        c.municipality, c.phone, c.email, c.website_url, c.raw_lat, c.raw_lon, c.lat, c.lon,
-        c.coord_status, c.coord_resolution_method, c.capacity_value, c.capacity_text, c.wifi_flag,
-        c.sockets_flag, c.accessibility_flag, c.open_air_flag, c.notes_raw, c.is_active,
-        c.created_at, c.updated_at,
-        (
-          SELECT sv.raw_schedule_text
-          FROM schedule_versions sv
-          WHERE sv.center_id = c.id
-          ORDER BY CASE sv.version_status WHEN 'active' THEN 0 ELSE 1 END, sv.created_at DESC, sv.id DESC
-          LIMIT 1
-        ) AS raw_schedule_text
-      FROM centers c
-      WHERE c.slug = ?
+        id, slug, kind, name, district, neighborhood, address_line, postal_code, municipality,
+        phone, email, website_url, raw_lat, raw_lon, lat, lon, coord_status, coord_resolution_method,
+        capacity_value, capacity_text, wifi_flag, sockets_flag, accessibility_flag, open_air_flag,
+        notes_raw, is_active, created_at, updated_at
+      FROM centers
+      WHERE slug = ?
       LIMIT 1`,
     )
     .bind(slug)
-    .first<CenterDetailRow>();
+    .first<CenterRow>();
 
   if (!detailResult) {
     return null;
   }
 
-  const sourcesResult = await db
-    .prepare(
-      `SELECT
-        s.code,
-        s.name,
-        csl.external_id
-      FROM center_source_links csl
-      JOIN sources s ON s.id = csl.source_id
-      WHERE csl.center_id = ?
-      ORDER BY csl.is_primary DESC, s.code ASC`,
-    )
-    .bind(detailResult.id)
-    .all<CenterSourceSummary>();
+  const center = hydrateCenter(detailResult);
+  const [scheduleMap, sourcesResult] = await Promise.all([
+    loadActiveSchedulesByCenterIds(db, [center.id]),
+    db
+      .prepare(
+        `SELECT
+          s.code,
+          s.name,
+          csl.external_id
+        FROM center_source_links csl
+        JOIN sources s ON s.id = csl.source_id
+        WHERE csl.center_id = ?
+        ORDER BY csl.is_primary DESC, s.code ASC`,
+      )
+      .bind(center.id)
+      .all<CenterSourceSummary>(),
+  ]);
 
   return {
-    center: hydrateCenter(detailResult),
-    rawScheduleText: detailResult.raw_schedule_text,
+    center,
+    schedule: scheduleMap.get(center.id) ?? null,
     sources: sourcesResult.results ?? [],
   };
 }

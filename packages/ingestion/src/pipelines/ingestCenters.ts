@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { parseSchedule } from "../../../schedule-engine/src/index";
 import { librariesSource, loadLibraryRows } from "../sources/libraries";
 import { loadStudyRoomRows, studyRoomsSource } from "../sources/studyRooms";
 import { normalizeMadridCenterRecord } from "../normalizers/center";
@@ -116,6 +117,62 @@ function buildRunSql(summary: IngestionRunSummary): string {
   });
 
   const scheduleStatements = summary.records.flatMap(({ center, rawScheduleText }) => {
+    const parsedSchedule = parseSchedule({
+      kind: center.kind,
+      rawScheduleText,
+      openAirFlag: center.open_air_flag,
+    });
+    const scheduleVersionIdSql = `(SELECT id FROM schedule_versions WHERE center_id = ${sqlValue(center.id)} AND source_id = ${sqlValue(summary.sourceCode)} AND run_id = ${sqlValue(summary.id)} ORDER BY id DESC LIMIT 1)`;
+    const regularRuleStatements = parsedSchedule.regular_rules.map((rule) => {
+      return `INSERT INTO regular_rules (
+        schedule_version_id, audience, weekday, opens_at, closes_at, sequence
+      ) VALUES (
+        ${scheduleVersionIdSql},
+        ${sqlValue(rule.audience)},
+        ${sqlValue(rule.weekday)},
+        ${sqlValue(rule.opens_at)},
+        ${sqlValue(rule.closes_at)},
+        ${sqlValue(rule.sequence)}
+      );`;
+    });
+    const holidayClosureStatements = parsedSchedule.holiday_closures.map((closure) => {
+      return `INSERT INTO holiday_closures (
+        schedule_version_id, audience, month, day, label
+      ) VALUES (
+        ${scheduleVersionIdSql},
+        ${sqlValue(closure.audience)},
+        ${sqlValue(closure.month)},
+        ${sqlValue(closure.day)},
+        ${sqlValue(closure.label)}
+      );`;
+    });
+    const partialOverrideStatements = parsedSchedule.partial_day_overrides.map((override) => {
+      return `INSERT INTO partial_day_overrides (
+        schedule_version_id, audience, month, day, opens_at, closes_at, sequence, label
+      ) VALUES (
+        ${scheduleVersionIdSql},
+        ${sqlValue(override.audience)},
+        ${sqlValue(override.month)},
+        ${sqlValue(override.day)},
+        ${sqlValue(override.opens_at)},
+        ${sqlValue(override.closes_at)},
+        ${sqlValue(override.sequence)},
+        ${sqlValue(override.label)}
+      );`;
+    });
+    const anomalyStatements = parsedSchedule.anomalies.map((anomaly) => {
+      return `INSERT INTO schedule_parse_anomalies (
+        schedule_version_id, code, severity, field_name, raw_fragment, message
+      ) VALUES (
+        ${scheduleVersionIdSql},
+        ${sqlValue(anomaly.code)},
+        ${sqlValue(anomaly.severity)},
+        ${sqlValue(anomaly.field_name)},
+        ${sqlValue(anomaly.raw_fragment)},
+        ${sqlValue(anomaly.message)}
+      );`;
+    });
+
     return [
       `UPDATE schedule_versions
       SET version_status = 'superseded'
@@ -131,13 +188,17 @@ function buildRunSql(summary: IngestionRunSummary): string {
         ${sqlValue(summary.id)},
         'active',
         ${sqlValue(rawScheduleText)},
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        ${sqlValue(center.open_air_flag)},
+        ${sqlValue(center.notes_raw)},
+        ${sqlValue(parsedSchedule.normalized_summary)},
+        ${sqlValue(parsedSchedule.parse_confidence)},
+        ${sqlValue(JSON.stringify(parsedSchedule.anomalies))},
+        ${sqlValue(parsedSchedule.open_air_flag)},
         ${sqlValue(summary.finishedAt)}
       );`,
+      ...regularRuleStatements,
+      ...holidayClosureStatements,
+      ...partialOverrideStatements,
+      ...anomalyStatements,
     ];
   });
 

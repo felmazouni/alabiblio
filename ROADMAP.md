@@ -69,8 +69,11 @@
 - [x] Crear seed inicial de `sources`
 - [x] Crear indices basicos para `sources`, `ingestion_runs`, `centers` y `center_source_links`
 - [x] Crear tabla `schedule_versions`
+- [x] Crear tabla `regular_rules`
+- [x] Crear tabla `holiday_closures`
+- [x] Crear tabla `partial_day_overrides`
+- [x] Crear tabla `schedule_parse_anomalies`
 - [ ] Crear tablas `regular_rules`, `seasonal_rules`, `exam_extension_rules`, `holiday_closures` y `partial_day_overrides`
-- [ ] Crear tabla `schedule_parse_anomalies`
 - [ ] Crear tabla `schedule_manual_overrides`
 - [ ] Crear tabla `center_ser_coverage`
 - [ ] Crear tablas `transport_nodes`, `transport_routes` y `center_transport_links`
@@ -83,34 +86,35 @@
 
 ## 4. Normalizacion de horarios
 - [x] Crear extractor de horario raw por fuente
-- [ ] Crear segmentador de bloques de horario por audiencia operativa
-- [ ] Crear clasificador de bloques `sala`, `secretaria`, `centro` y `otros`
-- [ ] Implementar parser de `regular_rules`
+- [x] Crear segmentador de bloques de horario por audiencia operativa
+- [x] Crear clasificador de bloques `sala`, `secretaria`, `centro` y `otros`
+- [x] Implementar parser de `regular_rules`
 - [ ] Implementar parser de `seasonal_rules`
 - [ ] Implementar parser de `exam_extension_rules`
-- [ ] Implementar parser de `holiday_closures`
-- [ ] Implementar parser de `partial_day_overrides`
+- [x] Implementar parser de `holiday_closures`
+- [x] Implementar parser de `partial_day_overrides`
 - [x] Implementar deteccion de `open_air_flag`
 - [ ] Implementar almacenamiento de `notes_raw`
 - [x] Persistir `raw_schedule_text` en `schedule_versions`
-- [ ] Implementar calculo de `parse_confidence`
-- [ ] Implementar generacion de `parse_warnings`
-- [ ] Detectar y registrar horarios partidos
-- [ ] Detectar y registrar cierres puntuales
+- [x] Implementar calculo de `parse_confidence`
+- [x] Implementar generacion de `parse_warnings`
+- [x] Detectar y registrar horarios partidos
+- [x] Detectar y registrar cierres puntuales
 - [ ] Detectar y registrar reglas especificas de julio y agosto
 - [ ] Detectar y registrar ampliaciones de examenes
-- [ ] Detectar y registrar horarios multiples incompatibles
-- [ ] Crear motor `is_open_now`
-- [ ] Crear motor `next_change_at`
-- [ ] Crear motor `today_human_schedule`
-- [ ] Exponer `schedule_confidence` desde la version activa de horario
-- [ ] Derivar `opens_today` en dominio para fecha y timezone de request
-- [ ] Derivar `closes_today` en dominio para fecha y timezone de request
-- [ ] Crear tests unitarios de parser simple
+- [x] Detectar y registrar horarios multiples incompatibles
+- [x] Crear motor `is_open_now`
+- [x] Crear motor `next_change_at`
+- [x] Crear motor `today_human_schedule`
+- [x] Exponer `schedule_confidence` desde la version activa de horario
+- [x] Derivar `opens_today` en dominio para fecha y timezone de request
+- [x] Derivar `closes_today` en dominio para fecha y timezone de request
+- [x] Crear tests unitarios de parser simple
 - [ ] Crear tests unitarios de parser estacional
-- [ ] Crear tests unitarios de cierres y overrides parciales
-- [ ] Crear tests unitarios de casos `al aire libre`
-- [ ] Crear tests unitarios de horarios multiples con audiencia distinta
+- [x] Crear tests unitarios de cierres y overrides parciales
+- [x] Crear tests unitarios de casos `al aire libre`
+- [x] Crear tests unitarios de horarios multiples con audiencia distinta
+- [x] Crear tests unitarios de textos ambiguos con warnings
 - [ ] Bloquear cierre de fase sin suite verde del parser
 
 ## 5. Ingenieria geoespacial
@@ -162,7 +166,7 @@
 - [x] Implementar endpoint de listado de centros
 - [x] Conectar `GET /api/centers` a D1 con datos canonicos persistidos
 - [x] Implementar endpoint de detalle de centro
-- [ ] Implementar endpoint de horario operativo de centro
+- [x] Implementar endpoint de horario operativo de centro
 - [ ] Implementar endpoint de movilidad de centro
 - [ ] Implementar endpoint de eventos de centro
 - [ ] Implementar endpoint de comparador de centros
@@ -170,15 +174,16 @@
 - [ ] Implementar busqueda textual por nombre, barrio, distrito y direccion
 - [ ] Implementar filtros `abierto ahora`, `distancia`, `rating` y servicios
 - [ ] Implementar ordenaciones `distancia`, `mejor llegada` y `mejor valoracion`
-- [ ] Exponer `schedule_confidence` desde horario activo
+- [x] Exponer `schedule_confidence` desde horario activo
 - [ ] Exponer `source_last_updated` desde vinculo fuente-centro
 - [ ] Exponer `contact_summary` derivado desde contacto canonico
-- [ ] Exponer `opens_today`
-- [ ] Exponer `closes_today`
+- [x] Exponer `opens_today`
+- [x] Exponer `closes_today`
 - [ ] Exponer `recommendation_score` como campo contextual por request
 - [ ] Exponer `quick_flags` como campos derivados
 - [ ] Definir `recommendation_score = null` cuando no exista contexto de ubicacion valido
 - [x] Anadir validacion basica de entrada en `GET /api/centers`
+- [x] Implementar filtros `abierto ahora`, `wifi`, `accesible` y `al aire libre`
 - [ ] Anadir cache selectiva en KV para lecturas calientes
 - [ ] Anadir trazabilidad de source y run en respuestas admin
 - [ ] Crear tests de contratos y tests de integracion de endpoints
@@ -197,21 +202,22 @@
 - [ ] Crear ordenacion por mejor valoracion
 - [x] Crear cards de centro con datos reales basicos
 - [x] Crear vista de detalle minima con contacto, coordenadas y horario raw
-- [ ] Mostrar `abierto/cerrado` en bloque superior
+- [x] Mostrar `abierto/cerrado` en cards y bloque superior del detalle
 - [ ] Mostrar `cierra en X` en bloque superior
 - [ ] Mostrar `aforo` en bloque superior
 - [ ] Mostrar `tiempo de llegada` en bloque superior
 - [ ] Mostrar CTA `como llegar` en bloque superior
 - [ ] Mostrar `quick_flags` en cards
-- [ ] Mostrar `schedule_confidence` cuando el dato operativo tenga baja fiabilidad
-- [ ] Crear bloque visible de horario de hoy
-- [ ] Crear bloque visible de aforo, contacto y servicios
+- [x] Mostrar `schedule_confidence` cuando el dato operativo tenga baja fiabilidad
+- [x] Crear bloque visible de horario de hoy
+- [x] Crear bloque visible de aforo, contacto y servicios
 - [ ] Crear bloque visible de movilidad y como llegar
 - [ ] Crear bloque visible de zona SER
 - [ ] Crear bloque visible de eventos
 - [ ] Crear comparador de centros
 - [ ] Crear iconografia clara para metricas de valoracion y servicios
 - [x] Crear estados de carga, vacio y error
+- [x] Mostrar apertura o cierre del dia cuando sea posible en cards y detalle
 - [ ] Ajustar UX movil y desktop con foco en decision inmediata
 
 ## 9. Identidad y valoraciones
@@ -245,8 +251,8 @@
 - [ ] Crear tests de overrides y trazabilidad
 
 ## 11. Tests y rendimiento
-- [ ] Completar suite unitaria del motor de horarios
-- [ ] Completar suite unitaria del dominio de estado operativo
+- [x] Completar suite unitaria minima del motor de horarios
+- [x] Completar suite unitaria minima del dominio de estado operativo
 - [ ] Completar suite unitaria geoespacial
 - [ ] Completar suite de integracion de conectores de datos
 - [ ] Completar suite de integracion de API

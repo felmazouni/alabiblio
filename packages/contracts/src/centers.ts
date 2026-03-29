@@ -2,11 +2,19 @@ export type CenterKind = "study_room" | "library";
 
 export type CenterCoordStatus = "provided" | "missing" | "invalid";
 
+export type ScheduleAudience = "sala" | "centro" | "secretaria" | "otros";
+
+export type ScheduleAnomalySeverity = "info" | "warning" | "error";
+
 export interface ListCentersQuery {
   kind?: CenterKind;
   limit?: number;
   offset?: number;
   q?: string;
+  open_now?: boolean;
+  has_wifi?: boolean;
+  accessible?: boolean;
+  open_air?: boolean;
 }
 
 export interface CenterRecord {
@@ -40,7 +48,49 @@ export interface CenterRecord {
   updated_at: string;
 }
 
-export interface CenterListItem {
+export interface ScheduleRegularRule {
+  audience: ScheduleAudience;
+  weekday: number;
+  opens_at: string;
+  closes_at: string;
+  sequence: number;
+}
+
+export interface ScheduleHolidayClosure {
+  audience: ScheduleAudience;
+  month: number;
+  day: number;
+  label: string;
+}
+
+export interface SchedulePartialDayOverride {
+  audience: ScheduleAudience;
+  month: number;
+  day: number;
+  opens_at: string;
+  closes_at: string;
+  sequence: number;
+  label: string;
+}
+
+export interface ScheduleParseAnomaly {
+  code: string;
+  severity: ScheduleAnomalySeverity;
+  field_name: string | null;
+  raw_fragment: string | null;
+  message: string;
+}
+
+export interface CenterScheduleSummary {
+  is_open_now: boolean | null;
+  next_change_at: string | null;
+  today_human_schedule: string | null;
+  schedule_confidence: number | null;
+  opens_today: string | null;
+  closes_today: string | null;
+}
+
+export interface CenterListItem extends CenterScheduleSummary {
   id: string;
   slug: string;
   kind: CenterKind;
@@ -75,6 +125,14 @@ export interface CenterSourceSummary {
   external_id: string;
 }
 
+export interface CenterSchedulePayload extends CenterScheduleSummary {
+  raw_schedule_text: string | null;
+  regular_rules: ScheduleRegularRule[];
+  holiday_closures: ScheduleHolidayClosure[];
+  partial_day_overrides: SchedulePartialDayOverride[];
+  warnings: ScheduleParseAnomaly[];
+}
+
 export interface CenterDetailItem {
   id: string;
   slug: string;
@@ -98,11 +156,15 @@ export interface CenterDetailItem {
   sockets_flag: boolean;
   accessibility_flag: boolean;
   open_air_flag: boolean;
-  raw_schedule_text: string | null;
   notes_raw: string | null;
   sources: CenterSourceSummary[];
+  schedule: CenterSchedulePayload;
 }
 
 export interface GetCenterDetailResponse {
   item: CenterDetailItem;
+}
+
+export interface GetCenterScheduleResponse {
+  item: CenterSchedulePayload;
 }

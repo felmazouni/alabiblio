@@ -152,6 +152,15 @@
   letter-spacing: -0.03em;
 }
 
+.center-card__header-top,
+.detail-panel__status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .center-card__kind,
 .detail-panel__kind {
   display: inline-flex;
@@ -170,6 +179,51 @@
 .center-card__meta {
   margin: 0;
   color: rgba(228, 235, 245, 0.68);
+}
+
+.center-card__schedule,
+.center-card__helper {
+  margin: 0;
+}
+
+.center-card__schedule {
+  color: rgba(245, 247, 251, 0.96);
+  font-weight: 700;
+}
+
+.center-card__helper {
+  color: rgba(156, 198, 255, 0.82);
+  font-size: 0.92rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.status-pill--open {
+  border-color: rgba(101, 224, 162, 0.28);
+  background: rgba(101, 224, 162, 0.14);
+  color: #b7ffd8;
+}
+
+.status-pill--closed {
+  border-color: rgba(255, 149, 91, 0.28);
+  background: rgba(255, 149, 91, 0.14);
+  color: #ffd8bc;
+}
+
+.status-pill--warning {
+  border-color: rgba(255, 212, 102, 0.28);
+  background: rgba(255, 212, 102, 0.14);
+  color: #ffe8a8;
 }
 
 .center-card__details {
@@ -251,6 +305,33 @@
   color: rgba(228, 235, 245, 0.72);
 }
 
+.detail-panel__hero {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 20px 0;
+}
+
+.detail-panel__hero > div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.detail-panel__hero h3,
+.detail-panel__warnings strong,
+.detail-panel__fallback {
+  margin: 0;
+}
+
+.detail-panel__hero p {
+  margin: 0;
+  color: rgba(245, 247, 251, 0.92);
+  font-weight: 700;
+}
+
 .detail-panel__close,
 .load-more__button {
   min-height: 44px;
@@ -307,6 +388,27 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.detail-panel__warnings {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.detail-panel__warnings li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 212, 102, 0.18);
+  background: rgba(255, 212, 102, 0.08);
+}
+
+.detail-panel__fallback {
+  color: rgba(228, 235, 245, 0.72);
+}
+
 .detail-panel__sources span {
   color: rgba(228, 235, 245, 0.68);
   font-size: 0.9rem;
@@ -336,6 +438,10 @@
 
   .center-card__details,
   .detail-panel__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-panel__hero {
     grid-template-columns: 1fr;
   }
 

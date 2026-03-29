@@ -1,4 +1,7 @@
-import type { CenterDetailItem } from "@alabiblio/contracts/centers";
+import type {
+  CenterDetailItem,
+  ScheduleRegularRule,
+} from "@alabiblio/contracts/centers";
 
 type CenterDetailPanelProps = {
   center: CenterDetailItem | null;
@@ -13,6 +16,75 @@ function renderValue(value: string | number | null): string {
   }
 
   return String(value);
+}
+
+function weekdayLabel(weekday: number): string {
+  const labels = [
+    "Domingo",
+    "Lunes",
+    "Martes",
+    "Miercoles",
+    "Jueves",
+    "Viernes",
+    "Sabado",
+  ];
+
+  return labels[weekday] ?? "Dia";
+}
+
+function groupRegularRules(rules: ScheduleRegularRule[]): Array<{
+  weekday: number;
+  text: string;
+}> {
+  return [...new Set(rules.map((rule) => rule.weekday))]
+    .sort((left, right) => left - right)
+    .map((weekday) => {
+      const groupedRules = rules
+        .filter((rule) => rule.weekday === weekday)
+        .sort((left, right) => left.sequence - right.sequence);
+
+      return {
+        weekday,
+        text: groupedRules
+          .map((rule) => `${rule.opens_at}-${rule.closes_at}`)
+          .join(" | "),
+      };
+    });
+}
+
+function getDetailStatus(center: CenterDetailItem): {
+  label: string;
+  className: string;
+  helper: string | null;
+} {
+  if (
+    center.schedule.schedule_confidence !== null &&
+    center.schedule.schedule_confidence < 0.4
+  ) {
+    return {
+      label: "Horario no fiable",
+      className: "status-pill status-pill--warning",
+      helper: center.schedule.today_human_schedule,
+    };
+  }
+
+  if (center.schedule.is_open_now) {
+    return {
+      label: "Abierto ahora",
+      className: "status-pill status-pill--open",
+      helper: center.schedule.closes_today
+        ? `Cierra a las ${center.schedule.closes_today}`
+        : center.schedule.today_human_schedule,
+    };
+  }
+
+  return {
+    label: "Cerrado",
+    className: "status-pill status-pill--closed",
+    helper: center.schedule.opens_today
+      ? `Abre a las ${center.schedule.opens_today}`
+      : center.schedule.today_human_schedule,
+  };
 }
 
 export function CenterDetailPanel({
@@ -43,19 +115,25 @@ export function CenterDetailPanel({
     return (
       <aside className="detail-panel detail-panel--state">
         <strong>Selecciona un centro</strong>
-        <p>Abre una card para ver contacto, coordenadas y horario raw.</p>
+        <p>Abre una card para ver estado operativo, horario y contacto.</p>
       </aside>
     );
   }
+
+  const status = getDetailStatus(center);
+  const groupedRules = groupRegularRules(center.schedule.regular_rules);
 
   return (
     <aside className="detail-panel">
       <div className="detail-panel__top">
         <div>
-          <span className="detail-panel__kind">{center.kind_label}</span>
+          <div className="detail-panel__status-row">
+            <span className="detail-panel__kind">{center.kind_label}</span>
+            <span className={status.className}>{status.label}</span>
+          </div>
           <h2>{center.name}</h2>
           <p>
-            {[center.district, center.neighborhood].filter(Boolean).join(" · ") ||
+            {[center.district, center.neighborhood].filter(Boolean).join(" | ") ||
               "Sin distrito o barrio"}
           </p>
         </div>
@@ -64,18 +142,29 @@ export function CenterDetailPanel({
         </button>
       </div>
 
+      <section className="detail-panel__hero">
+        <div>
+          <h3>Horario de hoy</h3>
+          <p>{center.schedule.today_human_schedule ?? "Sin horario estructurado"}</p>
+        </div>
+        <div>
+          <h3>Proximo cambio</h3>
+          <p>{status.helper ?? "Sin dato fiable"}</p>
+        </div>
+        <div>
+          <h3>Confianza</h3>
+          <p>
+            {center.schedule.schedule_confidence !== null
+              ? `${Math.round(center.schedule.schedule_confidence * 100)}%`
+              : "Sin dato"}
+          </p>
+        </div>
+      </section>
+
       <dl className="detail-panel__grid">
         <div>
           <dt>Direccion</dt>
           <dd>{renderValue(center.address_line)}</dd>
-        </div>
-        <div>
-          <dt>Codigo postal</dt>
-          <dd>{renderValue(center.postal_code)}</dd>
-        </div>
-        <div>
-          <dt>Municipio</dt>
-          <dd>{center.municipality}</dd>
         </div>
         <div>
           <dt>Telefono</dt>
@@ -102,20 +191,12 @@ export function CenterDetailPanel({
           <dd>{renderValue(center.capacity_text)}</dd>
         </div>
         <div>
-          <dt>Valor numerico</dt>
-          <dd>{renderValue(center.capacity_value)}</dd>
-        </div>
-        <div>
           <dt>Coordenadas</dt>
           <dd>
             {center.lat !== null && center.lon !== null
               ? `${center.lat}, ${center.lon}`
               : "Sin coordenadas validas"}
           </dd>
-        </div>
-        <div>
-          <dt>coord_status</dt>
-          <dd>{center.coord_status}</dd>
         </div>
       </dl>
 
@@ -127,8 +208,44 @@ export function CenterDetailPanel({
       </div>
 
       <section className="detail-panel__section">
+        <h3>Horario estructurado</h3>
+        {groupedRules.length > 0 ? (
+          <ul className="detail-panel__sources">
+            {groupedRules.map((item) => (
+              <li key={item.weekday}>
+                <strong>{weekdayLabel(item.weekday)}</strong>
+                <span>{item.text}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="detail-panel__fallback">
+            Todavia no hay reglas estructuradas fiables.
+          </p>
+        )}
+      </section>
+
+      <section className="detail-panel__section">
+        <h3>Avisos y anomalias</h3>
+        {center.schedule.warnings.length > 0 ? (
+          <ul className="detail-panel__warnings">
+            {center.schedule.warnings.map((warning, index) => (
+              <li key={`${warning.code}-${index}`}>
+                <strong>{warning.code}</strong>
+                <span>{warning.message}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="detail-panel__fallback">
+            Sin avisos de parseo en la version activa.
+          </p>
+        )}
+      </section>
+
+      <section className="detail-panel__section">
         <h3>Horario raw</h3>
-        <pre>{center.raw_schedule_text ?? "Sin horario raw"}</pre>
+        <pre>{center.schedule.raw_schedule_text ?? "Sin horario raw"}</pre>
       </section>
 
       <section className="detail-panel__section">
