@@ -73,7 +73,7 @@
 - [x] Crear tabla `holiday_closures`
 - [x] Crear tabla `partial_day_overrides`
 - [x] Crear tabla `schedule_parse_anomalies`
-- [ ] Crear tablas `regular_rules`, `seasonal_rules`, `exam_extension_rules`, `holiday_closures` y `partial_day_overrides`
+- [ ] Crear tablas `seasonal_rules` y `exam_extension_rules`
 - [ ] Crear tabla `schedule_manual_overrides`
 - [ ] Crear tabla `center_ser_coverage`
 - [ ] Crear tablas `transport_nodes`, `transport_routes` y `center_transport_links`
@@ -94,14 +94,14 @@
 - [x] Implementar parser de `holiday_closures`
 - [x] Implementar parser de `partial_day_overrides`
 - [x] Implementar deteccion de `open_air_flag`
-- [ ] Implementar almacenamiento de `notes_raw`
+- [x] Implementar almacenamiento de `notes_raw`
 - [x] Persistir `raw_schedule_text` en `schedule_versions`
 - [x] Implementar calculo de `parse_confidence`
 - [x] Implementar generacion de `parse_warnings`
 - [x] Detectar y registrar horarios partidos
 - [x] Detectar y registrar cierres puntuales
-- [ ] Detectar y registrar reglas especificas de julio y agosto
-- [ ] Detectar y registrar ampliaciones de examenes
+- [x] Detectar y registrar reglas especificas de julio y agosto
+- [x] Detectar y registrar ampliaciones de examenes
 - [x] Detectar y registrar horarios multiples incompatibles
 - [x] Crear motor `is_open_now`
 - [x] Crear motor `next_change_at`
@@ -175,10 +175,12 @@
 - [ ] Implementar filtros `abierto ahora`, `distancia`, `rating` y servicios
 - [ ] Implementar ordenaciones `distancia`, `mejor llegada` y `mejor valoracion`
 - [x] Exponer `schedule_confidence` desde horario activo
-- [ ] Exponer `source_last_updated` desde vinculo fuente-centro
-- [ ] Exponer `contact_summary` derivado desde contacto canonico
+- [x] Exponer `source_last_updated` desde vinculo fuente-centro
+- [x] Exponer `contact_summary` derivado desde contacto canonico
 - [x] Exponer `opens_today`
 - [x] Exponer `closes_today`
+- [x] Exponer `schedule_confidence_label` derivado en dominio y API
+- [x] Exponer `data_freshness` derivado para UI
 - [ ] Exponer `recommendation_score` como campo contextual por request
 - [ ] Exponer `quick_flags` como campos derivados
 - [ ] Definir `recommendation_score = null` cuando no exista contexto de ubicacion valido
@@ -211,6 +213,9 @@
 - [x] Mostrar `schedule_confidence` cuando el dato operativo tenga baja fiabilidad
 - [x] Crear bloque visible de horario de hoy
 - [x] Crear bloque visible de aforo, contacto y servicios
+- [x] Priorizar estado operativo, horario y contacto en el bloque superior del detalle
+- [x] Mover datos tecnicos secundarios a bloques inferiores del detalle
+- [x] Mejorar legibilidad visual de avisos y anomalias
 - [ ] Crear bloque visible de movilidad y como llegar
 - [ ] Crear bloque visible de zona SER
 - [ ] Crear bloque visible de eventos
@@ -219,6 +224,7 @@
 - [x] Crear estados de carga, vacio y error
 - [x] Mostrar apertura o cierre del dia cuando sea posible en cards y detalle
 - [ ] Ajustar UX movil y desktop con foco en decision inmediata
+- [x] Mejorar layout movil del explorador y del panel de detalle
 
 ## 9. Identidad y valoraciones
 - [ ] Implementar login con Google Identity
@@ -257,18 +263,18 @@
 - [ ] Completar suite de integracion de conectores de datos
 - [ ] Completar suite de integracion de API
 - [ ] Completar suite E2E de listado, detalle, login y valoracion
-- [ ] Definir TTL por endpoint publico
+- [x] Definir TTL por endpoint publico
 - [ ] Definir TTL por endpoint admin
 - [ ] Definir estrategia de cache key por bucket geografico de lat/lon
-- [ ] Definir invalidacion tras `ingestion_run` completado
+- [x] Definir invalidacion tras `ingestion_run` completado
 - [ ] Medir TTFB, payload y latencia de filtros
 - [ ] Reducir payload de listado y detalle
 - [ ] Optimizar cache de queries calientes
 - [ ] Optimizar refresco de snapshots externos
 - [ ] Validar accesibilidad basica de filtros, mapa y formularios
 - [ ] Validar comportamiento movil en escenarios reales
-- [ ] Anadir smoke test de despliegue `staging`
-- [ ] Anadir smoke test de despliegue `production`
+- [x] Anadir smoke test de despliegue `staging`
+- [x] Anadir smoke test de despliegue `production`
 - [ ] Bloquear cierre de fase sin budgets de rendimiento cumplidos
 
 ## 12. Despliegue y entrega
@@ -283,7 +289,7 @@
 - [ ] Configurar cron jobs de refresco
 - [ ] Publicar basemap libre en Cloudflare
 - [ ] Ejecutar seed inicial de datos validados
-- [ ] Ejecutar smoke tests en `staging`
-- [ ] Ejecutar smoke tests en `production`
+- [x] Ejecutar smoke tests en `staging`
+- [x] Ejecutar smoke tests en `production`
 - [ ] Marcar checks reales del roadmap segun avance
 - [ ] Preparar build final y assets de entrega del proyecto

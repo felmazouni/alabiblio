@@ -1,6 +1,8 @@
 import type {
   CenterKind,
   ScheduleAudience,
+  ScheduleAnomalyCode,
+  ScheduleAnomalySeverity,
   ScheduleHolidayClosure,
   ScheduleParseAnomaly,
   SchedulePartialDayOverride,
@@ -57,8 +59,8 @@ function normalizeSearch(value: string): string {
 }
 
 function createAnomaly(
-  code: string,
-  severity: "info" | "warning" | "error",
+  code: ScheduleAnomalyCode,
+  severity: ScheduleAnomalySeverity,
   message: string,
   rawFragment: string | null,
   fieldName: string | null = "raw_schedule_text",
@@ -87,7 +89,21 @@ function classifyBlockAudience(
     return "secretaria";
   }
 
-  if (haystack.includes("horario especial")) {
+  if (
+    haystack.includes("sala de estudio") ||
+    haystack.includes("sala de lectura") ||
+    haystack.includes("lectura y estudio") ||
+    haystack.includes("espacio de lectura")
+  ) {
+    return "sala";
+  }
+
+  if (
+    haystack.includes("horario especial") ||
+    haystack.includes("horario de verano") ||
+    haystack.includes("horario especial examenes") ||
+    haystack.includes("horario especial de examenes")
+  ) {
     return "otros";
   }
 
@@ -109,7 +125,7 @@ export function segmentScheduleBlocks(
   }
 
   const headingRegex =
-    /(Horario(?:\s+de\s+funcionamiento)?(?:\s+del\s+centro)?|Horario\s+del\s+centro|Horario\s+de\s+secretar(?:ia|ía)|Horario\s+especial(?:\s+examenes|\s+exámenes)?)\s*:/gi;
+    /(Horario(?:\s+de\s+funcionamiento)?(?:\s+del\s+centro)?|Horario\s+del\s+centro|Horario\s+de\s+secretar(?:ia|ía)|Horario\s+de\s+verano|Horario\s+especial(?:\s+de)?(?:\s+examenes|\s+exámenes)?)\s*:/gi;
   const blocks: ScheduleBlock[] = [];
   const matches = [...text.matchAll(headingRegex)];
 
@@ -123,6 +139,8 @@ export function segmentScheduleBlocks(
     ];
   }
 
+  const leadingText = normalizeWhitespace(text.slice(0, matches[0]?.index ?? 0));
+
   for (let index = 0; index < matches.length; index += 1) {
     const match = matches[index];
 
@@ -133,7 +151,11 @@ export function segmentScheduleBlocks(
     const start = match.index ?? 0;
     const bodyStart = start + match[0].length;
     const nextStart = matches[index + 1]?.index ?? text.length;
-    const body = normalizeWhitespace(text.slice(bodyStart, nextStart));
+    const body = normalizeWhitespace(
+      index === 0 && leadingText !== ""
+        ? `${leadingText}. ${text.slice(bodyStart, nextStart)}`
+        : text.slice(bodyStart, nextStart),
+    );
     const label = normalizeWhitespace(match[1] ?? match[0]);
 
     if (body === "") {
@@ -165,7 +187,11 @@ function normalizeTime(raw: string): string {
 }
 
 function extractTimeRanges(clause: string): Array<{ opens_at: string; closes_at: string }> {
-  const ranges = [...clause.matchAll(/(\d{1,2}(?::\d{2})?)\s*(?:h(?:oras?)?(?:\s*a\.m\.)?)?\s*a\s*(\d{1,2}(?::\d{2})?)/gi)];
+  const ranges = [
+    ...clause.matchAll(
+      /(\d{1,2}(?::\d{2})?)\s*(?:h(?:oras?)?(?:\s*a\.m\.)?)?\s*a\s*(\d{1,2}(?::\d{2})?)/gi,
+    ),
+  ];
 
   return ranges.flatMap((match) => {
     const opensAt = match[1];
@@ -189,11 +215,23 @@ function expandDayRange(start: number, end: number): number[] {
     return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   }
 
-  return [...Array.from({ length: 7 - start }, (_, index) => start + index), ...Array.from({ length: end + 1 }, (_, index) => index)];
+  return [
+    ...Array.from({ length: 7 - start }, (_, index) => start + index),
+    ...Array.from({ length: end + 1 }, (_, index) => index),
+  ];
 }
 
 function extractWeekdays(clause: string): number[] {
   const search = normalizeSearch(clause);
+
+  if (search.includes("todos los dias")) {
+    return [0, 1, 2, 3, 4, 5, 6];
+  }
+
+  if (search.includes("fines de semana")) {
+    return [0, 6];
+  }
+
   const rangeMatch = search.match(
     /(?:de\s+)?(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\s+a\s+(lunes|martes|miercoles|jueves|viernes|sabado|domingo)/i,
   );
@@ -205,9 +243,9 @@ function extractWeekdays(clause: string): number[] {
     );
   }
 
-  const matches = [...search.matchAll(/\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo)s?\b/g)].map(
-    (match) => DAY_TO_INDEX[match[1] as keyof typeof DAY_TO_INDEX],
-  );
+  const matches = [
+    ...search.matchAll(/\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo)s?\b/g),
+  ].map((match) => DAY_TO_INDEX[match[1] as keyof typeof DAY_TO_INDEX]);
 
   return [...new Set(matches)];
 }
@@ -243,31 +281,66 @@ function parseMonthDayPairs(clause: string): Array<{ month: number; day: number 
   return results;
 }
 
+function isSeasonalClause(clause: string): boolean {
+  const search = normalizeSearch(clause);
+  return (
+    search.includes("julio") ||
+    search.includes("agosto") ||
+    search.includes("verano") ||
+    search.includes("del 15 de junio") ||
+    search.includes("de junio al") ||
+    search.includes("de septiembre")
+  );
+}
+
+function isExamClause(clause: string): boolean {
+  return normalizeSearch(clause).includes("examen");
+}
+
 function buildRegularRules(
   block: ScheduleBlock,
   anomalies: ScheduleParseAnomaly[],
 ): ScheduleRegularRule[] {
   const rules: ScheduleRegularRule[] = [];
+  let carriedWeekdays: number[] = [];
   const clauses = extractClauses(block.text);
+  const hasSeasonalOrExamClauses = clauses.some(
+    (clause) => isSeasonalClause(clause) || isExamClause(clause),
+  );
 
   for (const clause of clauses) {
     const search = normalizeSearch(clause);
-
-    if (Object.keys(MONTH_TO_INDEX).some((month) => search.includes(month))) {
-      continue;
-    }
-
-    if (!search.match(/\d{1,2}(?::\d{2})?\s*a\s*\d{1,2}(?::\d{2})?/)) {
-      continue;
-    }
-
-    const weekdays = extractWeekdays(clause);
-    if (weekdays.length === 0) {
-      continue;
-    }
-
+    const explicitWeekdays = extractWeekdays(clause);
     const ranges = extractTimeRanges(clause);
+
+    if (isSeasonalClause(clause) || isExamClause(clause)) {
+      if (explicitWeekdays.length > 0) {
+        carriedWeekdays = explicitWeekdays;
+      }
+      continue;
+    }
+
+    if (explicitWeekdays.length > 0 && ranges.length === 0) {
+      carriedWeekdays = explicitWeekdays;
+      continue;
+    }
+
+    if (
+      Object.keys(MONTH_TO_INDEX).some((month) => search.includes(month)) &&
+      !search.includes("lunes a domingo") &&
+      !search.includes("lunes a sabado") &&
+      !search.includes("lunes a viernes")
+    ) {
+      continue;
+    }
+
     if (ranges.length === 0) {
+      continue;
+    }
+
+    const weekdays = explicitWeekdays.length > 0 ? explicitWeekdays : carriedWeekdays;
+
+    if (weekdays.length === 0) {
       continue;
     }
 
@@ -282,6 +355,10 @@ function buildRegularRules(
       );
     }
 
+    if (explicitWeekdays.length > 0) {
+      carriedWeekdays = explicitWeekdays;
+    }
+
     for (const weekday of weekdays) {
       ranges.forEach((range, index) => {
         rules.push({
@@ -292,6 +369,63 @@ function buildRegularRules(
           sequence: index + 1,
         });
       });
+    }
+  }
+
+  if (rules.length === 0 && !hasSeasonalOrExamClauses) {
+    const search = normalizeSearch(block.text);
+    const weekdayRange = search.match(
+      /(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\s+a\s+(lunes|martes|miercoles|jueves|viernes|sabado|domingo)/,
+    );
+    const timeRanges = [...search.matchAll(/(\d{1,2}(?::\d{2})?)\s*a\s*(\d{1,2}(?::\d{2})?)/g)];
+
+    if (weekdayRange?.[1] && weekdayRange[2] && timeRanges.length > 0) {
+      const weekdays = expandDayRange(
+        DAY_TO_INDEX[weekdayRange[1] as keyof typeof DAY_TO_INDEX],
+        DAY_TO_INDEX[weekdayRange[2] as keyof typeof DAY_TO_INDEX],
+      );
+
+      for (const weekday of weekdays) {
+        timeRanges.forEach((range, index) => {
+          rules.push({
+            audience: block.audience,
+            weekday,
+            opens_at: normalizeTime(range[1] ?? "00"),
+            closes_at: normalizeTime(range[2] ?? "00"),
+            sequence: index + 1,
+          });
+        });
+      }
+    }
+  }
+
+  if (rules.length === 0 && !hasSeasonalOrExamClauses) {
+    const blockWeekdays = extractWeekdays(block.text);
+    const blockRanges = extractTimeRanges(block.text);
+
+    if (blockWeekdays.length > 0 && blockRanges.length > 0) {
+      if (blockRanges.length > 1) {
+        anomalies.push(
+          createAnomaly(
+            "split_schedule_detected",
+            "info",
+            "Se detecto un horario partido.",
+            block.text,
+          ),
+        );
+      }
+
+      for (const weekday of blockWeekdays) {
+        blockRanges.forEach((range, index) => {
+          rules.push({
+            audience: block.audience,
+            weekday,
+            opens_at: range.opens_at,
+            closes_at: range.closes_at,
+            sequence: index + 1,
+          });
+        });
+      }
     }
   }
 
@@ -316,9 +450,9 @@ function buildHolidayClosures(
       if (search.includes("festiv")) {
         anomalies.push(
           createAnomaly(
-            "unspecified_holiday_reference",
+            "holiday_without_explicit_dates",
             "warning",
-            "Se mencionan festivos sin fechas explicitas.",
+            "Se mencionan festivos o cierres sin fechas explicitas.",
             clause,
           ),
         );
@@ -393,6 +527,37 @@ function buildPartialDayOverrides(
   return overrides;
 }
 
+function pushClauseWarnings(
+  clauses: string[],
+  anomalies: ScheduleParseAnomaly[],
+): void {
+  for (const clause of clauses) {
+    if (isSeasonalClause(clause)) {
+      anomalies.push(
+        createAnomaly(
+          normalizeSearch(clause).includes("julio") || normalizeSearch(clause).includes("agosto")
+            ? "seasonal_july_august_detected"
+            : "seasonal_rules_detected",
+          "warning",
+          "Se detecta una regla estacional parcial que aun no se estructura formalmente.",
+          clause,
+        ),
+      );
+    }
+
+    if (isExamClause(clause)) {
+      anomalies.push(
+        createAnomaly(
+          "exam_extension_detected",
+          "warning",
+          "Se detecta una ampliacion o regla de examenes aun no estructurada formalmente.",
+          clause,
+        ),
+      );
+    }
+  }
+}
+
 function buildAnomalies(
   context: ParsedScheduleContext,
   blocks: ScheduleBlock[],
@@ -400,9 +565,10 @@ function buildAnomalies(
   existing: ScheduleParseAnomaly[],
 ): ScheduleParseAnomaly[] {
   const anomalies = [...existing];
-  const text = normalizeSearch(context.rawScheduleText ?? "");
+  const rawText = context.rawScheduleText ?? "";
+  const text = normalizeSearch(rawText);
 
-  if ((context.rawScheduleText ?? "").trim() === "") {
+  if (rawText.trim() === "") {
     anomalies.push(
       createAnomaly(
         "schedule_missing",
@@ -420,7 +586,7 @@ function buildAnomalies(
         "open_air_without_explicit_schedule",
         "warning",
         "Centro al aire libre sin rango horario estructurado.",
-        context.rawScheduleText,
+        rawText,
       ),
     );
   }
@@ -431,37 +597,20 @@ function buildAnomalies(
         "schedule_requires_manual_contact",
         "error",
         "El horario remite a consulta telefonica y no puede estructurarse con fiabilidad.",
-        context.rawScheduleText,
+        rawText,
       ),
     );
   }
 
-  if (text.includes("julio") || text.includes("agosto")) {
-    anomalies.push(
-      createAnomaly(
-        "seasonal_rules_unparsed",
-        "warning",
-        "Se detectan reglas estacionales no estructuradas todavia.",
-        context.rawScheduleText,
-      ),
-    );
-  }
-
-  if (text.includes("examen")) {
-    anomalies.push(
-      createAnomaly(
-        "exam_extension_unparsed",
-        "warning",
-        "Se detecta ampliacion por examenes aun no estructurada.",
-        context.rawScheduleText,
-      ),
-    );
-  }
+  pushClauseWarnings(
+    blocks.flatMap((block) => extractClauses(block.text)),
+    anomalies,
+  );
 
   const primaryAudiences = new Set(
-    blocks
-      .filter((block) => block.audience === "sala" || block.audience === "centro")
-      .map((block) => block.audience),
+    regularRules
+      .filter((rule) => rule.audience === "sala" || rule.audience === "centro")
+      .map((rule) => rule.audience),
   );
 
   if (primaryAudiences.size > 1) {
@@ -470,7 +619,7 @@ function buildAnomalies(
         "multiple_primary_audiences",
         "warning",
         "Se detectan bloques multiples de horario potencialmente incompatibles.",
-        context.rawScheduleText,
+        rawText,
       ),
     );
   }
@@ -481,7 +630,7 @@ function buildAnomalies(
         "regular_rules_not_parsed",
         "error",
         "No se han podido extraer reglas regulares fiables.",
-        context.rawScheduleText,
+        rawText,
       ),
     );
   }
@@ -489,7 +638,10 @@ function buildAnomalies(
   return anomalies;
 }
 
-function computeConfidence(anomalies: ScheduleParseAnomaly[], regularRulesCount: number): number | null {
+function computeConfidence(
+  anomalies: ScheduleParseAnomaly[],
+  regularRulesCount: number,
+): number | null {
   if (anomalies.some((item) => item.code === "schedule_missing")) {
     return null;
   }
@@ -497,12 +649,23 @@ function computeConfidence(anomalies: ScheduleParseAnomaly[], regularRulesCount:
   let confidence = regularRulesCount > 0 ? 0.92 : 0.25;
 
   for (const anomaly of anomalies) {
-    if (anomaly.severity === "error") {
-      confidence -= 0.35;
-    } else if (anomaly.severity === "warning") {
-      confidence -= 0.14;
-    } else {
-      confidence -= 0.04;
+    switch (anomaly.code) {
+      case "seasonal_rules_detected":
+      case "seasonal_july_august_detected":
+      case "exam_extension_detected":
+        confidence -= 0.1;
+        break;
+      case "split_schedule_detected":
+        confidence -= 0.03;
+        break;
+      default:
+        if (anomaly.severity === "error") {
+          confidence -= 0.35;
+        } else if (anomaly.severity === "warning") {
+          confidence -= 0.14;
+        } else {
+          confidence -= 0.04;
+        }
     }
   }
 
@@ -520,11 +683,16 @@ function computeConfidence(anomalies: ScheduleParseAnomaly[], regularRulesCount:
 export function parseSchedule(context: ParsedScheduleContext): ParsedSchedule {
   const blocks = segmentScheduleBlocks(context.rawScheduleText, context.kind);
   const openAirFlag =
-    context.openAirFlag || normalizeSearch(context.rawScheduleText ?? "").includes("al aire libre");
+    context.openAirFlag ||
+    normalizeSearch(context.rawScheduleText ?? "").includes("al aire libre");
   const anomalies: ScheduleParseAnomaly[] = [];
   const regularRules = blocks.flatMap((block) => buildRegularRules(block, anomalies));
-  const holidayClosures = blocks.flatMap((block) => buildHolidayClosures(block, anomalies));
-  const partialDayOverrides = blocks.flatMap((block) => buildPartialDayOverrides(block, anomalies));
+  const holidayClosures = blocks.flatMap((block) =>
+    buildHolidayClosures(block, anomalies),
+  );
+  const partialDayOverrides = blocks.flatMap((block) =>
+    buildPartialDayOverrides(block, anomalies),
+  );
   const finalAnomalies = buildAnomalies(context, blocks, regularRules, anomalies);
 
   return {
@@ -537,6 +705,12 @@ export function parseSchedule(context: ParsedScheduleContext): ParsedSchedule {
     normalized_summary: JSON.stringify({
       block_count: blocks.length,
       audiences: [...new Set(blocks.map((block) => block.audience))],
+      seasonal_clause_count: blocks.flatMap((block) =>
+        extractClauses(block.text).filter(isSeasonalClause),
+      ).length,
+      exam_clause_count: blocks.flatMap((block) =>
+        extractClauses(block.text).filter(isExamClause),
+      ).length,
     }),
   };
 }

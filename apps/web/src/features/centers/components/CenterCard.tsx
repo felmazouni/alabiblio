@@ -10,12 +10,23 @@ function renderBadge(label: string) {
   return <span className="center-card__badge">{label}</span>;
 }
 
+function getConfidenceText(center: CenterListItem): string | null {
+  switch (center.schedule_confidence_label) {
+    case "high":
+      return null;
+    case "medium":
+      return "Horario con alguna excepcion pendiente";
+    case "low":
+      return "Horario no fiable";
+  }
+}
+
 function getStatusTone(center: CenterListItem): {
   label: string;
   className: string;
   helper: string | null;
 } {
-  if (center.schedule_confidence !== null && center.schedule_confidence < 0.4) {
+  if (center.schedule_confidence_label === "low") {
     return {
       label: "Horario no fiable",
       className: "status-pill status-pill--warning",
@@ -51,6 +62,7 @@ export function CenterCard({
     .filter((value): value is string => Boolean(value))
     .join(" | ");
   const status = getStatusTone(center);
+  const confidenceText = getConfidenceText(center);
 
   return (
     <button
@@ -69,6 +81,9 @@ export function CenterCard({
           {center.today_human_schedule ?? "Horario de hoy sin estructurar"}
         </p>
         {status.helper ? <p className="center-card__helper">{status.helper}</p> : null}
+        {confidenceText ? (
+          <p className="center-card__confidence">{confidenceText}</p>
+        ) : null}
       </div>
 
       <dl className="center-card__details">
@@ -77,16 +92,16 @@ export function CenterCard({
           <dd>{center.address_line ?? "Direccion pendiente"}</dd>
         </div>
         <div>
-          <dt>Telefono</dt>
-          <dd>{center.phone ?? "Sin telefono"}</dd>
-        </div>
-        <div>
-          <dt>Email</dt>
-          <dd>{center.email ?? "Sin email"}</dd>
+          <dt>Contacto</dt>
+          <dd>{center.contact_summary ?? "Sin contacto visible"}</dd>
         </div>
         <div>
           <dt>Capacidad</dt>
           <dd>{center.capacity_text ?? "Sin dato de aforo"}</dd>
+        </div>
+        <div>
+          <dt>Actualizado</dt>
+          <dd>{center.data_freshness ?? "Sin fecha"}</dd>
         </div>
       </dl>
 

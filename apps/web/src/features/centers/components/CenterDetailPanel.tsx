@@ -52,15 +52,46 @@ function groupRegularRules(rules: ScheduleRegularRule[]): Array<{
     });
 }
 
+function getWarningLabel(code: string): string {
+  switch (code) {
+    case "seasonal_july_august_detected":
+      return "Julio y agosto";
+    case "seasonal_rules_detected":
+      return "Horario estacional";
+    case "exam_extension_detected":
+      return "Ampliacion por examenes";
+    case "schedule_requires_manual_contact":
+      return "Confirmacion manual";
+    case "multiple_primary_audiences":
+      return "Horarios multiples";
+    case "split_schedule_detected":
+      return "Horario partido";
+    case "holiday_without_explicit_dates":
+      return "Festivos ambiguos";
+    case "regular_rules_not_parsed":
+      return "Estructura insuficiente";
+    default:
+      return code;
+  }
+}
+
+function getConfidenceLabel(center: CenterDetailItem): string {
+  switch (center.schedule.schedule_confidence_label) {
+    case "high":
+      return "Alta";
+    case "medium":
+      return "Media";
+    case "low":
+      return "Baja";
+  }
+}
+
 function getDetailStatus(center: CenterDetailItem): {
   label: string;
   className: string;
   helper: string | null;
 } {
-  if (
-    center.schedule.schedule_confidence !== null &&
-    center.schedule.schedule_confidence < 0.4
-  ) {
+  if (center.schedule.schedule_confidence_label === "low") {
     return {
       label: "Horario no fiable",
       className: "status-pill status-pill--warning",
@@ -144,20 +175,23 @@ export function CenterDetailPanel({
 
       <section className="detail-panel__hero">
         <div>
-          <h3>Horario de hoy</h3>
-          <p>{center.schedule.today_human_schedule ?? "Sin horario estructurado"}</p>
+          <h3>Estado operativo</h3>
+          <p>{status.label}</p>
+          <span>{status.helper ?? "Sin cambio fiable para hoy"}</span>
         </div>
         <div>
-          <h3>Proximo cambio</h3>
-          <p>{status.helper ?? "Sin dato fiable"}</p>
+          <h3>Horario de hoy</h3>
+          <p>{center.schedule.today_human_schedule ?? "Sin horario estructurado"}</p>
+          <span>
+            {center.schedule.opens_today && center.schedule.closes_today
+              ? `${center.schedule.opens_today} - ${center.schedule.closes_today}`
+              : "Sin tramo horario fiable"}
+          </span>
         </div>
         <div>
           <h3>Confianza</h3>
-          <p>
-            {center.schedule.schedule_confidence !== null
-              ? `${Math.round(center.schedule.schedule_confidence * 100)}%`
-              : "Sin dato"}
-          </p>
+          <p>{getConfidenceLabel(center)}</p>
+          <span>{center.data_freshness ?? "Sin fecha de actualizacion"}</span>
         </div>
       </section>
 
@@ -167,12 +201,12 @@ export function CenterDetailPanel({
           <dd>{renderValue(center.address_line)}</dd>
         </div>
         <div>
-          <dt>Telefono</dt>
-          <dd>{renderValue(center.phone)}</dd>
+          <dt>Contacto</dt>
+          <dd>{renderValue(center.contact_summary)}</dd>
         </div>
         <div>
-          <dt>Email</dt>
-          <dd>{renderValue(center.email)}</dd>
+          <dt>Telefono</dt>
+          <dd>{renderValue(center.phone)}</dd>
         </div>
         <div>
           <dt>Web</dt>
@@ -191,12 +225,8 @@ export function CenterDetailPanel({
           <dd>{renderValue(center.capacity_text)}</dd>
         </div>
         <div>
-          <dt>Coordenadas</dt>
-          <dd>
-            {center.lat !== null && center.lon !== null
-              ? `${center.lat}, ${center.lon}`
-              : "Sin coordenadas validas"}
-          </dd>
+          <dt>Email</dt>
+          <dd>{renderValue(center.email)}</dd>
         </div>
       </dl>
 
@@ -230,8 +260,11 @@ export function CenterDetailPanel({
         {center.schedule.warnings.length > 0 ? (
           <ul className="detail-panel__warnings">
             {center.schedule.warnings.map((warning, index) => (
-              <li key={`${warning.code}-${index}`}>
-                <strong>{warning.code}</strong>
+              <li
+                key={`${warning.code}-${index}`}
+                className={`detail-panel__warning detail-panel__warning--${warning.severity}`}
+              >
+                <strong>{getWarningLabel(warning.code)}</strong>
                 <span>{warning.message}</span>
               </li>
             ))}
@@ -244,8 +277,29 @@ export function CenterDetailPanel({
       </section>
 
       <section className="detail-panel__section">
-        <h3>Horario raw</h3>
-        <pre>{center.schedule.raw_schedule_text ?? "Sin horario raw"}</pre>
+        <h3>Contexto operativo</h3>
+        <dl className="detail-panel__grid detail-panel__grid--secondary">
+          <div>
+            <dt>Notas de la fuente</dt>
+            <dd>{renderValue(center.schedule.notes_raw ?? center.notes_raw)}</dd>
+          </div>
+          <div>
+            <dt>Fuente actualizada</dt>
+            <dd>{renderValue(center.data_freshness)}</dd>
+          </div>
+          <div>
+            <dt>Coordenadas</dt>
+            <dd>
+              {center.lat !== null && center.lon !== null
+                ? `${center.lat}, ${center.lon}`
+                : "Sin coordenadas validas"}
+            </dd>
+          </div>
+          <div>
+            <dt>Estado de coordenadas</dt>
+            <dd>{renderValue(center.coord_status)}</dd>
+          </div>
+        </dl>
       </section>
 
       <section className="detail-panel__section">
@@ -259,6 +313,11 @@ export function CenterDetailPanel({
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="detail-panel__section detail-panel__section--raw">
+        <h3>Horario raw</h3>
+        <pre>{center.schedule.raw_schedule_text ?? "Sin horario raw"}</pre>
       </section>
     </aside>
   );

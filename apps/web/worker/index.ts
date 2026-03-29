@@ -7,7 +7,11 @@ import {
 import { handleApiNotFound, handleHealth } from "./routes/health";
 
 export default {
-  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: WorkerEnv,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/api/health") {
@@ -15,7 +19,7 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname === "/api/centers") {
-      return handleListCenters(request, env);
+      return handleListCenters(request, env, ctx);
     }
 
     if (request.method === "GET" && url.pathname.startsWith("/api/centers/")) {
@@ -28,7 +32,7 @@ export default {
           return handleApiNotFound(request);
         }
 
-        return handleGetCenterSchedule(slug, env);
+        return handleGetCenterSchedule(slug, env, ctx, request);
       }
 
       const slug = nestedPath;
@@ -37,7 +41,7 @@ export default {
         return handleApiNotFound(request);
       }
 
-      return handleGetCenterDetail(slug, env);
+      return handleGetCenterDetail(slug, env, ctx, request);
     }
 
     if (url.pathname.startsWith("/api/")) {

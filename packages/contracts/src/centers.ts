@@ -6,6 +6,21 @@ export type ScheduleAudience = "sala" | "centro" | "secretaria" | "otros";
 
 export type ScheduleAnomalySeverity = "info" | "warning" | "error";
 
+export type ScheduleConfidenceLabel = "high" | "medium" | "low";
+
+export type ScheduleAnomalyCode =
+  | "schedule_missing"
+  | "open_air_without_explicit_schedule"
+  | "schedule_requires_manual_contact"
+  | "seasonal_rules_detected"
+  | "seasonal_july_august_detected"
+  | "exam_extension_detected"
+  | "multiple_primary_audiences"
+  | "regular_rules_not_parsed"
+  | "holiday_without_explicit_dates"
+  | "split_schedule_detected"
+  | "partial_override_without_open_range";
+
 export interface ListCentersQuery {
   kind?: CenterKind;
   limit?: number;
@@ -74,7 +89,7 @@ export interface SchedulePartialDayOverride {
 }
 
 export interface ScheduleParseAnomaly {
-  code: string;
+  code: ScheduleAnomalyCode;
   severity: ScheduleAnomalySeverity;
   field_name: string | null;
   raw_fragment: string | null;
@@ -86,6 +101,7 @@ export interface CenterScheduleSummary {
   next_change_at: string | null;
   today_human_schedule: string | null;
   schedule_confidence: number | null;
+  schedule_confidence_label: ScheduleConfidenceLabel;
   opens_today: string | null;
   closes_today: string | null;
 }
@@ -102,6 +118,7 @@ export interface CenterListItem extends CenterScheduleSummary {
   phone: string | null;
   email: string | null;
   website_url: string | null;
+  contact_summary: string | null;
   lat: number | null;
   lon: number | null;
   coord_status: CenterCoordStatus;
@@ -110,6 +127,8 @@ export interface CenterListItem extends CenterScheduleSummary {
   sockets_flag: boolean;
   accessibility_flag: boolean;
   open_air_flag: boolean;
+  source_last_updated: string | null;
+  data_freshness: string | null;
 }
 
 export interface ListCentersResponse {
@@ -127,10 +146,13 @@ export interface CenterSourceSummary {
 
 export interface CenterSchedulePayload extends CenterScheduleSummary {
   raw_schedule_text: string | null;
+  notes_raw: string | null;
   regular_rules: ScheduleRegularRule[];
   holiday_closures: ScheduleHolidayClosure[];
   partial_day_overrides: SchedulePartialDayOverride[];
   warnings: ScheduleParseAnomaly[];
+  source_last_updated: string | null;
+  data_freshness: string | null;
 }
 
 export interface CenterDetailItem {
@@ -147,6 +169,7 @@ export interface CenterDetailItem {
   phone: string | null;
   email: string | null;
   website_url: string | null;
+  contact_summary: string | null;
   lat: number | null;
   lon: number | null;
   coord_status: CenterCoordStatus;
@@ -157,6 +180,8 @@ export interface CenterDetailItem {
   accessibility_flag: boolean;
   open_air_flag: boolean;
   notes_raw: string | null;
+  source_last_updated: string | null;
+  data_freshness: string | null;
   sources: CenterSourceSummary[];
   schedule: CenterSchedulePayload;
 }

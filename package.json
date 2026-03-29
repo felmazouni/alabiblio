@@ -20,7 +20,9 @@
     "db:seed:production": "pnpm --dir apps/web exec wrangler d1 execute alabiblio-production-db --remote --file ../../sql/seeds/0001_sources.sql",
     "ingest:centers:local": "tsx scripts/ingest-centers.ts local",
     "ingest:centers:staging": "tsx scripts/ingest-centers.ts staging",
-    "ingest:centers:production": "tsx scripts/ingest-centers.ts production"
+    "ingest:centers:production": "tsx scripts/ingest-centers.ts production",
+    "smoke:staging": "tsx scripts/smoke-public.ts https://staging.alabiblio.org",
+    "smoke:production": "tsx scripts/smoke-public.ts https://alabiblio.org"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",

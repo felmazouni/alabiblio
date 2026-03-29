@@ -1,9 +1,12 @@
 import type {
   CenterSchedulePayload,
+  ScheduleAudience,
+  ScheduleConfidenceLabel,
   ScheduleHolidayClosure,
   SchedulePartialDayOverride,
   ScheduleRegularRule,
 } from "@alabiblio/contracts/centers";
+import { getScheduleConfidenceLabel } from "../../domain/src/centers";
 import type { ActiveScheduleRecord, ScheduleRuntimeOptions } from "./types";
 
 type MadridDateParts = {
@@ -57,6 +60,34 @@ function getMadridParts(date: Date, timeZone: string): MadridDateParts {
 function timeToMinutes(time: string): number {
   const [hoursText, minutesText] = time.split(":");
   return Number(hoursText) * 60 + Number(minutesText);
+}
+
+function selectRelevantAudience(
+  schedule: ActiveScheduleRecord,
+  preferredAudiences: ScheduleAudience[],
+): ScheduleAudience | null {
+  for (const audience of preferredAudiences) {
+    if (
+      schedule.regular_rules.some((rule) => rule.audience === audience) ||
+      schedule.partial_day_overrides.some((rule) => rule.audience === audience) ||
+      schedule.holiday_closures.some((rule) => rule.audience === audience)
+    ) {
+      return audience;
+    }
+  }
+
+  return null;
+}
+
+function filterByAudience<T extends { audience: ScheduleAudience }>(
+  items: T[],
+  selectedAudience: ScheduleAudience | null,
+): T[] {
+  if (selectedAudience === null) {
+    return items;
+  }
+
+  return items.filter((item) => item.audience === selectedAudience);
 }
 
 function buildTodayRanges(
@@ -114,11 +145,15 @@ function formatTodayHumanSchedule(
     return null;
   }
 
-  return ranges.map((range) => `${range.opens_at}-${range.closes_at}`).join(" · ");
+  return ranges.map((range) => `${range.opens_at}-${range.closes_at}`).join(" | ");
 }
 
 function formatLocalChangeAt(parts: MadridDateParts, time: string): string {
   return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}T${time}:00`;
+}
+
+function buildConfidenceLabel(value: number | null): ScheduleConfidenceLabel {
+  return getScheduleConfidenceLabel(value);
 }
 
 export function buildSchedulePayload(
@@ -131,11 +166,15 @@ export function buildSchedulePayload(
   if (!schedule) {
     return {
       raw_schedule_text: null,
+      notes_raw: null,
       regular_rules: [],
       holiday_closures: [],
       partial_day_overrides: [],
       warnings: [],
+      source_last_updated: options?.sourceLastUpdated ?? null,
+      data_freshness: options?.dataFreshness ?? null,
       schedule_confidence: null,
+      schedule_confidence_label: "low",
       is_open_now: null,
       next_change_at: null,
       today_human_schedule: null,
@@ -144,17 +183,26 @@ export function buildSchedulePayload(
     };
   }
 
-  const parts = getMadridParts(now, timeZone);
-  const closedByHoliday = hasClosureToday(
-    schedule.holiday_closures,
-    parts.month,
-    parts.day,
+  const selectedAudience = selectRelevantAudience(
+    schedule,
+    options?.preferredAudiences ?? ["sala", "centro", "otros", "secretaria"],
   );
+  const regularRules = filterByAudience(schedule.regular_rules, selectedAudience);
+  const holidayClosures = filterByAudience(
+    schedule.holiday_closures,
+    selectedAudience,
+  );
+  const partialDayOverrides = filterByAudience(
+    schedule.partial_day_overrides,
+    selectedAudience,
+  );
+  const parts = getMadridParts(now, timeZone);
+  const closedByHoliday = hasClosureToday(holidayClosures, parts.month, parts.day);
   const ranges = closedByHoliday
     ? []
     : buildTodayRanges(
-        schedule.regular_rules,
-        schedule.partial_day_overrides,
+        regularRules,
+        partialDayOverrides,
         parts.weekday,
         parts.month,
         parts.day,
@@ -168,14 +216,20 @@ export function buildSchedulePayload(
     }) ?? null;
   const nextRange =
     ranges.find((range) => currentMinutes < timeToMinutes(range.opens_at)) ?? null;
+  const confidenceLabel =
+    options?.scheduleConfidenceLabel ?? buildConfidenceLabel(schedule.schedule_confidence);
 
   return {
     raw_schedule_text: schedule.raw_schedule_text,
-    regular_rules: schedule.regular_rules,
-    holiday_closures: schedule.holiday_closures,
-    partial_day_overrides: schedule.partial_day_overrides,
+    notes_raw: schedule.notes_raw,
+    regular_rules: regularRules,
+    holiday_closures: holidayClosures,
+    partial_day_overrides: partialDayOverrides,
     warnings: schedule.warnings,
+    source_last_updated: options?.sourceLastUpdated ?? null,
+    data_freshness: options?.dataFreshness ?? null,
     schedule_confidence: schedule.schedule_confidence,
+    schedule_confidence_label: confidenceLabel,
     is_open_now:
       schedule.schedule_confidence !== null && schedule.schedule_confidence < 0.3
         ? null
@@ -189,7 +243,7 @@ export function buildSchedulePayload(
     today_human_schedule: formatTodayHumanSchedule(
       ranges,
       closedByHoliday,
-      schedule.regular_rules.length > 0,
+      regularRules.length > 0,
       schedule.schedule_confidence,
     ),
     opens_today: ranges[0]?.opens_at ?? null,

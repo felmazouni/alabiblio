@@ -50,6 +50,7 @@ type ScheduleVersionRow = {
   schedule_version_id: number;
   center_id: string;
   raw_schedule_text: string | null;
+  notes_raw: string | null;
   parse_confidence: number | null;
   open_air_flag: number;
 };
@@ -68,6 +69,11 @@ type PartialDayOverrideRow = SchedulePartialDayOverride & {
 
 type ScheduleAnomalyRow = ScheduleParseAnomaly & {
   schedule_version_id: number;
+};
+
+type SourceFreshnessRow = {
+  center_id: string;
+  source_last_updated: string | null;
 };
 
 function hydrateCenter(row: CenterRow): CenterRecord {
@@ -153,6 +159,7 @@ async function loadActiveScheduleRows(
             sv.id AS schedule_version_id,
             sv.center_id,
             sv.raw_schedule_text,
+            sv.notes_raw,
             sv.parse_confidence,
             sv.open_air_flag,
             ROW_NUMBER() OVER (
@@ -166,6 +173,7 @@ async function loadActiveScheduleRows(
           schedule_version_id,
           center_id,
           raw_schedule_text,
+          notes_raw,
           parse_confidence,
           open_air_flag
         FROM ranked
@@ -337,6 +345,7 @@ export async function loadActiveSchedulesByCenterIds(
     scheduleMap.set(row.center_id, {
       schedule_version_id: row.schedule_version_id,
       raw_schedule_text: row.raw_schedule_text,
+      notes_raw: row.notes_raw,
       schedule_confidence: row.parse_confidence,
       open_air_flag: row.open_air_flag === 1,
       regular_rules: regularRules.filter(
@@ -355,6 +364,53 @@ export async function loadActiveSchedulesByCenterIds(
   }
 
   return scheduleMap;
+}
+
+export async function loadSourceFreshnessByCenterIds(
+  db: D1Database,
+  centerIds: string[],
+): Promise<Map<string, string | null>> {
+  if (centerIds.length === 0) {
+    return new Map();
+  }
+
+  const rows: SourceFreshnessRow[] = [];
+
+  for (const centerIdChunk of chunkValues(centerIds)) {
+    const placeholders = buildPlaceholders(centerIdChunk);
+    const result = await db
+      .prepare(
+        `SELECT
+          csl.center_id,
+          MAX(COALESCE(csl.source_record_updated_at, ir.finished_at)) AS source_last_updated
+        FROM center_source_links csl
+        LEFT JOIN ingestion_runs ir ON ir.id = csl.run_id
+        WHERE csl.center_id IN (${placeholders})
+        GROUP BY csl.center_id`,
+      )
+      .bind(...centerIdChunk)
+      .all<SourceFreshnessRow>();
+
+    rows.push(...(result.results ?? []));
+  }
+
+  return new Map(
+    rows.map((row) => [row.center_id, row.source_last_updated]),
+  );
+}
+
+export async function getLatestDataVersion(
+  db: D1Database,
+): Promise<string | null> {
+  const result = await db
+    .prepare(
+      `SELECT MAX(finished_at) AS latest_data_version
+      FROM ingestion_runs
+      WHERE status = 'completed'`,
+    )
+    .first<{ latest_data_version: string | null }>();
+
+  return result?.latest_data_version ?? null;
 }
 
 export async function listCenters(
@@ -390,6 +446,7 @@ export async function getCenterBySlug(
   center: CenterRecord;
   schedule: ActiveScheduleRecord | null;
   sources: CenterSourceSummary[];
+  source_last_updated: string | null;
 } | null> {
   const detailResult = await db
     .prepare(
@@ -410,8 +467,9 @@ export async function getCenterBySlug(
   }
 
   const center = hydrateCenter(detailResult);
-  const [scheduleMap, sourcesResult] = await Promise.all([
+  const [scheduleMap, sourceFreshnessMap, sourcesResult] = await Promise.all([
     loadActiveSchedulesByCenterIds(db, [center.id]),
+    loadSourceFreshnessByCenterIds(db, [center.id]),
     db
       .prepare(
         `SELECT
@@ -431,5 +489,6 @@ export async function getCenterBySlug(
     center,
     schedule: scheduleMap.get(center.id) ?? null,
     sources: sourcesResult.results ?? [],
+    source_last_updated: sourceFreshnessMap.get(center.id) ?? null,
   };
 }

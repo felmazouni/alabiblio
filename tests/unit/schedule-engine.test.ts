@@ -18,6 +18,7 @@ function createActiveScheduleRecord(
   return {
     schedule_version_id: 1,
     raw_schedule_text: rawScheduleText,
+    notes_raw: null,
     schedule_confidence: parsed.parse_confidence,
     open_air_flag: parsed.open_air_flag,
     regular_rules: parsed.regular_rules,
@@ -106,13 +107,58 @@ test("registra warnings sobre textos ambiguos", () => {
   });
 
   assert.ok(
-    parsed.anomalies.some((item) => item.code === "seasonal_rules_unparsed"),
+    parsed.anomalies.some(
+      (item) => item.code === "seasonal_july_august_detected",
+    ),
   );
   assert.ok(
     parsed.anomalies.some(
       (item) => item.code === "schedule_requires_manual_contact",
     ),
   );
+});
+
+test("reutiliza el tramo de dias cuando el horario se declara en clausula separada", () => {
+  const parsed = parseSchedule({
+    kind: "library",
+    rawScheduleText:
+      "Apertura de lunes a viernes. Horario: de 8:30 a 21 horas.",
+    openAirFlag: false,
+  });
+
+  assert.equal(parsed.regular_rules.length, 5);
+  assert.equal(parsed.regular_rules[0]?.opens_at, "08:30");
+  assert.equal(parsed.parse_confidence, 0.92);
+});
+
+test("detecta referencias de verano en julio y agosto como warning tipado", () => {
+  const parsed = parseSchedule({
+    kind: "library",
+    rawScheduleText:
+      "De lunes a viernes, de 9 a 21 horas. Julio y agosto, de 9 a 15 horas.",
+    openAirFlag: false,
+  });
+
+  assert.ok(
+    parsed.anomalies.some(
+      (item) => item.code === "seasonal_july_august_detected",
+    ),
+  );
+  assert.ok((parsed.parse_confidence ?? 0) >= 0.75);
+});
+
+test("detecta ampliaciones de examenes sin inventar reglas", () => {
+  const parsed = parseSchedule({
+    kind: "study_room",
+    rawScheduleText:
+      "De lunes a viernes, de 9 a 21 horas. En examenes, apertura hasta las 00:00 horas.",
+    openAirFlag: false,
+  });
+
+  assert.ok(
+    parsed.anomalies.some((item) => item.code === "exam_extension_detected"),
+  );
+  assert.equal(parsed.regular_rules.length, 5);
 });
 
 test("calcula is_open_now y next_change_at cuando el centro esta abierto", () => {
@@ -152,4 +198,16 @@ test("respeta cierres puntuales aunque exista regla regular", () => {
   assert.equal(payload.is_open_now, false);
   assert.equal(payload.today_human_schedule, "Cerrado hoy");
   assert.equal(payload.next_change_at, null);
+});
+
+test("no inventa cerrado hoy cuando no hay estructura suficiente", () => {
+  const schedule = createActiveScheduleRecord(
+    "Verano: de lunes a viernes, de 9 a 15 horas. Consultar telefonicamente.",
+  );
+  const payload = buildSchedulePayload(schedule, {
+    now: new Date("2026-07-06T09:00:00Z"),
+  });
+
+  assert.equal(payload.today_human_schedule, null);
+  assert.equal(payload.schedule_confidence_label, "low");
 });

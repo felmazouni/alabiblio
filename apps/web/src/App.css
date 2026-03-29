@@ -132,7 +132,7 @@
 
 .center-card {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   width: 100%;
   padding: 20px;
   text-align: left;
@@ -177,23 +177,30 @@
 }
 
 .center-card__meta {
-  margin: 0;
+  margin: 0 0 4px;
   color: rgba(228, 235, 245, 0.68);
 }
 
 .center-card__schedule,
-.center-card__helper {
+.center-card__helper,
+.center-card__confidence {
   margin: 0;
 }
 
 .center-card__schedule {
   color: rgba(245, 247, 251, 0.96);
   font-weight: 700;
+  font-size: 1rem;
 }
 
 .center-card__helper {
   color: rgba(156, 198, 255, 0.82);
   font-size: 0.92rem;
+}
+
+.center-card__confidence {
+  color: #ffe8a8;
+  font-size: 0.88rem;
 }
 
 .status-pill {
@@ -231,6 +238,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
+  padding-top: 2px;
 }
 
 .center-card__details div,
@@ -332,6 +340,11 @@
   font-weight: 700;
 }
 
+.detail-panel__hero span {
+  color: rgba(156, 198, 255, 0.82);
+  font-size: 0.92rem;
+}
+
 .detail-panel__close,
 .load-more__button {
   min-height: 44px;
@@ -350,6 +363,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin: 20px 0;
+}
+
+.detail-panel__grid--secondary {
+  margin: 0;
 }
 
 .detail-panel__section + .detail-panel__section {
@@ -405,6 +422,16 @@
   background: rgba(255, 212, 102, 0.08);
 }
 
+.detail-panel__warning--error {
+  border-color: rgba(255, 120, 120, 0.28);
+  background: rgba(255, 120, 120, 0.1);
+}
+
+.detail-panel__warning--info {
+  border-color: rgba(104, 189, 255, 0.2);
+  background: rgba(104, 189, 255, 0.08);
+}
+
 .detail-panel__fallback {
   color: rgba(228, 235, 245, 0.72);
 }
@@ -436,9 +463,38 @@
     padding-inline: 14px;
   }
 
+  .app-header {
+    align-items: start;
+  }
+
+  .app-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .explorer-toolbar {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .explorer-search input {
+    min-height: 46px;
+  }
+
+  .filter-pill {
+    min-height: 38px;
+    padding-inline: 12px;
+    font-size: 0.92rem;
+  }
+
   .center-card__details,
   .detail-panel__grid {
     grid-template-columns: 1fr;
+  }
+
+  .center-card {
+    padding: 16px;
+    border-radius: 20px;
   }
 
   .detail-panel__hero {
@@ -447,5 +503,16 @@
 
   .detail-panel {
     position: static;
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .detail-panel__top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .detail-panel__close {
+    width: 100%;
   }
 }

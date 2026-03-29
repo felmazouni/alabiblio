@@ -1,6 +1,7 @@
 import type {
   CenterKind,
   ScheduleAudience,
+  ScheduleConfidenceLabel,
   ScheduleHolidayClosure,
   ScheduleParseAnomaly,
   SchedulePartialDayOverride,
@@ -26,6 +27,7 @@ export interface ParsedSchedule {
 export interface ActiveScheduleRecord {
   schedule_version_id: number;
   raw_schedule_text: string | null;
+  notes_raw: string | null;
   schedule_confidence: number | null;
   open_air_flag: boolean;
   regular_rules: ScheduleRegularRule[];
@@ -37,6 +39,10 @@ export interface ActiveScheduleRecord {
 export interface ScheduleRuntimeOptions {
   now?: Date;
   timeZone?: string;
+  preferredAudiences?: ScheduleAudience[];
+  sourceLastUpdated?: string | null;
+  dataFreshness?: string | null;
+  scheduleConfidenceLabel?: ScheduleConfidenceLabel;
 }
 
 export interface ParsedScheduleContext {
