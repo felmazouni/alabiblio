@@ -581,6 +581,9 @@ function TopPickCard({
   const footerTiles = buildFeaturedFooterTiles(mobility, center);
   const frame = buildFeaturedCardFrame(center, recommendedMode, serverOpenCount);
   const area = [center.neighborhood, center.district].filter(Boolean).join(" - ");
+  const locationLine = center.address_line ?? area;
+  const secondaryLine = center.address_line && area ? area : null;
+  const reason = buildMotivo(mobility).split(".")[0]?.trim() ?? buildMotivo(mobility);
 
   return (
     <button
@@ -602,19 +605,18 @@ function TopPickCard({
 
         <h2 className="best-option-card__name">{center.name}</h2>
 
-        {area ? (
-          <p className="best-option-card__subline">
+        {locationLine ? (
+          <p className="best-option-card__subline top-pick-card__location">
             <MapPin size={11} />
-            {area}
+            {locationLine}
           </p>
         ) : null}
 
-        <div className="best-option-card__section-head">
-          <div>
-            <strong>{frame.sectionTitle}</strong>
-            <span>{frame.sectionSummary}</span>
-          </div>
-        </div>
+        {secondaryLine ? <p className="top-pick-card__secondary-line">{secondaryLine}</p> : null}
+        <p className="top-pick-card__state-line">
+          <strong>{frame.sectionTitle}</strong>
+          <span>{frame.sectionSummary}</span>
+        </p>
 
         <div className="best-option-card__board">
           {transportRows.map((row) => (
@@ -622,9 +624,11 @@ function TopPickCard({
               key={`${center.id}-${row.mode}`}
               className={`best-option-card__board-row${row.recommended ? " best-option-card__board-row--recommended" : ""}`}
             >
-              <span className="best-option-card__board-mode">
-                {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
-                {row.label}
+              <span className="best-option-card__board-mode top-pick-card__board-mode">
+                <span className={`top-pick-card__mode-icon top-pick-card__mode-icon--${row.mode}`}>
+                  {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
+                </span>
+                <span className="top-pick-card__mode-label">{row.label}</span>
               </span>
               <span className="best-option-card__board-body">{row.body}</span>
               <span className="best-option-card__board-eta">{row.eta}</span>
@@ -647,7 +651,7 @@ function TopPickCard({
           ))}
         </div>
 
-        <p className="best-option-card__reason">{buildMotivo(mobility)}</p>
+        <p className="best-option-card__reason">{reason}</p>
 
         <div className="best-option-card__footer">
           <span className="best-option-card__cta">

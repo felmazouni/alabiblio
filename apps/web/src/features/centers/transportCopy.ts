@@ -336,41 +336,44 @@ export function buildSecondaryCardHighlights(center: CenterDecisionCardItem): Se
 
 function buildBusBoardBody(bus: BusModuleV1): string {
   if (bus.selected_line && bus.origin_stop) {
-    const parts = [
-      `Linea ${bus.selected_line}`,
-      `parada ${trimLabel(bus.origin_stop.name, 18)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"}`,
-    ];
-    if (bus.next_arrival_min !== null) {
-      parts.push(`llega en ${bus.next_arrival_min} min`);
-    } else if (bus.realtime_status !== "available") {
-      parts.push("tiempo real no disponible");
-    }
-    if (bus.destination_stop) {
-      parts.push(`bajada a ${formatDistanceCompact(bus.destination_stop.distance_m) ?? "distancia corta"}`);
-    }
-    return parts.join(" - ");
+    const head = bus.selected_destination
+      ? `Linea ${bus.selected_line} a ${trimLabel(bus.selected_destination, 18)}`
+      : `Linea ${bus.selected_line}`;
+    const origin = `subida en ${trimLabel(bus.origin_stop.name, 18)}`;
+    const destination = bus.destination_stop
+      ? `bajada a ${formatDistanceCompact(bus.destination_stop.distance_m) ?? "poca distancia"}`
+      : null;
+    return [head, origin, destination].filter(Boolean).join(" - ");
   }
 
-  return buildBusDegradation(bus);
+  if (bus.origin_stop && bus.realtime_status !== "available") {
+    return `Parada ${trimLabel(bus.origin_stop.name, 18)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - tiempo real no disponible`;
+  }
+
+  if (bus.origin_stop) {
+    return `Parada ${trimLabel(bus.origin_stop.name, 18)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - sin linea directa clara`;
+  }
+
+  return "No vemos una opcion EMT clara";
 }
 
 function buildBikeBoardBody(bike: BikeModuleV1): string {
   const origin = bike.origin_station
-    ? `Origen: ${stationRef(bike.origin_station.station_number, bike.origin_station.name)}${bike.bikes_available !== null ? ` - ${bike.bikes_available} bicis` : ""}`
-    : "Origen sin estacion util";
+    ? `${stationRef(bike.origin_station.station_number, bike.origin_station.name)}${bike.bikes_available !== null ? ` - ${bike.bikes_available} bicis` : ""}`
+    : "origen sin estacion";
   const destination = bike.destination_station
-    ? `Destino: ${stationRef(bike.destination_station.station_number, bike.destination_station.name)}${bike.docks_available !== null ? ` - ${bike.docks_available} anclajes` : ""}`
-    : "Destino sin estacion util";
-  return `${origin} - ${destination}`;
+    ? `${stationRef(bike.destination_station.station_number, bike.destination_station.name)}${bike.docks_available !== null ? ` - ${bike.docks_available} anclajes` : ""}`
+    : "destino sin estacion";
+  return `Origen: ${origin} / Destino: ${destination}`;
 }
 
 function buildMetroBoardBody(metro: MetroModuleV1): string {
   const origin = metro.origin_station
-    ? `${trimLabel(metro.origin_station.name, 18)}${metro.origin_station.lines.length > 0 ? ` (${metro.origin_station.lines.slice(0, 2).join(", ")})` : ""}`
-    : "Origen sin estacion util";
+    ? trimLabel(metro.origin_station.name, 18)
+    : "Origen sin estacion";
   const destination = metro.destination_station
-    ? `${trimLabel(metro.destination_station.name, 18)}${metro.destination_station.lines.length > 0 ? ` (${metro.destination_station.lines.slice(0, 2).join(", ")})` : ""}`
-    : "Destino sin estacion clara";
+    ? trimLabel(metro.destination_station.name, 18)
+    : "Destino sin estacion";
   return `${origin} -> ${destination}`;
 }
 

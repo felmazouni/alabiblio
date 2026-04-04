@@ -214,6 +214,10 @@ function getTopRealtimeArrival(stopId: string, line: string, realtimeByStopId: M
   return (realtimeByStopId.get(stopId) ?? []).filter((v) => v.line === line).sort((a, b) => a.minutes - b.minutes)[0] ?? null;
 }
 
+function getBestRealtimeArrivalByStop(stopId: string, realtimeByStopId: Map<string, EmtRealtimeArrival[]>): EmtRealtimeArrival | null {
+  return (realtimeByStopId.get(stopId) ?? []).slice().sort((a, b) => a.minutes - b.minutes)[0] ?? null;
+}
+
 function buildBusOptions(input: TripCentricMobilityInput): MobilityOption[] {
   if (!input.userLocation || input.center.lat === null || input.center.lon === null) return [];
   const directDistance = haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon);
@@ -366,7 +370,19 @@ function buildBusModule(input: TripCentricMobilityInput, bestBus: MobilityOption
     return { state: "unavailable", selected_line: null, selected_destination: null, origin_stop: null, destination_stop: null, next_arrival_min: null, realtime_status: input.emtRealtimeStatus ?? "unconfigured", fetched_at: input.emtRealtimeFetchedAt ?? null };
   }
   if (!bestBus) {
-    return { state: destinationStop ? "degraded_missing_anchor" : "partial", selected_line: null, selected_destination: null, origin_stop: originStop, destination_stop: destinationStop, next_arrival_min: null, realtime_status: input.emtRealtimeStatus ?? "unconfigured", fetched_at: input.emtRealtimeFetchedAt ?? null };
+    const fallbackOriginRaw = input.originEmtStops.find((stop) => getBestRealtimeArrivalByStop(stop.id, input.realtimeByStopId)) ?? input.originEmtStops[0] ?? null;
+    const fallbackOriginStop = toStopAnchor(fallbackOriginRaw);
+    const fallbackArrival = fallbackOriginStop ? getBestRealtimeArrivalByStop(fallbackOriginStop.id, input.realtimeByStopId) : null;
+    return {
+      state: fallbackOriginStop && fallbackArrival ? "degraded_missing_anchor" : destinationStop ? "degraded_missing_anchor" : "partial",
+      selected_line: fallbackArrival?.line ?? null,
+      selected_destination: fallbackArrival?.destination ?? null,
+      origin_stop: fallbackOriginStop ?? originStop,
+      destination_stop: null,
+      next_arrival_min: fallbackArrival?.minutes ?? null,
+      realtime_status: fallbackArrival ? "available" : input.emtRealtimeStatus ?? "unconfigured",
+      fetched_at: input.emtRealtimeFetchedAt ?? null,
+    };
   }
   const arrival = bestBus.realtime?.arrivals?.[0];
   return {
@@ -426,7 +442,7 @@ function buildMobilityHighlights(input: { car: CarModuleV1; bus: BusModuleV1; bi
 function buildSummary(input: { schedule: Pick<CenterScheduleSummary, "is_open_now">; walkingMinutes: number | null; car: CarModuleV1; bus: BusModuleV1; bike: BikeModuleV1; metro: MetroModuleV1 }): CenterMobilitySummaryV1 {
   const candidates: Array<{ mode: CenterMobilitySummaryV1["best_mode"]; eta: number; confidence: MobilityConfidence; state: MobilityModuleState; rationale: string }> = [];
   if (input.car.eta_min !== null) candidates.push({ mode: "car", eta: input.car.eta_min, confidence: input.car.state === "ok" ? "medium" : "low", state: input.car.state, rationale: input.car.ser_enabled ? "Coche con contexto SER" : "Coche estimado por distancia" });
-  if (input.bus.origin_stop) candidates.push({ mode: "bus", eta: input.bus.next_arrival_min ?? 99, confidence: input.bus.state === "ok" ? "high" : input.bus.state === "partial" ? "medium" : "low", state: input.bus.state, rationale: input.bus.next_arrival_min !== null ? "EMT con llegada proxima" : "EMT con anchors utiles" });
+  if ((input.bus.state === "ok" || input.bus.state === "partial") && input.bus.origin_stop) candidates.push({ mode: "bus", eta: input.bus.next_arrival_min ?? 99, confidence: input.bus.state === "ok" ? "high" : "medium", state: input.bus.state, rationale: input.bus.next_arrival_min !== null ? "EMT con llegada proxima" : "EMT con parada util" });
   if (input.bike.origin_station) candidates.push({ mode: "bike", eta: input.bike.eta_min ?? 99, confidence: input.bike.state === "ok" ? "medium" : "low", state: input.bike.state, rationale: input.bike.bikes_available !== null && input.bike.docks_available !== null ? "BiciMAD con stock y anclaje" : "BiciMAD con anchors utiles" });
   if (input.metro.origin_station) candidates.push({ mode: "metro", eta: input.metro.eta_min ?? 99, confidence: input.metro.state === "ok" ? "medium" : "low", state: input.metro.state, rationale: "Metro aproximado por anchors" });
   const best = candidates.sort((a, b) => moduleStateRank(a.state) - moduleStateRank(b.state) || a.eta - b.eta)[0];
