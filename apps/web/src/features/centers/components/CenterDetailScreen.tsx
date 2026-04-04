@@ -16,11 +16,10 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
-  buildBikeCopy,
-  buildBusCopy,
-  buildCarCopy,
+  buildDetailModeSummary,
+  buildFeaturedFooterTiles,
+  buildFeaturedTransportRows,
   buildHumanReason,
-  buildMetroCopy,
   buildModuleNote,
   modeLabel,
 } from "../transportCopy";
@@ -93,6 +92,20 @@ export function CenterDetailScreen({
   const mapsUrl = formatMapsUrl(item);
   const scheduleRows = buildCompactSchedule(item.schedule.regular_rules);
   const reason = buildHumanReason(mobility);
+  const transportRows = buildFeaturedTransportRows(mobility);
+  const footerTiles = buildFeaturedFooterTiles(mobility, {
+    ser: item.ser,
+    decision: {
+      best_mode: mobility.summary.best_mode,
+      best_time_minutes: mobility.summary.best_time_minutes,
+      distance_m: mobility.origin_dependent.walking_eta_min !== null
+        ? mobility.origin_dependent.walking_eta_min * 83
+        : null,
+      confidence: mobility.summary.confidence,
+      rationale: mobility.summary.rationale,
+      summary_label: null,
+    },
+  });
 
   return (
     <section className="detail-screen">
@@ -146,34 +159,32 @@ export function CenterDetailScreen({
           <h3>{mobility.summary.rationale[0] ?? "Decision de movilidad"}</h3>
           <p>{reason}</p>
         </div>
-        <div className="transport-v1-list">
-          <div className="transport-v1-row">
-            <span className="transport-v1-row__label"><Car size={14} />Coche</span>
-            <div className="transport-v1-row__copy">
-              <span className="transport-v1-row__body">{buildCarCopy(mobility)}</span>
-              {buildModuleNote("car", mobility) ? <span className="transport-v1-row__note">{buildModuleNote("car", mobility)}</span> : null}
+        <div className="transport-v1-list transport-v1-list--board">
+          {transportRows.map((row) => (
+            <div key={row.mode} className={`transport-v1-row transport-v1-row--board${row.recommended ? " transport-v1-row--recommended" : ""}`}>
+              <span className="transport-v1-row__label">
+                {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
+                {row.label}
+              </span>
+              <div className="transport-v1-row__copy">
+                <span className="transport-v1-row__body">
+                  {buildDetailModeSummary(row.mode, mobility)}
+                </span>
+                {buildModuleNote(row.mode, mobility) ? <span className="transport-v1-row__note">{buildModuleNote(row.mode, mobility)}</span> : null}
+              </div>
+              {row.eta !== "sin dato" ? <span className="transport-v1-row__eta">{row.eta}</span> : null}
             </div>
-          </div>
-          <div className="transport-v1-row">
-            <span className="transport-v1-row__label"><Bus size={14} />EMT</span>
-            <div className="transport-v1-row__copy">
-              <span className="transport-v1-row__body">{buildBusCopy(mobility)}</span>
-              {buildModuleNote("bus", mobility) ? <span className="transport-v1-row__note">{buildModuleNote("bus", mobility)}</span> : null}
-            </div>
-          </div>
-          <div className="transport-v1-row">
-            <span className="transport-v1-row__label"><Bike size={14} />BiciMAD</span>
-            <div className="transport-v1-row__copy">
-              <span className="transport-v1-row__body">{buildBikeCopy(mobility)}</span>
-              {buildModuleNote("bike", mobility) ? <span className="transport-v1-row__note">{buildModuleNote("bike", mobility)}</span> : null}
-            </div>
-          </div>
-          <div className="transport-v1-row">
-            <span className="transport-v1-row__label"><TrainFront size={14} />Metro</span>
-            <div className="transport-v1-row__copy">
-              <span className="transport-v1-row__body">{buildMetroCopy(mobility)}</span>
-              {buildModuleNote("metro", mobility) ? <span className="transport-v1-row__note">{buildModuleNote("metro", mobility)}</span> : null}
-            </div>
+          ))}
+          <div className="transport-v1-footer-grid">
+            {footerTiles.map((tile) => (
+              <div key={tile.mode} className={`transport-v1-footer-tile transport-v1-footer-tile--${tile.mode}`}>
+                <span className="transport-v1-footer-tile__label">
+                  {tile.mode === "car" ? <Car size={13} /> : <Navigation size={13} />}
+                  {tile.label}
+                </span>
+                <strong className="transport-v1-footer-tile__body">{tile.body}</strong>
+              </div>
+            ))}
           </div>
         </div>
       </section>

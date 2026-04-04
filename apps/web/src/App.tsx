@@ -51,11 +51,9 @@ import {
   fetchOriginPresets,
 } from "./features/centers/api";
 import {
-  buildBikeCopy,
-  buildBusCopy,
-  buildCarCopy,
+  buildFeaturedFooterTiles,
+  buildFeaturedTransportRows,
   buildHumanReason,
-  buildMetroCopy,
   modeLabel,
 } from "./features/centers/transportCopy";
 import { CenterCard } from "./features/centers/components/CenterCard";
@@ -77,22 +75,6 @@ const PAGE_SIZE = 24;
 
 function buildMotivo(mobility: CenterMobility | null): string {
   return buildHumanReason(mobility);
-}
-
-function buildFeaturedCarLine(mobility: CenterMobility | null): string {
-  return buildCarCopy(mobility);
-}
-
-function buildFeaturedBusLine(mobility: CenterMobility | null): string {
-  return buildBusCopy(mobility);
-}
-
-function buildFeaturedBikeLine(mobility: CenterMobility | null): string {
-  return buildBikeCopy(mobility);
-}
-
-function buildFeaturedMetroLine(mobility: CenterMobility | null): string {
-  return buildMetroCopy(mobility);
 }
 
 function getOriginStatusText(
@@ -295,6 +277,8 @@ function ExplorerScreen() {
   const featuredMobilityLoading =
     featuredTargetSlug !== null && featuredMobilitySlug !== featuredTargetSlug;
   const recommendedMode = featuredMobilityDisplay?.summary.best_mode ?? bestOption?.decision.best_mode ?? null;
+  const featuredTransportRows = buildFeaturedTransportRows(featuredMobilityDisplay);
+  const featuredFooterTiles = buildFeaturedFooterTiles(featuredMobilityDisplay, bestOption ?? null);
 
   // Active filter count (for badge)
   const activeFilterCount = [
@@ -790,32 +774,37 @@ function ExplorerScreen() {
                           : "Sin origen suficiente"}
                       </span>
                     </div>
-                    {bestOption.decision.distance_m !== null ? (
-                      <span className="best-option-card__section-distance">
-                        {bestOption.decision.distance_m < 1000
-                          ? `${Math.round(bestOption.decision.distance_m)} m`
-                          : `${(bestOption.decision.distance_m / 1000).toFixed(1)} km`}
-                      </span>
-                    ) : null}
                   </div>
 
-                  <div className="best-option-card__transport-grid">
-                    <div className={`best-option-card__transport-row${recommendedMode === "car" ? " best-option-card__transport-row--recommended" : ""}`}>
-                      <span className="best-option-card__transport-label"><Car size={12} />Coche</span>
-                      <span className="best-option-card__transport-body">{buildFeaturedCarLine(featuredMobilityDisplay)}</span>
-                    </div>
-                    <div className={`best-option-card__transport-row${recommendedMode === "bus" ? " best-option-card__transport-row--recommended" : ""}`}>
-                      <span className="best-option-card__transport-label"><Bus size={12} />EMT</span>
-                      <span className="best-option-card__transport-body">{buildFeaturedBusLine(featuredMobilityDisplay)}</span>
-                    </div>
-                    <div className={`best-option-card__transport-row${recommendedMode === "bike" ? " best-option-card__transport-row--recommended" : ""}`}>
-                      <span className="best-option-card__transport-label"><Bike size={12} />BiciMAD</span>
-                      <span className="best-option-card__transport-body">{buildFeaturedBikeLine(featuredMobilityDisplay)}</span>
-                    </div>
-                    <div className={`best-option-card__transport-row${recommendedMode === "metro" ? " best-option-card__transport-row--recommended" : ""}`}>
-                      <span className="best-option-card__transport-label"><TrainFront size={12} />Metro</span>
-                      <span className="best-option-card__transport-body">{buildFeaturedMetroLine(featuredMobilityDisplay)}</span>
-                    </div>
+                  <div className="best-option-card__board">
+                    {featuredTransportRows.map((row) => (
+                      <div
+                        key={row.mode}
+                        className={`best-option-card__board-row${row.recommended ? " best-option-card__board-row--recommended" : ""}`}
+                      >
+                        <span className="best-option-card__board-mode">
+                          {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
+                          {row.label}
+                        </span>
+                        <span className="best-option-card__board-body">{row.body}</span>
+                        <span className="best-option-card__board-eta">{row.eta}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="best-option-card__footer-grid">
+                    {featuredFooterTiles.map((tile) => (
+                      <div
+                        key={tile.mode}
+                        className={`best-option-card__footer-tile best-option-card__footer-tile--${tile.mode}`}
+                      >
+                        <span className="best-option-card__footer-label">
+                          {tile.mode === "car" ? <Car size={13} /> : <Navigation size={13} />}
+                          {tile.label}
+                        </span>
+                        <strong className="best-option-card__footer-body">{tile.body}</strong>
+                      </div>
+                    ))}
                   </div>
 
                   {featuredMobilityLoading ? (

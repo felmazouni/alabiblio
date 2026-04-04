@@ -1,25 +1,20 @@
 import type { GetCenterMobilityResponse } from "@alabiblio/contracts/mobility";
 import {
   buildCenterMobility,
-  type DecisionBicimadStation,
-  type DecisionEmtStop,
-  type DecisionMetroStation,
 } from "@alabiblio/domain/mobility";
-import { fetchEmtRealtimeForStopIds } from "@alabiblio/mobility/emtApi";
 import { buildSchedulePayload } from "@alabiblio/schedule-engine";
 import type { ActiveScheduleRecord } from "@alabiblio/schedule-engine/types";
 import {
   getCenterBySlug,
   getCenterSerCoverageByCenterId,
   getLatestDataVersion,
-  listActiveTransportNodesByKinds,
   listTransportNodesByCenterId,
   type WorkerEnv,
 } from "../lib/db";
 import {
-  buildOriginTransportCandidates,
   groupDestinationTransportNodes,
 } from "../lib/mobility";
+import { loadOriginTransportContext } from "../lib/originTransport";
 
 const MOBILITY_CACHE_TTL_SECONDS = 15;
 
@@ -123,18 +118,6 @@ function buildScheduleSummaryForDecision(
   });
 }
 
-function groupRealtimeByStopId(arrivals: Awaited<ReturnType<typeof fetchEmtRealtimeForStopIds>>["arrivals"]) {
-  const grouped = new Map<string, Awaited<ReturnType<typeof fetchEmtRealtimeForStopIds>>["arrivals"]>();
-
-  for (const arrival of arrivals) {
-    const current = grouped.get(arrival.stop_id) ?? [];
-    current.push(arrival);
-    grouped.set(arrival.stop_id, current);
-  }
-
-  return grouped;
-}
-
 export async function handleGetCenterMobility(
   slug: string,
   env: WorkerEnv,
@@ -199,47 +182,7 @@ export async function handleGetCenterMobility(
           listTransportNodesByCenterId(env.DB, centerRecord.center.id),
         ]);
         const destination = groupDestinationTransportNodes(nodeRows);
-        let originEmtStops: DecisionEmtStop[] = [];
-        let originBicimadStations: DecisionBicimadStation[] = [];
-        let originMetroStations: DecisionMetroStation[] = [];
-        let realtimeByStopId = new Map<
-          string,
-          Awaited<ReturnType<typeof fetchEmtRealtimeForStopIds>>["arrivals"]
-        >();
-        let emtRealtimeStatus: Awaited<ReturnType<typeof fetchEmtRealtimeForStopIds>>["status"] = "unconfigured";
-        let emtRealtimeFetchedAt: string | null = null;
-
-        if (userLocation) {
-          const activeTransportNodes = await listActiveTransportNodesByKinds(env.DB, [
-            "emt_stop",
-            "bicimad_station",
-            "metro_station",
-          ]);
-          const originCandidates = buildOriginTransportCandidates({
-            rows: activeTransportNodes,
-            origin: userLocation,
-          });
-          originEmtStops = originCandidates.originEmtStops;
-          originBicimadStations = originCandidates.originBicimadStations;
-          originMetroStations = originCandidates.originMetroStations;
-          const realtime = await fetchEmtRealtimeForStopIds(
-            originCandidates.originEmtStops.map((stop) => stop.id),
-            env.EMT_CLIENT_ID ||
-              env.EMT_PASS_KEY ||
-              env.EMT_EMAIL ||
-              env.EMT_PASSWORD
-              ? {
-                  clientId: env.EMT_CLIENT_ID,
-                  passKey: env.EMT_PASS_KEY,
-                  email: env.EMT_EMAIL,
-                  password: env.EMT_PASSWORD,
-                }
-              : null,
-          );
-          realtimeByStopId = groupRealtimeByStopId(realtime.arrivals);
-          emtRealtimeStatus = realtime.status;
-          emtRealtimeFetchedAt = new Date().toISOString();
-        }
+        const originContext = await loadOriginTransportContext(env, userLocation);
 
         const payload: GetCenterMobilityResponse = {
           item: buildCenterMobility({
@@ -256,16 +199,16 @@ export async function handleGetCenterMobility(
                   label: "Origen activo",
                 }
               : null,
-            originEmtStops,
+            originEmtStops: originContext.originEmtStops,
             destinationEmtStops: destination.destinationEmtStops,
-            originBicimadStations,
+            originBicimadStations: originContext.originBicimadStations,
             destinationBicimadStations: destination.destinationBicimadStations,
-            originMetroStations,
+            originMetroStations: originContext.originMetroStations,
             destinationMetroStations: destination.destinationMetroStations,
             destinationParkings: destination.destinationParkings,
-            realtimeByStopId,
-            emtRealtimeStatus,
-            emtRealtimeFetchedAt,
+            realtimeByStopId: originContext.realtimeByStopId,
+            emtRealtimeStatus: originContext.emtRealtimeStatus,
+            emtRealtimeFetchedAt: originContext.emtRealtimeFetchedAt,
             fetchedAt: new Date().toISOString(),
           }),
         };

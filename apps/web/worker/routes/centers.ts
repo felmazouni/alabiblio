@@ -17,13 +17,12 @@ import {
   buildDecisionSummary,
   sortCenterListItems,
 } from "@alabiblio/domain/mobility";
-import { fetchEmtRealtimeForStopIds } from "@alabiblio/mobility/emtApi";
 import { buildSchedulePayload } from "@alabiblio/schedule-engine";
 import {
+  countCenters,
   getCenterBySlug,
   getCenterSerCoverageByCenterId,
   getLatestDataVersion,
-  listActiveTransportNodesByKinds,
   listCenters,
   listTransportNodesByCenterId,
   loadActiveSchedulesByCenterIds,
@@ -33,12 +32,15 @@ import {
   type WorkerEnv,
 } from "../lib/db";
 import {
-  buildOriginTransportCandidates,
   groupDestinationTransportNodes,
 } from "../lib/mobility";
+import { loadOriginTransportContext } from "../lib/originTransport";
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 48;
+const LIST_SCAN_CHUNK = 48;
+const LIST_SCAN_LIMIT = 144;
+const LIST_VISIBLE_PADDING = 12;
 const LIST_CACHE_TTL_SECONDS = 30;
 const DETAIL_CACHE_TTL_SECONDS = 60;
 const SCHEDULE_AUDIENCE_ORDER: ScheduleAudience[] = [
@@ -278,18 +280,6 @@ function buildScheduleFromRecord(
   });
 }
 
-function groupRealtimeByStopId(arrivals: Awaited<ReturnType<typeof fetchEmtRealtimeForStopIds>>["arrivals"]) {
-  const typedMap = new Map<string, Awaited<ReturnType<typeof fetchEmtRealtimeForStopIds>>["arrivals"]>();
-
-  for (const arrival of arrivals) {
-    const current = typedMap.get(arrival.stop_id) ?? [];
-    current.push(arrival);
-    typedMap.set(arrival.stop_id, current);
-  }
-
-  return typedMap;
-}
-
 function buildListSortMode(
   requestedSort: CenterSortBy | undefined,
   hasUserLocation: boolean,
@@ -323,52 +313,104 @@ function sortDecisionRecords<
   );
 }
 
-async function loadOriginContext(
-  env: WorkerEnv,
+function buildCenterFilters(
+  query: ReturnType<typeof parseListCentersQuery>,
+) {
+  return {
+    kind: query.kind,
+    q: query.q,
+    has_wifi: query.has_wifi,
+    has_sockets: query.has_sockets,
+    accessible: query.accessible,
+    open_air: query.open_air,
+    has_ser: query.has_ser,
+    district: query.district,
+    neighborhood: query.neighborhood,
+  };
+}
+
+function buildBaseListRecord(
+  center: Awaited<ReturnType<typeof listCenters>>[number],
+  scheduleRecord: Parameters<typeof buildScheduleFromRecord>[0],
   userLocation: { lat: number; lon: number } | null,
 ) {
-  if (!userLocation) {
-    return {
-      originEmtStops: [],
-      originBicimadStations: [],
-      originMetroStations: [],
-      realtimeByStopId: new Map(),
-      emtRealtimeStatus: "unconfigured" as const,
-      emtRealtimeFetchedAt: null as string | null,
-    };
+  const schedule = buildScheduleFromRecord(scheduleRecord ?? null, null);
+  const mobility = buildCenterMobility({
+    center,
+    schedule,
+    userLocation,
+    ser: null,
+    originEmtStops: [],
+    destinationEmtStops: [],
+    originBicimadStations: [],
+    destinationBicimadStations: [],
+    originMetroStations: [],
+    destinationMetroStations: [],
+    destinationParkings: [],
+    realtimeByStopId: new Map(),
+    emtRealtimeStatus: "unconfigured",
+    fetchedAt: new Date().toISOString(),
+  });
+  const decision = buildDecisionSummary({
+    center,
+    schedule,
+    userLocation,
+    mobility,
+  });
+
+  return { center, schedule, mobility, decision };
+}
+
+async function loadListWindowRecords(
+  env: WorkerEnv,
+  query: ReturnType<typeof parseListCentersQuery>,
+  userLocation: { lat: number; lon: number } | null,
+) {
+  const sortMode = buildListSortMode(query.sort_by, userLocation !== null);
+  const filters = buildCenterFilters(query);
+  const targetCount = Math.max(query.offset + query.limit + LIST_VISIBLE_PADDING, DEFAULT_LIMIT);
+  const records: Array<ReturnType<typeof buildBaseListRecord>> = [];
+  let scanned = 0;
+  let fetchOffset = 0;
+  let exhausted = false;
+
+  while (records.length < targetCount && scanned < LIST_SCAN_LIMIT && !exhausted) {
+    const batchLimit = Math.min(LIST_SCAN_CHUNK, LIST_SCAN_LIMIT - scanned);
+    const centers = await listCenters(env.DB, filters, {
+      limit: batchLimit,
+      offset: fetchOffset,
+    });
+
+    if (centers.length === 0) {
+      exhausted = true;
+      break;
+    }
+
+    fetchOffset += centers.length;
+    scanned += centers.length;
+
+    const scheduleMap = await loadActiveSchedulesByCenterIds(
+      env.DB,
+      centers.map((center) => center.id),
+    );
+
+    const batchRecords = centers
+      .map((center) => buildBaseListRecord(center, scheduleMap.get(center.id) ?? null, userLocation))
+      .filter((item) =>
+        query.open_now === undefined ? true : item.schedule.is_open_now === query.open_now,
+      );
+
+    records.push(...batchRecords);
+
+    if (centers.length < batchLimit) {
+      exhausted = true;
+    }
   }
 
-  const activeTransportNodes = await listActiveTransportNodesByKinds(env.DB, [
-    "emt_stop",
-    "bicimad_station",
-    "metro_station",
-  ]);
-  const originCandidates = buildOriginTransportCandidates({
-    rows: activeTransportNodes,
-    origin: userLocation,
-  });
-  const realtimeResult = await fetchEmtRealtimeForStopIds(
-    originCandidates.originEmtStops.map((stop) => stop.id),
-    env.EMT_CLIENT_ID ||
-      env.EMT_PASS_KEY ||
-      env.EMT_EMAIL ||
-      env.EMT_PASSWORD
-      ? {
-          clientId: env.EMT_CLIENT_ID,
-          passKey: env.EMT_PASS_KEY,
-          email: env.EMT_EMAIL,
-          password: env.EMT_PASSWORD,
-        }
-      : null,
-  );
-
   return {
-    originEmtStops: originCandidates.originEmtStops,
-    originBicimadStations: originCandidates.originBicimadStations,
-    originMetroStations: originCandidates.originMetroStations,
-    realtimeByStopId: groupRealtimeByStopId(realtimeResult.arrivals),
-    emtRealtimeStatus: realtimeResult.status,
-    emtRealtimeFetchedAt: new Date().toISOString(),
+    records: sortDecisionRecords(records, sortMode),
+    exhausted,
+    sortMode,
   };
 }
 
@@ -405,69 +447,26 @@ export async function handleListCenters(
         originBucket: buildOriginBucket(query.user_lat, query.user_lon),
       },
       async (dataVersion) => {
-        const centers = await listCenters(env.DB, {
-          kind: query.kind,
-          q: query.q,
-          has_wifi: query.has_wifi,
-          has_sockets: query.has_sockets,
-          accessible: query.accessible,
-          open_air: query.open_air,
-          has_ser: query.has_ser,
-          district: query.district,
-          neighborhood: query.neighborhood,
-        });
-        const centerIds = centers.map((center) => center.id);
         const userLocation =
           query.user_lat !== undefined && query.user_lon !== undefined
             ? { lat: query.user_lat, lon: query.user_lon }
             : null;
-        const sortMode = buildListSortMode(query.sort_by, userLocation !== null);
-        const scheduleMap = await loadActiveSchedulesByCenterIds(env.DB, centerIds);
-        const baseRecords = centers
-          .map((center) => {
-            const schedule = buildScheduleFromRecord(scheduleMap.get(center.id) ?? null, null);
-            const mobility = buildCenterMobility({
-              center,
-              schedule,
-              userLocation,
-              ser: null,
-              originEmtStops: [],
-              destinationEmtStops: [],
-              originBicimadStations: [],
-              destinationBicimadStations: [],
-              originMetroStations: [],
-              destinationMetroStations: [],
-              destinationParkings: [],
-              realtimeByStopId: new Map(),
-              emtRealtimeStatus: "unconfigured",
-              fetchedAt: new Date().toISOString(),
-            });
-            const decision = buildDecisionSummary({
-              center,
-              schedule,
-              userLocation,
-              mobility,
-            });
+        const [totalMatchingCenters, listWindow] = await Promise.all([
+          countCenters(env.DB, buildCenterFilters(query)),
+          loadListWindowRecords(env, query, userLocation),
+        ]);
+        const openCountInResults = listWindow.records.filter((r) => r.schedule.is_open_now).length;
+        let sortedRecords = listWindow.records;
 
-            return { center, schedule, mobility, decision };
-          })
-          .filter((item) =>
-            query.open_now === undefined ? true : item.schedule.is_open_now === query.open_now,
+        if (userLocation && listWindow.records.length > 0) {
+          const candidateRecords = listWindow.records.slice(
+            0,
+            Math.max(query.offset + query.limit + LIST_VISIBLE_PADDING, DEFAULT_LIMIT),
           );
-        const baseSortedRecords = sortDecisionRecords(baseRecords, sortMode);
-        const openCountInResults = baseSortedRecords.filter((r) => r.schedule.is_open_now).length;
-        let sortedRecords = baseSortedRecords;
-
-        if (userLocation && baseSortedRecords.length > 0) {
-          const candidateCount = Math.min(
-            baseSortedRecords.length,
-            Math.max(query.offset + query.limit + 12, 24),
-          );
-          const candidateRecords = baseSortedRecords.slice(0, candidateCount);
           const candidateIds = candidateRecords.map((record) => record.center.id);
           const [transportNodeMap, originContext] = await Promise.all([
             loadTransportNodesByCenterIds(env.DB, candidateIds),
-            loadOriginContext(env, userLocation),
+            loadOriginTransportContext(env, userLocation),
           ]);
           const enrichedCandidates = candidateRecords.map((record) => {
             const destination = groupDestinationTransportNodes(
@@ -500,8 +499,8 @@ export async function handleListCenters(
           });
           const candidateIdSet = new Set(candidateIds);
           sortedRecords = [
-            ...sortDecisionRecords(enrichedCandidates, sortMode),
-            ...baseSortedRecords.filter((record) => !candidateIdSet.has(record.center.id)),
+            ...sortDecisionRecords(enrichedCandidates, listWindow.sortMode),
+            ...listWindow.records.filter((record) => !candidateIdSet.has(record.center.id)),
           ];
         }
 
@@ -511,7 +510,7 @@ export async function handleListCenters(
         const items = pagedRecords.map((item) =>
           toCenterDecisionCardItem({
             center: item.center,
-            schedule: buildScheduleFromRecord(scheduleMap.get(item.center.id) ?? null, null),
+            schedule: item.schedule,
             ser: serMap.has(item.center.id)
               ? {
                   enabled: serMap.get(item.center.id)?.enabled ?? false,
@@ -524,12 +523,22 @@ export async function handleListCenters(
         );
         const payload: ListCentersResponse = {
           items,
-          total: sortedRecords.length,
+          total:
+            query.open_now === undefined
+              ? totalMatchingCenters
+              : listWindow.exhausted
+                ? sortedRecords.length
+                : Math.max(sortedRecords.length, query.offset + pagedRecords.length + 1),
           open_count: openCountInResults,
           limit: query.limit,
           offset: query.offset,
           next_offset:
-            query.offset + query.limit < sortedRecords.length
+            query.offset + query.limit <
+            (query.open_now === undefined
+              ? totalMatchingCenters
+              : listWindow.exhausted
+                ? sortedRecords.length
+                : Math.max(sortedRecords.length, query.offset + pagedRecords.length + 1))
               ? query.offset + query.limit
               : null,
         };

@@ -24,12 +24,34 @@ type EmtLoginAttempt = {
   headers: Record<string, string>;
 };
 
+const EMT_LOGIN_TIMEOUT_MS = 3500;
+const EMT_REALTIME_TIMEOUT_MS = 4000;
+
 let cachedAccessToken:
   | {
       value: string;
       expiresAt: number;
     }
   | null = null;
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number,
+  fetchImpl: typeof fetch,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetchImpl(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function getJsonValue(
   record: Record<string, JsonValue>,
@@ -103,12 +125,14 @@ async function loginEmt(
   const errors: string[] = [];
 
   for (const attempt of attempts) {
-    const response = await fetchImpl(
+    const response = await fetchWithTimeout(
       "https://openapi.emtmadrid.es/v1/mobilitylabs/user/login/",
       {
         method: "GET",
         headers: attempt.headers,
       },
+      EMT_LOGIN_TIMEOUT_MS,
+      fetchImpl,
     );
 
     if (!response.ok) {
@@ -222,9 +246,9 @@ export async function fetchEmtRealtimeForStopIds(
     };
   }
 
-  const results = await Promise.all(
+  const results = await Promise.allSettled(
     stopIds.slice(0, 6).map(async (stopId) => {
-      const response = await fetchImpl(
+      const response = await fetchWithTimeout(
         `https://openapi.emtmadrid.es/v1/transport/busemtmad/stops/${encodeURIComponent(stopId)}/arrives/all/`,
         {
           method: "POST",
@@ -241,6 +265,8 @@ export async function fetchEmtRealtimeForStopIds(
               new Date().toISOString().slice(0, 10).replace(/-/g, ""),
           }),
         },
+        EMT_REALTIME_TIMEOUT_MS,
+        fetchImpl,
       );
 
       if (!response.ok) {
@@ -266,31 +292,49 @@ export async function fetchEmtRealtimeForStopIds(
         arriveData,
       );
     }),
-  ).catch((error: Error) => {
-    return error;
-  });
+  );
+  const fulfilled = results
+    .filter(
+      (
+        result,
+      ): result is PromiseFulfilledResult<EmtRealtimeRawItem[]> => result.status === "fulfilled",
+    )
+    .map((result) => result.value);
+  const rejected = results
+    .filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    )
+    .map((result) =>
+      result.reason instanceof Error ? result.reason.message : "emt_realtime_unknown",
+    );
 
-  if (results instanceof Error) {
+  if (fulfilled.length === 0 && rejected.length > 0) {
     return {
       status: "error",
-      message: `Tiempo real EMT no disponible (${results.message}).`,
+      message: `Tiempo real EMT no disponible (${rejected.join(", ")}).`,
       arrivals: [],
     };
   }
 
-  const arrivals = results.flat().sort((left, right) => left.minutes - right.minutes);
+  const arrivals = fulfilled.flat().sort((left, right) => left.minutes - right.minutes);
 
   if (arrivals.length === 0) {
     return {
-      status: "empty",
-      message: "EMT no ha devuelto proximas llegadas para las paradas cercanas.",
+      status: rejected.length > 0 ? "error" : "empty",
+      message:
+        rejected.length > 0
+          ? `Tiempo real EMT parcial o agotado (${rejected.join(", ")}).`
+          : "EMT no ha devuelto proximas llegadas para las paradas cercanas.",
       arrivals: [],
     };
   }
 
   return {
-    status: "available",
-    message: null,
+    status: rejected.length > 0 ? "error" : "available",
+    message:
+      rejected.length > 0
+        ? `Tiempo real EMT parcial (${rejected.join(", ")}).`
+        : null,
     arrivals,
   };
 }

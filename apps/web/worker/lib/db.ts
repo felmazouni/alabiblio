@@ -553,22 +553,51 @@ export async function getLatestDataVersion(
   return result?.latest_data_version ?? null;
 }
 
+type CenterListFilters = Pick<
+  ListCentersQuery,
+  | "kind"
+  | "q"
+  | "has_wifi"
+  | "has_sockets"
+  | "accessible"
+  | "open_air"
+  | "has_ser"
+  | "district"
+  | "neighborhood"
+>;
+
+export async function countCenters(
+  db: D1Database,
+  query: CenterListFilters,
+): Promise<number> {
+  const where = buildWhereClause(query);
+  const result = await db
+    .prepare(
+      `SELECT COUNT(*) AS total
+      FROM centers
+      WHERE ${where.clause}`,
+    )
+    .bind(...where.bindings)
+    .first<{ total: number | string }>();
+
+  return Number(result?.total ?? 0);
+}
+
 export async function listCenters(
   db: D1Database,
-  query: Pick<
-    ListCentersQuery,
-    | "kind"
-    | "q"
-    | "has_wifi"
-    | "has_sockets"
-    | "accessible"
-    | "open_air"
-    | "has_ser"
-    | "district"
-    | "neighborhood"
-  >,
+  query: CenterListFilters,
+  options?: {
+    limit?: number;
+    offset?: number;
+  },
 ): Promise<CenterRecord[]> {
   const where = buildWhereClause(query);
+  const limitClause =
+    options?.limit !== undefined ? ` LIMIT ${Math.max(1, Math.trunc(options.limit))}` : "";
+  const offsetClause =
+    options?.limit !== undefined && options?.offset !== undefined
+      ? ` OFFSET ${Math.max(0, Math.trunc(options.offset))}`
+      : "";
 
   const result = await db
     .prepare(
@@ -579,7 +608,7 @@ export async function listCenters(
         notes_raw, is_active, created_at, updated_at
       FROM centers
       WHERE ${where.clause}
-      ORDER BY name ASC, id ASC`,
+      ORDER BY name ASC, id ASC${limitClause}${offsetClause}`,
     )
     .bind(...where.bindings)
     .all<CenterRow>();

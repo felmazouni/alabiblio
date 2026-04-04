@@ -1,6 +1,6 @@
 import type { CenterDecisionCardItem } from "@alabiblio/contracts/centers";
 import { Clock3, MapPin, Navigation } from "lucide-react";
-import { humanizeHighlightLabel } from "../transportCopy";
+import { buildSecondaryCardHighlights } from "../transportCopy";
 
 type CenterRowItemProps = {
   center: CenterDecisionCardItem;
@@ -8,7 +8,7 @@ type CenterRowItemProps = {
 };
 
 export function CenterRowItem({ center, onSelect }: CenterRowItemProps) {
-  const highlights = [center.mobility_highlights.primary, center.mobility_highlights.secondary].filter(Boolean);
+  const highlights = buildSecondaryCardHighlights(center);
 
   return (
     <button type="button" className="center-row-item" onClick={() => onSelect(center.slug)}>
@@ -51,8 +51,8 @@ export function CenterRowItem({ center, onSelect }: CenterRowItemProps) {
       </div>
       <div className="center-row-item__features">
         {highlights.slice(0, 2).map((highlight) => (
-          <span key={`${center.id}-${highlight!.mode}-${highlight!.label}`} className="center-row-item__highlight">
-            {humanizeHighlightLabel(highlight!.label)}
+          <span key={`${center.id}-${highlight}`} className="center-row-item__highlight">
+            {highlight}
           </span>
         ))}
       </div>

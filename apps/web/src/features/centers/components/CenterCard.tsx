@@ -1,7 +1,7 @@
 import type { CenterDecisionCardItem } from "@alabiblio/contracts/centers";
 import { Accessibility, Clock3, MapPin, Navigation, Plug, Trees, Users, Wifi } from "lucide-react";
 import SpotlightCard from "../../../components/reactbits/SpotlightCard";
-import { humanizeHighlightLabel } from "../transportCopy";
+import { buildSecondaryCardHighlights } from "../transportCopy";
 import "./CenterCard.css";
 
 type CenterCardProps = {
@@ -27,22 +27,11 @@ function serviceItems(center: CenterDecisionCardItem) {
   ].filter((value): value is NonNullable<typeof value> => value !== null);
 }
 
-function highlightModeLabel(mode: NonNullable<CenterDecisionCardItem["mobility_highlights"]["primary"]>["mode"]): string {
-  switch (mode) {
-    case "walk": return "A pie";
-    case "car": return "Coche";
-    case "bus": return "EMT";
-    case "bike": return "BiciMAD";
-    case "metro": return "Metro";
-    default: return "Llegada";
-  }
-}
-
 export function CenterCard({ center, onSelect }: CenterCardProps) {
   const area = buildArea(center);
   const nextChange = buildNextChange(center);
   const services = serviceItems(center).slice(0, 4);
-  const highlights = [center.mobility_highlights.primary, center.mobility_highlights.secondary].filter(Boolean);
+  const highlightRows = buildSecondaryCardHighlights(center);
 
   return (
     <button type="button" className="decision-card" onClick={() => onSelect(center.slug)}>
@@ -92,16 +81,16 @@ export function CenterCard({ center, onSelect }: CenterCardProps) {
           </div>
         ) : null}
 
-        <div className="decision-card__highlights">
-          {highlights.length > 0 ? highlights.map((highlight) => (
-            <div key={`${center.id}-${highlight!.mode}-${highlight!.label}`} className="decision-card__highlight">
-              <span className="decision-card__highlight-mode">{highlightModeLabel(highlight!.mode)}</span>
-              <span className="decision-card__highlight-label">{humanizeHighlightLabel(highlight!.label)}</span>
+        <div className="decision-card__board">
+          {highlightRows.length > 0 ? highlightRows.map((line) => (
+            <div key={`${center.id}-${line}`} className="decision-card__board-row">
+              <span className="decision-card__board-label">{line.split(" · ")[0]}</span>
+              <span className="decision-card__board-body">{line.split(" · ").slice(1).join(" · ")}</span>
             </div>
           )) : (
-            <div className="decision-card__highlight decision-card__highlight--fallback">
-              <span className="decision-card__highlight-mode">Llegada</span>
-              <span className="decision-card__highlight-label">
+            <div className="decision-card__board-row decision-card__board-row--fallback">
+              <span className="decision-card__board-label">LLEGADA</span>
+              <span className="decision-card__board-body">
                 {center.decision.summary_label ?? "Sin origen suficiente"}
               </span>
             </div>
