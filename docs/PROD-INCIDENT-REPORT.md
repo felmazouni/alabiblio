@@ -93,7 +93,7 @@ Se demostraron tres problemas reales dentro del runtime de la app:
 ## Deploy mas reciente
 
 - entorno: `production`
-- version desplegada: `18c7d654-86dc-4fb1-b049-196aeb584645`
+- version desplegada: `bc01480c-013e-4d4f-bf28-c3af0d46bbbd`
 
 ## Evidencia adicional desde esta maquina
 
