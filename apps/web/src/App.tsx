@@ -29,10 +29,13 @@ import {
   Bike,
   Bus,
   Car,
+  Clock3,
+  Flag,
   LayoutGrid,
   List,
   MapPin,
   Navigation,
+  Route as RouteIcon,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -462,8 +465,12 @@ function TopPicksScreen() {
             <section className="top-picks-header">
               <div className="top-picks-header__copy">
                 <span className="list-topbar__eyebrow">cerca de ti</span>
-                <h1>Las 3 mejores opciones</h1>
-                <p>Analizamos tres centros con transporte completo y dejamos el resto del catalogo en carga base.</p>
+                <h1>{serverOpenCount > 0 ? "Las mejores opciones abiertas ahora" : "Las mejores opciones proximas"}</h1>
+                <p>
+                  {serverOpenCount > 0
+                    ? "Priorizamos solo centros abiertos y resolvemos transporte completo para las tres mejores opciones."
+                    : "No hay centros abiertos elegibles ahora mismo. Mostramos las opciones mas utiles para mas tarde."}
+                </p>
               </div>
               <div className="top-picks-header__actions">
                 <button
@@ -488,7 +495,7 @@ function TopPicksScreen() {
 
             <section className="top-picks-summary">
               <span className="list-topbar__pill"><strong>{topPicks.length}</strong> opciones resueltas</span>
-              <span className="list-topbar__pill list-topbar__pill--open"><strong>{serverOpenCount}</strong> abiertas</span>
+              <span className="list-topbar__pill list-topbar__pill--open"><strong>{serverOpenCount}</strong> abiertas ahora</span>
               {originPresetsError ? <span className="screen__inline-error">{originPresetsError}</span> : null}
             </section>
 
@@ -628,7 +635,24 @@ function TopPickCard({
                 </span>
                 <span className="top-pick-card__mode-label">{row.label}</span>
               </span>
-              <span className="best-option-card__board-body">{row.body}</span>
+              <span className="best-option-card__board-copy">
+                <strong className="best-option-card__board-headline">{row.headline}</strong>
+                {row.details.length > 0 ? (
+                  <span className="best-option-card__board-details">
+                    {row.details.map((detail) => (
+                      <span key={`${center.id}-${row.mode}-${detail.kind}-${detail.text}`} className={`best-option-card__board-detail best-option-card__board-detail--${detail.kind}`}>
+                        {detail.kind === "origin" ? <MapPin size={11} /> : null}
+                        {detail.kind === "destination" ? <Flag size={11} /> : null}
+                        {detail.kind === "time" ? <Clock3 size={11} /> : null}
+                        {detail.kind === "route" ? <RouteIcon size={11} /> : null}
+                        {detail.kind === "availability" ? <Bike size={11} /> : null}
+                        {detail.kind === "note" ? <Navigation size={11} /> : null}
+                        {detail.text}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+              </span>
               <span className="best-option-card__board-eta">{row.eta}</span>
             </div>
           ))}
@@ -895,7 +919,10 @@ function CatalogScreen() {
                 <strong>{total}</strong> centros
               </span>
               <span className="list-topbar__pill list-topbar__pill--open">
-                <strong>{serverOpenCount}</strong> abiertos
+                <strong>{serverOpenCount}</strong> abiertos ahora
+              </span>
+              <span className="list-topbar__pill">
+                <strong>{items.length}</strong> cargados
               </span>
               <button
                 type="button"

@@ -16,7 +16,11 @@ export type SecondaryCardHighlightRow = {
 export type TransportBoardRow = {
   mode: "metro" | "bus" | "bike";
   label: string;
-  body: string;
+  headline: string;
+  details: Array<{
+    kind: "route" | "origin" | "destination" | "time" | "availability" | "note";
+    text: string;
+  }>;
   eta: string | null;
   recommended: boolean;
 };
@@ -26,6 +30,14 @@ export type TransportFooterTile = {
   label: string;
   body: string;
 };
+
+function buildBoardDetail(
+  kind: "route" | "origin" | "destination" | "time" | "availability" | "note",
+  text: string | null | undefined,
+) {
+  const clean = cleanText(text);
+  return clean ? { kind, text: clean } : null;
+}
 
 function cleanText(value: string | null | undefined): string {
   return (value ?? "")
@@ -346,40 +358,69 @@ export function buildSecondaryCardHighlights(center: CenterDecisionCardItem): Se
   return rows.slice(0, 3);
 }
 
-function buildBusBoardBody(bus: BusModuleV1): string {
+function buildBusBoardContent(bus: BusModuleV1): Pick<TransportBoardRow, "headline" | "details"> {
   if (bus.selected_line && bus.origin_stop) {
-    const line = `Linea ${bus.selected_line}`;
-    const origin = trimLabel(bus.origin_stop.name, 18);
-    const destination = bus.destination_stop
-      ? trimLabel(bus.destination_stop.name, 18)
-      : (bus.selected_destination ? trimLabel(bus.selected_destination, 18) : null);
-    const realtime = bus.next_arrival_min !== null ? `espera ${bus.next_arrival_min} min` : "sin tiempo real";
-    const trip = bus.estimated_travel_min !== null ? `viaje ${bus.estimated_travel_min} min` : null;
-    return [line, destination ? `${origin} -> ${destination}` : origin, realtime, trip].filter(Boolean).join(" - ");
+    return {
+      headline: `L${bus.selected_line}`,
+      details: [
+        buildBoardDetail("origin", `Subida: ${trimLabel(bus.origin_stop.name, 20)}`),
+        buildBoardDetail(
+          "destination",
+          bus.destination_stop
+            ? `Bajada: ${trimLabel(bus.destination_stop.name, 20)}`
+            : bus.selected_destination
+              ? `Destino: ${trimLabel(bus.selected_destination, 20)}`
+              : null,
+        ),
+        buildBoardDetail("time", bus.next_arrival_min !== null ? `Espera ${bus.next_arrival_min} min` : "Tiempo real no disponible"),
+        buildBoardDetail("route", bus.estimated_travel_min !== null ? `Viaje ${bus.estimated_travel_min} min` : null),
+      ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+    };
   }
 
   if (bus.origin_stop && bus.realtime_status !== "available") {
-    return `Parada ${trimLabel(bus.origin_stop.name, 18)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - tiempo real no disponible`;
+    return {
+      headline: trimLabel(bus.origin_stop.name, 20),
+      details: [
+        buildBoardDetail("origin", `Parada a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"}`),
+        buildBoardDetail("time", "Tiempo real no disponible"),
+      ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+    };
   }
 
   if (bus.origin_stop) {
-    return `Parada ${trimLabel(bus.origin_stop.name, 18)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - sin linea directa clara`;
+    return {
+      headline: trimLabel(bus.origin_stop.name, 20),
+      details: [
+        buildBoardDetail("origin", `Parada a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"}`),
+        buildBoardDetail("note", "Sin linea directa util"),
+      ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+    };
   }
 
-  return "No vemos una opcion EMT clara";
+  return {
+    headline: "Sin linea util",
+    details: [buildBoardDetail("note", "No vemos una opcion EMT clara")].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+  };
 }
 
-function buildBikeBoardBody(bike: BikeModuleV1): string {
+function buildBikeBoardContent(bike: BikeModuleV1): Pick<TransportBoardRow, "headline" | "details"> {
   const origin = bike.origin_station
     ? `${stationRef(bike.origin_station.station_number, bike.origin_station.name)}${bike.bikes_available !== null ? ` - ${bike.bikes_available} bicis` : ""}`
     : "origen sin estacion";
   const destination = bike.destination_station
     ? `${stationRef(bike.destination_station.station_number, bike.destination_station.name)}${bike.docks_available !== null ? ` - ${bike.docks_available} anclajes` : ""}`
     : "destino sin estacion";
-  return `Origen: ${origin} - Destino: ${destination}`;
+  return {
+    headline: bike.eta_min !== null ? `Trayecto BiciMAD ${bike.eta_min} min` : "Trayecto BiciMAD",
+    details: [
+      buildBoardDetail("origin", `Origen: ${origin}`),
+      buildBoardDetail("destination", `Destino: ${destination}`),
+    ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+  };
 }
 
-function buildMetroBoardBody(metro: MetroModuleV1): string {
+function buildMetroBoardContent(metro: MetroModuleV1): Pick<TransportBoardRow, "headline" | "details"> {
   const origin = metro.origin_station
     ? trimLabel(metro.origin_station.name, 18)
     : "Origen sin estacion";
@@ -387,7 +428,24 @@ function buildMetroBoardBody(metro: MetroModuleV1): string {
     ? trimLabel(metro.destination_station.name, 18)
     : "Destino sin estacion";
   const lines = metro.line_labels.slice(0, 3).join(", ");
-  return `${origin} -> ${destination}${lines ? ` - ${lines}` : ""}`;
+  return {
+    headline: `${origin} -> ${destination}`,
+    details: [
+      buildBoardDetail("route", lines ? lines : null),
+      buildBoardDetail(
+        "origin",
+        metro.origin_station?.distance_m !== undefined && metro.origin_station?.distance_m !== null
+          ? `Origen a ${formatWalkMinutesFromMeters(metro.origin_station.distance_m)}`
+          : null,
+      ),
+      buildBoardDetail(
+        "destination",
+        metro.destination_station?.distance_m !== undefined && metro.destination_station?.distance_m !== null
+          ? `Destino a ${formatWalkMinutesFromMeters(metro.destination_station.distance_m)}`
+          : null,
+      ),
+    ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+  };
 }
 
 export function buildFeaturedTransportRows(
@@ -402,14 +460,20 @@ export function buildFeaturedTransportRows(
     {
       mode: "metro",
       label: "METRO",
-      body: metro ? buildMetroBoardBody(metro) : "Sin una alternativa clara de metro",
+      ...(metro ? buildMetroBoardContent(metro) : {
+        headline: "Sin alternativa clara",
+        details: [buildBoardDetail("note", "No vemos una combinacion de metro clara")].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+      }),
       eta: formatEta(metro?.eta_min ?? null),
       recommended: bestMode === "metro",
     },
     {
       mode: "bus",
       label: "BUS",
-      body: bus ? buildBusBoardBody(bus) : "Sin una alternativa EMT clara",
+      ...(bus ? buildBusBoardContent(bus) : {
+        headline: "Sin alternativa EMT",
+        details: [buildBoardDetail("note", "No vemos una opcion EMT clara")].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+      }),
       eta: bus && bus.estimated_total_min !== null
         ? `${bus.estimated_total_min} min`
         : bus && bus.next_arrival_min !== null
@@ -420,7 +484,10 @@ export function buildFeaturedTransportRows(
     {
       mode: "bike",
       label: "BICIMAD",
-      body: bike ? buildBikeBoardBody(bike) : "Sin una alternativa BiciMAD clara",
+      ...(bike ? buildBikeBoardContent(bike) : {
+        headline: "Sin alternativa BiciMAD",
+        details: [buildBoardDetail("note", "No vemos una combinacion BiciMAD clara")].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+      }),
       eta: formatEta(bike?.eta_min ?? null),
       recommended: bestMode === "bike",
     },

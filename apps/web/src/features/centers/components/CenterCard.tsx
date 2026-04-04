@@ -107,7 +107,9 @@ export function CenterCard({
                       : <Bike size={13} />}
                   {row.label}
                 </span>
-                <span className="decision-card__board-body">{row.body}</span>
+                <span className="decision-card__board-body">
+                  {row.details.length > 0 ? `${row.headline} - ${row.details.map((detail) => detail.text).join(" - ")}` : row.headline}
+                </span>
                 {row.eta ? <span className="decision-card__board-eta">{row.eta}</span> : null}
               </div>
             )) : highlightRows.length > 0 ? highlightRows.map((line) => (

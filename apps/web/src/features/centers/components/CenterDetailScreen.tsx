@@ -8,9 +8,11 @@ import {
   Car,
   Clock3,
   ExternalLink,
+  Flag,
   FileText,
   MapPin,
   Navigation,
+  Route as RouteIcon,
   TrainFront,
   Users,
 } from "lucide-react";
@@ -72,7 +74,31 @@ export function CenterDetailScreen({
   if (loading) {
     return (
       <section className="detail-screen">
-        <EmptyStateCard title="Cargando detalle" body="Preparando decision, transporte y contexto." />
+        <section className="detail-screen__hero detail-screen__hero--loading">
+          <div className="detail-screen__hero-header">
+            <div className="detail-screen__hero-copy">
+              <span className="detail-screen__eyebrow">Cargando centro</span>
+              <h1 className="detail-screen__skeleton detail-screen__skeleton--title" />
+              <p className="detail-screen__skeleton detail-screen__skeleton--line" />
+            </div>
+          </div>
+          <div className="detail-screen__kpi-strip">
+            <div className="detail-screen__kpi detail-screen__kpi--skeleton" />
+            <div className="detail-screen__kpi detail-screen__kpi--skeleton" />
+            <div className="detail-screen__kpi detail-screen__kpi--skeleton" />
+          </div>
+        </section>
+        <section className="detail-screen__section">
+          <div className="detail-screen__section-copy">
+            <span className="detail-screen__section-label">Como llegar</span>
+            <h3>Preparando transporte y contexto</h3>
+            <p>Mostramos primero la base del centro y cargamos la movilidad aparte.</p>
+          </div>
+          <div className="transport-v1-list transport-v1-list--board">
+            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Cargando bloques de coche, EMT, BiciMAD y metro...</div>
+            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Preparando mapa y trazado de llegada...</div>
+          </div>
+        </section>
       </section>
     );
   }
@@ -179,9 +205,26 @@ export function CenterDetailScreen({
                   {row.label}
                 </span>
                 <div className="transport-v1-row__copy">
-                  <span className="transport-v1-row__body">
-                    {buildDetailModeSummary(row.mode, mobility)}
-                  </span>
+                  <strong className="transport-v1-row__headline">{row.headline}</strong>
+                  {row.details.length > 0 ? (
+                    <span className="transport-v1-row__detail-list">
+                      {row.details.map((detail) => (
+                        <span key={`${row.mode}-${detail.kind}-${detail.text}`} className={`transport-v1-row__detail transport-v1-row__detail--${detail.kind}`}>
+                          {detail.kind === "origin" ? <MapPin size={11} /> : null}
+                          {detail.kind === "destination" ? <Flag size={11} /> : null}
+                          {detail.kind === "time" ? <Clock3 size={11} /> : null}
+                          {detail.kind === "route" ? <RouteIcon size={11} /> : null}
+                          {detail.kind === "availability" ? <Bike size={11} /> : null}
+                          {detail.kind === "note" ? <Navigation size={11} /> : null}
+                          {detail.text}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="transport-v1-row__body">
+                      {buildDetailModeSummary(row.mode, mobility)}
+                    </span>
+                  )}
                   {buildModuleNote(row.mode, mobility) ? <span className="transport-v1-row__note">{buildModuleNote(row.mode, mobility)}</span> : null}
                 </div>
                 {row.eta ? <span className="transport-v1-row__eta">{row.eta}</span> : null}
