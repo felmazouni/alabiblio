@@ -10,7 +10,6 @@ import type {
   OriginPreset,
   UserOrigin,
 } from "@alabiblio/contracts/origin";
-import type { ReactNode } from "react";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import {
   BrowserRouter,
@@ -31,10 +30,8 @@ import {
   MapPin,
   Navigation,
   Search,
-  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  TimerReset,
   TrainFront,
   X,
 } from "lucide-react";
@@ -46,7 +43,6 @@ import ShinyText from "./components/reactbits/ShinyText";
 import {
   fetchCenterDetail,
   fetchCenterMobility,
-  fetchCenterMobilitySummary,
   fetchCenters,
   fetchGeocodeOptions,
   fetchOriginPresets,
@@ -103,11 +99,6 @@ function getOriginTone(
   return "idle";
 }
 
-function buildListSubtitle(origin: UserOrigin | null): string {
-  if (!origin) return "Explora sin origen o activa uno para calcular llegadas";
-  return `Saliendo desde ${origin.label}`;
-}
-
 function buildCentersListQuery(input: {
   kindFilter: KindFilter;
   deferredSearch: string;
@@ -140,11 +131,6 @@ function buildCentersListQuery(input: {
     user_lat: input.userLat,
     user_lon: input.userLon,
   };
-}
-
-function pickFeaturedCenter(items: CenterListItem[], originActive: boolean): CenterListItem | null {
-  if (!originActive || items.length === 0) return null;
-  return items.find((item) => item.is_open_now) ?? items[0] ?? null;
 }
 
 function buildFeaturedCardFrame(
@@ -195,20 +181,9 @@ function buildFeaturedCardFrame(
   };
 }
 
-function LandingFeature({ icon, title, body }: { icon: ReactNode; title: string; body: string }) {
-  return (
-    <SpotlightCard className="landing-feature">
-      <span className="landing-feature__icon">{icon}</span>
-      <div className="landing-feature__copy">
-        <strong>{title}</strong>
-        <p>{body}</p>
-      </div>
-    </SpotlightCard>
-  );
-}
-
 const DESKTOP_NAV = [
-  { to: "/", label: "Explorar" },
+  { to: "/", label: "Top 3" },
+  { to: "/listado", label: "Listado" },
 ];
 
 function DesktopTopBar() {
@@ -245,9 +220,447 @@ function DesktopTopBar() {
   );
 }
 
-function ExplorerScreen() {
+function TopPicksScreen() {
   const navigate = useNavigate();
-  const [exploreWithoutOrigin, setExploreWithoutOrigin] = useState(false);
+  const [originSheetOpen, setOriginSheetOpen] = useState(false);
+  const [originQuery, setOriginQuery] = useState("");
+  const [originResults, setOriginResults] = useState<GeocodeAddressOption[]>([]);
+  const [originSearchLoading, setOriginSearchLoading] = useState(false);
+  const [originSearchError, setOriginSearchError] = useState<string | null>(null);
+  const [originPresets, setOriginPresets] = useState<OriginPreset[]>([]);
+  const [originPresetsError, setOriginPresetsError] = useState<string | null>(null);
+  const [items, setItems] = useState<CenterListItem[]>([]);
+  const [serverOpenCount, setServerOpenCount] = useState(0);
+  const [topMobilityItems, setTopMobilityItems] = useState<CenterTopMobilityItem[]>([]);
+  const [topPicksResolvedKey, setTopPicksResolvedKey] = useState<string | null>(null);
+  const [topPicksErrorState, setTopPicksErrorState] = useState<{ key: string; message: string } | null>(null);
+  const originSearchController = useRef<AbortController | null>(null);
+  const {
+    origin,
+    geolocationStatus,
+    requestGeolocation,
+    setManualOrigin,
+  } = useUserOrigin();
+
+  const originActive = origin !== null;
+  const requestKey = originActive ? `${origin?.lat ?? "none"}:${origin?.lon ?? "none"}` : null;
+  const topMobilityMap = new Map(topMobilityItems.map((entry) => [entry.slug, entry.item] as const));
+  const topPicks = topMobilityItems
+    .map((entry) => ({
+      rank: entry.rank,
+      center: items.find((item) => item.slug === entry.slug) ?? null,
+      mobility: entry.item,
+    }))
+    .filter((entry): entry is { rank: number; center: CenterListItem; mobility: CenterMobility } => entry.center !== null);
+  const hasCurrentTopPicksError =
+    topPicksErrorState !== null && topPicksErrorState.key === requestKey;
+  const loading = originActive && topPicksResolvedKey !== requestKey && !hasCurrentTopPicksError;
+  const error = hasCurrentTopPicksError ? topPicksErrorState.message : null;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchOriginPresets(controller.signal)
+      .then((response) => setOriginPresets(response.items))
+      .catch((nextError: Error) => {
+        if (!controller.signal.aborted) {
+          setOriginPresetsError(`No se pudieron cargar las zonas (${nextError.message}).`);
+        }
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!originActive) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const resolvedRequestKey = requestKey ?? "none";
+
+    void Promise.all([
+      fetchCenters(
+        buildCentersListQuery({
+          kindFilter: "all",
+          deferredSearch: "",
+          limit: 12,
+          offset: 0,
+          openNowOnly: false,
+          wifiOnly: false,
+          socketsOnly: false,
+          accessibleOnly: false,
+          serOnly: false,
+          districtFilter: "",
+          neighborhoodFilter: "",
+          sortBy: "recommended",
+          userLat: origin?.lat,
+          userLon: origin?.lon,
+        }),
+        controller.signal,
+      ),
+      fetchTopMobilityCenters(
+        buildCentersListQuery({
+          kindFilter: "all",
+          deferredSearch: "",
+          limit: 12,
+          offset: 0,
+          openNowOnly: false,
+          wifiOnly: false,
+          socketsOnly: false,
+          accessibleOnly: false,
+          serOnly: false,
+          districtFilter: "",
+          neighborhoodFilter: "",
+          sortBy: "recommended",
+          userLat: origin?.lat,
+          userLon: origin?.lon,
+        }),
+        controller.signal,
+      ),
+    ])
+      .then(([centersResponse, topResponse]) => {
+        if (!controller.signal.aborted) {
+          setItems(centersResponse.items);
+          setServerOpenCount(centersResponse.open_count);
+          setTopMobilityItems(topResponse.items);
+          setTopPicksResolvedKey(resolvedRequestKey);
+          setTopPicksErrorState(null);
+        }
+      })
+      .catch((nextError: Error) => {
+        if (!controller.signal.aborted) {
+          setItems([]);
+          setTopMobilityItems([]);
+          setTopPicksResolvedKey(resolvedRequestKey);
+          setTopPicksErrorState({
+            key: resolvedRequestKey,
+            message: `No se pudieron cargar las mejores opciones (${nextError.message}).`,
+          });
+        }
+      });
+
+    return () => controller.abort();
+  }, [originActive, origin?.lat, origin?.lon, requestKey]);
+
+  function handleOriginQueryChange(value: string): void {
+    setOriginQuery(value);
+
+    const trimmed = value.trim();
+    if (trimmed.length < 3) {
+      originSearchController.current?.abort();
+      setOriginResults([]);
+      setOriginSearchError(null);
+      setOriginSearchLoading(false);
+      return;
+    }
+
+    setOriginSearchLoading(true);
+    setOriginSearchError(null);
+  }
+
+  useEffect(() => {
+    const q = originQuery.trim();
+    if (q.length < 3) {
+      return;
+    }
+
+    originSearchController.current?.abort();
+    const controller = new AbortController();
+    originSearchController.current = controller;
+    const timer = window.setTimeout(() => {
+      void fetchGeocodeOptions(q, controller.signal)
+        .then((response) => {
+          if (!controller.signal.aborted) {
+            setOriginResults(response.items);
+            setOriginSearchError(
+              response.items.length === 0 ? "No encuentro esa direccion. Prueba con calle, barrio o estacion." : null,
+            );
+            setOriginSearchLoading(false);
+          }
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) {
+            setOriginSearchError("No se pudo buscar la direccion. Intentalo de nuevo.");
+            setOriginResults([]);
+            setOriginSearchLoading(false);
+          }
+        });
+    }, 350);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [originQuery]);
+
+  function applyOrigin(nextOrigin: UserOrigin): void {
+    setManualOrigin(nextOrigin);
+    setOriginQuery(nextOrigin.label);
+    setOriginResults([]);
+    setOriginSearchError(null);
+    setOriginSheetOpen(false);
+  }
+
+  return (
+    <section className="screen screen--list">
+      <div className="screen__background">
+        <DotGrid dotSize={10} gap={22} baseColor="#243045" activeColor="#ffb45d" />
+      </div>
+
+      <FadeContent blur duration={320} className="screen__content">
+        {!originActive ? (
+          <section className="entry-screen">
+            <div className="entry-screen__brand">
+              <div className="entry-screen__logo">
+                <div className="entry-screen__logo-mark">
+                  <Navigation size={26} />
+                </div>
+                <div className="entry-screen__logo-copy">
+                  <ShinyText text="alabiblio" className="entry-screen__wordmark" />
+                  <span className="entry-screen__eyebrow">TOP 3 / MADRID / TIEMPO REAL</span>
+                </div>
+              </div>
+              <span className="entry-screen__live-pill">
+                <Sparkles size={12} />
+                DATOS EN TIEMPO REAL
+              </span>
+              <h1>Las 3 mejores opciones para ir ahora.</h1>
+              <p>
+                Resolvemos solo las tres bibliotecas mas utiles desde tu origen y dejamos el listado completo aparte.
+              </p>
+            </div>
+
+            <div className="entry-screen__actions">
+              <button
+                type="button"
+                className="entry-screen__primary"
+                onClick={() => requestGeolocation()}
+              >
+                <Navigation size={16} />
+                Usar mi ubicacion
+              </button>
+              <button
+                type="button"
+                className="entry-screen__secondary"
+                onClick={() => setOriginSheetOpen(true)}
+              >
+                <MapPin size={16} />
+                Introducir direccion
+              </button>
+              <button
+                type="button"
+                className="entry-screen__ghost"
+                onClick={() => navigate("/listado")}
+              >
+                Ver listado base
+                <ArrowRight size={14} />
+              </button>
+              <span className="entry-screen__status">
+                {getOriginStatusText(origin, geolocationStatus)}
+              </span>
+            </div>
+          </section>
+        ) : (
+          <>
+            <section className="top-picks-header">
+              <div className="top-picks-header__copy">
+                <span className="list-topbar__eyebrow">cerca de ti</span>
+                <h1>Las 3 mejores opciones</h1>
+                <p>Analizamos tres centros con transporte completo y dejamos el resto del catalogo en carga base.</p>
+              </div>
+              <div className="top-picks-header__actions">
+                <button
+                  type="button"
+                  className={`list-topbar__origin list-topbar__origin--${getOriginTone(origin, geolocationStatus)}`}
+                  onClick={() => setOriginSheetOpen(true)}
+                >
+                  <span className="list-topbar__origin-dot" />
+                  <Navigation size={15} />
+                  <span>{getOriginStatusText(origin, geolocationStatus)}</span>
+                </button>
+                <button
+                  type="button"
+                  className="entry-screen__ghost top-picks-header__link"
+                  onClick={() => navigate("/listado")}
+                >
+                  Ver listado base
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </section>
+
+            <section className="top-picks-summary">
+              <span className="list-topbar__pill"><strong>{topPicks.length}</strong> opciones resueltas</span>
+              <span className="list-topbar__pill list-topbar__pill--open"><strong>{serverOpenCount}</strong> abiertas</span>
+              {originPresetsError ? <span className="screen__inline-error">{originPresetsError}</span> : null}
+            </section>
+
+            {loading ? (
+              <div className="center-list__grid">
+                <LoadingCard count={3} />
+              </div>
+            ) : error ? (
+              <EmptyStateCard title="No se pudo cargar el Top 3" body={error} />
+            ) : topPicks.length === 0 ? (
+              <EmptyStateCard title="Sin opciones cercanas" body="Activa otro origen o abre el listado base para explorar todos los centros." />
+            ) : (
+              <section className="top-picks-grid">
+                {topPicks.map((entry) => (
+                  <TopPickCard
+                    key={entry.center.id}
+                    center={entry.center}
+                    mobility={topMobilityMap.get(entry.center.slug) ?? entry.mobility}
+                    rank={entry.rank}
+                    serverOpenCount={serverOpenCount}
+                    onSelect={(slug) => navigate(`/centers/${slug}`)}
+                  />
+                ))}
+              </section>
+            )}
+          </>
+        )}
+      </FadeContent>
+
+      <OriginSheet
+        open={originSheetOpen}
+        origin={origin}
+        geolocationStatus={geolocationStatus}
+        query={originQuery}
+        results={originResults}
+        loading={originSearchLoading}
+        error={originSearchError}
+        presets={originPresets}
+        onClose={() => setOriginSheetOpen(false)}
+        onRequestGeolocation={() => {
+          requestGeolocation();
+          setOriginResults([]);
+          setOriginSearchError(null);
+          setOriginSheetOpen(false);
+        }}
+        onQueryChange={handleOriginQueryChange}
+        onSelectAddress={(option) =>
+          applyOrigin({
+            kind: "manual_address",
+            label: option.label,
+            lat: option.lat,
+            lon: option.lon,
+          })
+        }
+        onSelectPreset={(preset) =>
+          applyOrigin({
+            kind: "preset_area",
+            label: preset.label,
+            area_code: preset.code,
+            lat: preset.lat,
+            lon: preset.lon,
+          })
+        }
+        onContinueWithoutOrigin={() => {
+          setOriginSheetOpen(false);
+          navigate("/listado");
+        }}
+      />
+    </section>
+  );
+}
+
+function TopPickCard({
+  center,
+  mobility,
+  rank,
+  serverOpenCount,
+  onSelect,
+}: {
+  center: CenterListItem;
+  mobility: CenterMobility;
+  rank: number;
+  serverOpenCount: number;
+  onSelect: (slug: string) => void;
+}) {
+  const recommendedMode = mobility.summary.best_mode ?? center.decision.best_mode ?? null;
+  const transportRows = buildFeaturedTransportRows(mobility);
+  const footerTiles = buildFeaturedFooterTiles(mobility, center);
+  const frame = buildFeaturedCardFrame(center, recommendedMode, serverOpenCount);
+  const area = [center.neighborhood, center.district].filter(Boolean).join(" - ");
+
+  return (
+    <button
+      type="button"
+      className="best-option-card top-pick-card"
+      onClick={() => onSelect(center.slug)}
+    >
+      <SpotlightCard className="best-option-card__surface top-pick-card__surface">
+        <div className="best-option-card__eyebrow-row">
+          <span className="best-option-card__eyebrow">
+            <Sparkles size={11} />
+            {rank === 1 ? "1a opcion" : rank === 2 ? "2a opcion" : "3a opcion"}
+          </span>
+          <span className="best-option-card__kind-badge">{center.kind_label}</span>
+          <span className={center.is_open_now ? "decision-card__status decision-card__status--open" : "decision-card__status decision-card__status--closed"}>
+            {center.is_open_now ? "Abierta" : "Cerrada"}
+          </span>
+        </div>
+
+        <h2 className="best-option-card__name">{center.name}</h2>
+
+        {area ? (
+          <p className="best-option-card__subline">
+            <MapPin size={11} />
+            {area}
+          </p>
+        ) : null}
+
+        <div className="best-option-card__section-head">
+          <div>
+            <strong>{frame.sectionTitle}</strong>
+            <span>{frame.sectionSummary}</span>
+          </div>
+        </div>
+
+        <div className="best-option-card__board">
+          {transportRows.map((row) => (
+            <div
+              key={`${center.id}-${row.mode}`}
+              className={`best-option-card__board-row${row.recommended ? " best-option-card__board-row--recommended" : ""}`}
+            >
+              <span className="best-option-card__board-mode">
+                {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
+                {row.label}
+              </span>
+              <span className="best-option-card__board-body">{row.body}</span>
+              <span className="best-option-card__board-eta">{row.eta}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="best-option-card__footer-grid">
+          {footerTiles.map((tile) => (
+            <div
+              key={tile.mode}
+              className={`best-option-card__footer-tile best-option-card__footer-tile--${tile.mode}`}
+            >
+              <span className="best-option-card__footer-label">
+                {tile.mode === "car" ? <Car size={13} /> : <Navigation size={13} />}
+                {tile.label}
+              </span>
+              <strong className="best-option-card__footer-body">{tile.body}</strong>
+            </div>
+          ))}
+        </div>
+
+        <p className="best-option-card__reason">{buildMotivo(mobility)}</p>
+
+        <div className="best-option-card__footer">
+          <span className="best-option-card__cta">
+            Ver detalle <ArrowRight size={13} />
+          </span>
+        </div>
+      </SpotlightCard>
+    </button>
+  );
+}
+
+function CatalogScreen() {
+  const navigate = useNavigate();
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [sortBy, setSortBy] = useState<CenterSortBy>("recommended");
   const [searchText, setSearchText] = useState("");
@@ -275,10 +688,6 @@ function ExplorerScreen() {
   const [originSearchError, setOriginSearchError] = useState<string | null>(null);
   const [originPresets, setOriginPresets] = useState<OriginPreset[]>([]);
   const [originPresetsError, setOriginPresetsError] = useState<string | null>(null);
-  const [topMobilityItems, setTopMobilityItems] = useState<CenterTopMobilityItem[]>([]);
-  const [topMobilityResolvedKey, setTopMobilityResolvedKey] = useState<string | null>(null);
-  const [cardMobilityBySlug, setCardMobilityBySlug] = useState<Record<string, CenterMobility>>({});
-  const [cardMobilityLoadingBySlug, setCardMobilityLoadingBySlug] = useState<Record<string, boolean>>({});
   const originSearchController = useRef<AbortController | null>(null);
   const {
     origin,
@@ -288,41 +697,7 @@ function ExplorerScreen() {
     clearOrigin,
   } = useUserOrigin();
 
-  const originActive = origin !== null;
-  const showEntry = !originActive && !exploreWithoutOrigin;
   const hasMore = items.length < total;
-  const topMobilityKey = originActive
-    ? JSON.stringify(buildCentersListQuery({
-      kindFilter,
-      deferredSearch,
-      openNowOnly,
-      wifiOnly,
-      socketsOnly,
-      accessibleOnly,
-      serOnly,
-      districtFilter,
-      neighborhoodFilter,
-      sortBy,
-      userLat: origin?.lat,
-      userLon: origin?.lon,
-    }))
-    : null;
-  const topMobilityItemsDisplay = topMobilityResolvedKey === topMobilityKey ? topMobilityItems : [];
-  const topMobilityLoading = originActive && topMobilityResolvedKey !== topMobilityKey;
-  const topMobilityMap = new Map(topMobilityItemsDisplay.map((entry) => [entry.slug, entry.item] as const));
-  const bestOption =
-    (topMobilityItemsDisplay[0]
-      ? items.find((item) => item.slug === topMobilityItemsDisplay[0]?.slug) ?? null
-      : null) ?? pickFeaturedCenter(items, originActive);
-  const featuredTargetSlug = bestOption?.slug ?? null;
-  const featuredMobilityDisplay =
-    featuredTargetSlug ? topMobilityMap.get(featuredTargetSlug) ?? cardMobilityBySlug[featuredTargetSlug] ?? null : null;
-  const featuredMobilityLoading = topMobilityLoading && featuredTargetSlug !== null && featuredMobilityDisplay === null;
-  const recommendedMode = featuredMobilityDisplay?.summary.best_mode ?? bestOption?.decision.best_mode ?? null;
-  const featuredTransportRows = buildFeaturedTransportRows(featuredMobilityDisplay);
-  const featuredFooterTiles = buildFeaturedFooterTiles(featuredMobilityDisplay, bestOption ?? null);
-  const featuredCardFrame = buildFeaturedCardFrame(bestOption, recommendedMode, serverOpenCount);
-  const topMobilitySlugs = new Set(topMobilityItemsDisplay.map((entry) => entry.slug));
 
   // Active filter count (for badge)
   const activeFilterCount = [
@@ -401,101 +776,14 @@ function ExplorerScreen() {
     wifiOnly,
   ]);
 
-  useEffect(() => {
-    if (!originActive) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    void fetchTopMobilityCenters(
-      buildCentersListQuery({
-        kindFilter,
-        deferredSearch,
-        openNowOnly,
-        wifiOnly,
-        socketsOnly,
-        accessibleOnly,
-        serOnly,
-        districtFilter,
-        neighborhoodFilter,
-        sortBy,
-        userLat: origin?.lat,
-        userLon: origin?.lon,
-      }),
-      controller.signal,
-    )
-      .then((response) => {
-        if (!controller.signal.aborted) {
-          setTopMobilityItems(response.items);
-          setTopMobilityResolvedKey(topMobilityKey);
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setTopMobilityItems([]);
-          setTopMobilityResolvedKey(topMobilityKey);
-        }
-      });
-
-    return () => controller.abort();
-  }, [
-    accessibleOnly,
-    deferredSearch,
-    districtFilter,
-    neighborhoodFilter,
-    kindFilter,
-    openNowOnly,
-    originActive,
-    origin?.lat,
-    origin?.lon,
-    serOnly,
-    socketsOnly,
-    sortBy,
-    topMobilityKey,
-    wifiOnly,
-  ]);
-
   function resetListState(): void {
     setOffset(0);
     setItems([]);
     setTotal(0);
     setServerOpenCount(0);
-    setTopMobilityItems([]);
-    setTopMobilityResolvedKey(null);
-    setCardMobilityBySlug({});
-    setCardMobilityLoadingBySlug({});
     setLoading(true);
     setLoadingMore(false);
     setListError(null);
-  }
-
-  function handleLoadCardMobility(slug: string): void {
-    if (!origin || cardMobilityBySlug[slug] || cardMobilityLoadingBySlug[slug]) {
-      return;
-    }
-
-    setCardMobilityLoadingBySlug((current) => ({ ...current, [slug]: true }));
-
-    void fetchCenterMobilitySummary(
-      slug,
-      {
-        userLat: origin.lat,
-        userLon: origin.lon,
-      },
-    )
-      .then((response) => {
-        setCardMobilityBySlug((current) => ({
-          ...current,
-          [slug]: response.item,
-        }));
-      })
-      .finally(() => {
-        setCardMobilityLoadingBySlug((current) => ({
-          ...current,
-          [slug]: false,
-        }));
-      });
   }
 
   function clearAllFilters(): void {
@@ -561,7 +849,6 @@ function ExplorerScreen() {
 
   function applyOrigin(nextOrigin: UserOrigin): void {
     setManualOrigin(nextOrigin);
-    setExploreWithoutOrigin(false);
     setOriginQuery(nextOrigin.label);
     setOriginResults([]);
     setOriginSearchError(null);
@@ -576,134 +863,155 @@ function ExplorerScreen() {
       </div>
 
       <FadeContent blur duration={320} className="screen__content">
-        {showEntry ? (
-          <section className="entry-screen">
-            <div className="entry-screen__brand">
-              <div className="entry-screen__logo">
-                <div className="entry-screen__logo-mark">
-                  <Navigation size={26} />
-                </div>
-                <div className="entry-screen__logo-copy">
-                  <ShinyText text="alabiblio" className="entry-screen__wordmark" />
-                  <span className="entry-screen__eyebrow">ESPACIOS / ETA / MADRID</span>
-                </div>
+        <>
+          <section className="list-topbar">
+            <div className="list-topbar__row list-topbar__row--headline">
+              <div className="list-topbar__title">
+                <span className="list-topbar__eyebrow">listado base</span>
+                <h1>Catalogo de bibliotecas y salas</h1>
+                <p>Sin tiempo real en el grid. Solo datos base, filtros y acceso al detalle.</p>
               </div>
-              <span className="entry-screen__live-pill">
-                <Sparkles size={12} />
-                EN VIVO
-              </span>
-              <h1>Decide rapido a que biblioteca te compensa ir ahora.</h1>
-              <p>
-                Calculamos llegada, alternativa dominante y servicios utiles desde tu origen.
-              </p>
-            </div>
-
-            <div className="entry-screen__highlights">
-              <LandingFeature
-                icon={<Bus size={18} />}
-                title="EMT en tiempo real"
-                body="Usamos llegadas reales cuando hay base suficiente."
-              />
-              <LandingFeature
-                icon={<TimerReset size={18} />}
-                title="ETA siempre util"
-                body="Si no hay transporte, caemos a tiempo andando."
-              />
-              <LandingFeature
-                icon={<ShieldCheck size={18} />}
-                title="Servicios claros"
-                body="WiFi, enchufes, accesible y mas evidencia."
-              />
-            </div>
-
-            <div className="entry-screen__actions">
-              <button
-                type="button"
-                className="entry-screen__primary"
-                onClick={() => requestGeolocation()}
-              >
-                <Navigation size={16} />
-                Usar mi ubicacion
-              </button>
-              <button
-                type="button"
-                className="entry-screen__secondary"
-                onClick={() => setOriginSheetOpen(true)}
-              >
-                <MapPin size={16} />
-                Introducir direccion
-              </button>
-              <button
-                type="button"
-                className="entry-screen__ghost"
-                onClick={() => {
-                  setExploreWithoutOrigin(true);
-                  setOriginSheetOpen(false);
-                  resetListState();
-                }}
-              >
-                Continuar sin ubicacion
-                <ArrowRight size={14} />
-              </button>
-              <span className="entry-screen__status">
-                {getOriginStatusText(origin, geolocationStatus)}
-              </span>
-            </div>
-          </section>
-        ) : (
-          <>
-            {/* List topbar */}
-            <section className="list-topbar">
-              <div className="list-topbar__row list-topbar__row--headline">
-                <div className="list-topbar__title">
-                  <span className="list-topbar__eyebrow">decision activa</span>
-                  <h1>Bibliotecas</h1>
-                  <p>{buildListSubtitle(origin)}</p>
-                </div>
-                <div className="list-topbar__signals">
-                  <span className="list-topbar__signal list-topbar__signal--live">LIVE</span>
-                  <button
-                    type="button"
-                    className="list-topbar__origin-button"
-                    onClick={() => setOriginSheetOpen(true)}
-                    aria-label="Cambiar origen"
-                  >
-                    <Navigation size={16} />
-                  </button>
-                </div>
-              </div>
-              <div className="list-topbar__meta">
-                <span className="list-topbar__pill">
-                  <strong>{total}</strong> centros
-                </span>
-                <span className="list-topbar__pill list-topbar__pill--open">
-                  <strong>{serverOpenCount}</strong> abiertos
-                </span>
+              <div className="list-topbar__signals">
+                <span className="list-topbar__signal">BASE</span>
                 <button
                   type="button"
-                  className={`list-topbar__origin list-topbar__origin--${getOriginTone(origin, geolocationStatus)}`}
+                  className="list-topbar__origin-button"
                   onClick={() => setOriginSheetOpen(true)}
+                  aria-label="Cambiar origen"
                 >
-                  <span className="list-topbar__origin-dot" />
-                  <Navigation size={15} />
-                  <span>{getOriginStatusText(origin, geolocationStatus)}</span>
+                  <Navigation size={16} />
                 </button>
               </div>
-            </section>
+            </div>
+            <div className="list-topbar__meta">
+              <span className="list-topbar__pill">
+                <strong>{total}</strong> centros
+              </span>
+              <span className="list-topbar__pill list-topbar__pill--open">
+                <strong>{serverOpenCount}</strong> abiertos
+              </span>
+              <button
+                type="button"
+                className={`list-topbar__origin list-topbar__origin--${getOriginTone(origin, geolocationStatus)}`}
+                onClick={() => setOriginSheetOpen(true)}
+              >
+                <span className="list-topbar__origin-dot" />
+                <Navigation size={15} />
+                <span>{getOriginStatusText(origin, geolocationStatus)}</span>
+              </button>
+              <button
+                type="button"
+                className="entry-screen__ghost list-topbar__link"
+                onClick={() => navigate("/")}
+              >
+                Ver Top 3
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          </section>
 
-            {/* Search + view toggle */}
-            <section className="list-search-strip">
-              <div className="list-topbar__search">
-                <Search size={16} />
-                <SearchField
-                  value={searchText}
-                  onChange={(value) => {
-                    setSearchText(value);
-                    resetListState();
-                  }}
-                  placeholder="Buscar por nombre o barrio..."
-                />
-              </div>
+          <section className="list-search-strip">
+            <div className="list-topbar__search">
+              <Search size={16} />
+              <SearchField
+                value={searchText}
+                onChange={(value) => {
+                  setSearchText(value);
+                  resetListState();
+                }}
+                placeholder="Buscar por nombre o barrio..."
+              />
+            </div>
+            <div className="view-toggle">
+              <button
+                type="button"
+                className={`view-toggle__btn${viewMode === "cards" ? " view-toggle__btn--active" : ""}`}
+                onClick={() => setViewMode("cards")}
+                aria-label="Vista tarjetas"
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                type="button"
+                className={`view-toggle__btn${viewMode === "rows" ? " view-toggle__btn--active" : ""}`}
+                onClick={() => setViewMode("rows")}
+                aria-label="Vista lista"
+              >
+                <List size={16} />
+              </button>
+            </div>
+          </section>
+
+          <section className="controls-bar">
+            <div className="controls-bar__row">
+              <button
+                type="button"
+                className={`controls-bar__filters-btn${activeFilterCount > 0 ? " controls-bar__filters-btn--active" : ""}`}
+                onClick={() => setFilterDrawerOpen(true)}
+              >
+                <SlidersHorizontal size={14} />
+                Filtros
+                {activeFilterCount > 0 ? (
+                  <span className="controls-bar__badge">{activeFilterCount}</span>
+                ) : null}
+              </button>
+
+              {kindFilter !== "all" ? (
+                <button type="button" className="active-pill" onClick={() => { setKindFilter("all"); resetListState(); }}>
+                  {kindFilter === "library" ? "Bibliotecas" : "Salas estudio"}
+                  <X size={11} />
+                </button>
+              ) : null}
+              {sortBy !== "recommended" ? (
+                <button type="button" className="active-pill" onClick={() => { setSortBy("recommended"); resetListState(); }}>
+                  {sortBy === "distance" ? "Por distancia" : sortBy === "arrival" ? "Mejor ETA" : "Abiertos primero"}
+                  <X size={11} />
+                </button>
+              ) : null}
+              {openNowOnly ? (
+                <button type="button" className="active-pill" onClick={() => { setOpenNowOnly(false); resetListState(); }}>
+                  Abierto ahora <X size={11} />
+                </button>
+              ) : null}
+              {wifiOnly ? (
+                <button type="button" className="active-pill" onClick={() => { setWifiOnly(false); resetListState(); }}>
+                  WiFi <X size={11} />
+                </button>
+              ) : null}
+              {socketsOnly ? (
+                <button type="button" className="active-pill" onClick={() => { setSocketsOnly(false); resetListState(); }}>
+                  Enchufes <X size={11} />
+                </button>
+              ) : null}
+              {accessibleOnly ? (
+                <button type="button" className="active-pill" onClick={() => { setAccessibleOnly(false); resetListState(); }}>
+                  Accesible <X size={11} />
+                </button>
+              ) : null}
+              {serOnly ? (
+                <button type="button" className="active-pill" onClick={() => { setSerOnly(false); resetListState(); }}>
+                  Zona SER <X size={11} />
+                </button>
+              ) : null}
+              {districtFilter ? (
+                <button type="button" className="active-pill" onClick={() => { setDistrictFilter(""); resetListState(); }}>
+                  {districtFilter} <X size={11} />
+                </button>
+              ) : null}
+              {neighborhoodFilter ? (
+                <button type="button" className="active-pill" onClick={() => { setNeighborhoodFilter(""); resetListState(); }}>
+                  {neighborhoodFilter} <X size={11} />
+                </button>
+              ) : null}
+
+              {activeFilterCount > 0 ? (
+                <button type="button" className="controls-bar__clear" onClick={clearAllFilters}>
+                  Limpiar todo
+                </button>
+              ) : null}
+
+              <div className="controls-bar__spacer" />
+
               <div className="view-toggle">
                 <button
                   type="button"
@@ -711,7 +1019,7 @@ function ExplorerScreen() {
                   onClick={() => setViewMode("cards")}
                   aria-label="Vista tarjetas"
                 >
-                  <LayoutGrid size={16} />
+                  <LayoutGrid size={15} />
                 </button>
                 <button
                   type="button"
@@ -719,262 +1027,76 @@ function ExplorerScreen() {
                   onClick={() => setViewMode("rows")}
                   aria-label="Vista lista"
                 >
-                  <List size={16} />
+                  <List size={15} />
                 </button>
               </div>
-            </section>
+            </div>
 
-            {/* Controls bar: unico sistema de filtros */}
-            <section className="controls-bar">
-              <div className="controls-bar__row">
-                <button
-                  type="button"
-                  className={`controls-bar__filters-btn${activeFilterCount > 0 ? " controls-bar__filters-btn--active" : ""}`}
-                  onClick={() => setFilterDrawerOpen(true)}
-                >
-                  <SlidersHorizontal size={14} />
-                  Filtros
-                  {activeFilterCount > 0 ? (
-                    <span className="controls-bar__badge">{activeFilterCount}</span>
-                  ) : null}
-                </button>
-
-                {/* Active filter pills */}
-                {kindFilter !== "all" ? (
-                  <button type="button" className="active-pill" onClick={() => { setKindFilter("all"); resetListState(); }}>
-                    {kindFilter === "library" ? "Bibliotecas" : "Salas estudio"}
-                    <X size={11} />
-                  </button>
-                ) : null}
-                {sortBy !== "recommended" ? (
-                  <button type="button" className="active-pill" onClick={() => { setSortBy("recommended"); resetListState(); }}>
-                    {sortBy === "distance" ? "Por distancia" : sortBy === "arrival" ? "Mejor ETA" : "Abiertos primero"}
-                    <X size={11} />
-                  </button>
-                ) : null}
-                {openNowOnly ? (
-                  <button type="button" className="active-pill" onClick={() => { setOpenNowOnly(false); resetListState(); }}>
-                    Abierto ahora <X size={11} />
-                  </button>
-                ) : null}
-                {wifiOnly ? (
-                  <button type="button" className="active-pill" onClick={() => { setWifiOnly(false); resetListState(); }}>
-                    WiFi <X size={11} />
-                  </button>
-                ) : null}
-                {socketsOnly ? (
-                  <button type="button" className="active-pill" onClick={() => { setSocketsOnly(false); resetListState(); }}>
-                    Enchufes <X size={11} />
-                  </button>
-                ) : null}
-                {accessibleOnly ? (
-                  <button type="button" className="active-pill" onClick={() => { setAccessibleOnly(false); resetListState(); }}>
-                    Accesible <X size={11} />
-                  </button>
-                ) : null}
-                {serOnly ? (
-                  <button type="button" className="active-pill" onClick={() => { setSerOnly(false); resetListState(); }}>
-                    Zona SER <X size={11} />
-                  </button>
-                ) : null}
-                {districtFilter ? (
-                  <button type="button" className="active-pill" onClick={() => { setDistrictFilter(""); resetListState(); }}>
-                    {districtFilter} <X size={11} />
-                  </button>
-                ) : null}
-                {neighborhoodFilter ? (
-                  <button type="button" className="active-pill" onClick={() => { setNeighborhoodFilter(""); resetListState(); }}>
-                    {neighborhoodFilter} <X size={11} />
-                  </button>
-                ) : null}
-
-                {activeFilterCount > 0 ? (
-                  <button type="button" className="controls-bar__clear" onClick={clearAllFilters}>
-                    Limpiar todo
-                  </button>
-                ) : null}
-
-                <div className="controls-bar__spacer" />
-
-                {/* View toggle */}
-                <div className="view-toggle">
-                  <button
-                    type="button"
-                    className={`view-toggle__btn${viewMode === "cards" ? " view-toggle__btn--active" : ""}`}
-                    onClick={() => setViewMode("cards")}
-                    aria-label="Vista tarjetas"
-                  >
-                    <LayoutGrid size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    className={`view-toggle__btn${viewMode === "rows" ? " view-toggle__btn--active" : ""}`}
-                    onClick={() => setViewMode("rows")}
-                    aria-label="Vista lista"
-                  >
-                    <List size={15} />
-                  </button>
-                </div>
-              </div>
-
-              {origin ? (
-                <button
-                  type="button"
-                  className="origin-clear-button"
-                  onClick={() => { clearOrigin(); setExploreWithoutOrigin(false); resetListState(); }}
-                >
-                  Reiniciar origen
-                </button>
-              ) : null}
-            </section>
-
-            {/* Featured card: mejor opcion */}
-            {bestOption ? (
+            {origin ? (
               <button
                 type="button"
-                className="best-option-card"
-                onClick={() => navigate(`/centers/${bestOption.slug}`)}
+                className="origin-clear-button"
+                onClick={() => { clearOrigin(); resetListState(); }}
               >
-                <SpotlightCard className="best-option-card__surface">
-                  <div className="best-option-card__eyebrow-row">
-                    <span className="best-option-card__eyebrow">
-                      <Sparkles size={11} />
-                      {featuredCardFrame.eyebrow}
-                    </span>
-                    <span className="best-option-card__kind-badge">{bestOption.kind_label}</span>
-                    <span className={bestOption.is_open_now ? "decision-card__status decision-card__status--open" : "decision-card__status decision-card__status--closed"}>
-                      {bestOption.is_open_now ? "Abierta" : "Cerrada"}
-                    </span>
-                  </div>
-
-                  <h2 className="best-option-card__name">{bestOption.name}</h2>
-
-                  {bestOption.district || bestOption.neighborhood || bestOption.closes_today || bestOption.opens_today ? (
-                    <p className="best-option-card__subline">
-                      {bestOption.district || bestOption.neighborhood ? (
-                        <>
-                          <MapPin size={11} />
-                          {[bestOption.neighborhood, bestOption.district].filter(Boolean).join(" - ")}
-                        </>
-                      ) : null}
-                      {(bestOption.district || bestOption.neighborhood) && (bestOption.closes_today || bestOption.opens_today) ? " - " : null}
-                      {bestOption.is_open_now && bestOption.closes_today
-                        ? `Cierra a las ${bestOption.closes_today}`
-                        : !bestOption.is_open_now && bestOption.opens_today
-                        ? `Abre a las ${bestOption.opens_today}`
-                        : null}
-                    </p>
-                  ) : null}
-
-                  <div className="best-option-card__section-head">
-                    <div>
-                      <strong>{featuredCardFrame.sectionTitle}</strong>
-                      <span>{featuredCardFrame.sectionSummary}</span>
-                    </div>
-                  </div>
-
-                  <div className="best-option-card__board">
-                    {featuredTransportRows.map((row) => (
-                      <div
-                        key={row.mode}
-                        className={`best-option-card__board-row${row.recommended ? " best-option-card__board-row--recommended" : ""}`}
-                      >
-                        <span className="best-option-card__board-mode">
-                          {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
-                          {row.label}
-                        </span>
-                        <span className="best-option-card__board-body">{row.body}</span>
-                        <span className="best-option-card__board-eta">{row.eta}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="best-option-card__footer-grid">
-                    {featuredFooterTiles.map((tile) => (
-                      <div
-                        key={tile.mode}
-                        className={`best-option-card__footer-tile best-option-card__footer-tile--${tile.mode}`}
-                      >
-                        <span className="best-option-card__footer-label">
-                          {tile.mode === "car" ? <Car size={13} /> : <Navigation size={13} />}
-                          {tile.label}
-                        </span>
-                        <strong className="best-option-card__footer-body">{tile.body}</strong>
-                      </div>
-                    ))}
-                  </div>
-
-                  {featuredMobilityLoading ? (
-                    <span className="best-option-card__transport-loading">Actualizando transporte en tiempo real...</span>
-                  ) : null}
-
-                  <p className="best-option-card__reason">{buildMotivo(featuredMobilityDisplay)}</p>
-
-                  <div className="best-option-card__footer">
-                    <span className="best-option-card__cta">
-                      Ver detalle <ArrowRight size={13} />
-                    </span>
-                  </div>
-                </SpotlightCard>
+                Reiniciar origen
               </button>
             ) : null}
+          </section>
 
-            {originPresetsError ? <p className="screen__inline-error">{originPresetsError}</p> : null}
+          {originPresetsError ? <p className="screen__inline-error">{originPresetsError}</p> : null}
 
-            {/* Results */}
-            <section className="center-list">
-              {loading ? (
-                <div className="center-list__grid">
-                  <LoadingCard count={6} />
+          <section className="center-list">
+            {loading ? (
+              <div className="center-list__grid">
+                <LoadingCard count={6} />
+              </div>
+            ) : null}
+            {!loading && listError ? <EmptyStateCard title="Error de listado" body={listError} /> : null}
+            {!loading && !listError && items.length === 0 ? (
+              <EmptyStateCard title="Sin resultados" body="Prueba a quitar filtros o cambiar el origen." />
+            ) : null}
+            {!loading && !listError ? (
+              viewMode === "rows" ? (
+                <div className="center-list__rows">
+                  {items.map((center) => (
+                    <CenterRowItem
+                      key={center.id}
+                      center={center}
+                      onSelect={(slug) => navigate(`/centers/${slug}`)}
+                    />
+                  ))}
                 </div>
-              ) : null}
-              {!loading && listError ? <EmptyStateCard title="Error de listado" body={listError} /> : null}
-              {!loading && !listError && items.length === 0 ? (
-                <EmptyStateCard title="Sin resultados" body="Prueba a quitar filtros o cambiar el origen." />
-              ) : null}
-              {!loading && !listError ? (
-                viewMode === "rows" ? (
-                  <div className="center-list__rows">
-                    {items.map((center) => (
-                      <CenterRowItem
-                        key={center.id}
-                        center={center}
-                        onSelect={(slug) => navigate(`/centers/${slug}`)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="center-list__grid">
-                    {items.map((center) => (
-                      <CenterCard
-                        key={center.id}
-                        center={center}
-                        mobility={topMobilityMap.get(center.slug) ?? cardMobilityBySlug[center.slug] ?? null}
-                        mobilityLoading={cardMobilityLoadingBySlug[center.slug] ?? false}
-                        canLoadMobility={originActive && !topMobilitySlugs.has(center.slug)}
-                        onLoadMobility={() => handleLoadCardMobility(center.slug)}
-                        onSelect={(slug) => navigate(`/centers/${slug}`)}
-                      />
-                    ))}
-                  </div>
-                )
-              ) : null}
-              {!loading && !listError && hasMore ? (
-                <button
-                  type="button"
-                  className="center-list__more"
-                  onClick={() => {
-                    setLoadingMore(true);
-                    setOffset(items.length);
-                  }}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? "Cargando..." : `Cargar mas (${total - items.length} restantes)`}
-                </button>
-              ) : null}
-            </section>
-          </>
-        )}
+              ) : (
+                <div className="center-list__grid">
+                  {items.map((center) => (
+                    <CenterCard
+                      key={center.id}
+                      center={center}
+                      mobility={null}
+                      mobilityLoading={false}
+                      canLoadMobility={false}
+                      onLoadMobility={() => undefined}
+                      onSelect={(slug) => navigate(`/centers/${slug}`)}
+                    />
+                  ))}
+                </div>
+              )
+            ) : null}
+            {!loading && !listError && hasMore ? (
+              <button
+                type="button"
+                className="center-list__more"
+                onClick={() => {
+                  setLoadingMore(true);
+                  setOffset(items.length);
+                }}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "Cargando..." : `Cargar mas (${total - items.length} restantes)`}
+              </button>
+            ) : null}
+          </section>
+        </>
       </FadeContent>
 
       <OriginSheet
@@ -1013,7 +1135,6 @@ function ExplorerScreen() {
           })
         }
         onContinueWithoutOrigin={() => {
-          clearOrigin();
           setOriginSheetOpen(false);
           resetListState();
         }}
@@ -1135,12 +1256,13 @@ function AppRoutes() {
   return (
     <AppShell topBar={<DesktopTopBar />} bottomNav={<BottomNavBar />}>
       <Routes>
-        <Route path="/" element={<ExplorerScreen />} />
+        <Route path="/" element={<TopPicksScreen />} />
+        <Route path="/listado" element={<CatalogScreen />} />
         <Route path="/centers/:slug" element={<CenterDetailRoute />} />
-        <Route path="/map" element={<Navigate to="/" replace />} />
-        <Route path="/search" element={<Navigate to="/" replace />} />
-        <Route path="/saved" element={<Navigate to="/" replace />} />
-        <Route path="/profile" element={<Navigate to="/" replace />} />
+        <Route path="/map" element={<Navigate to="/listado" replace />} />
+        <Route path="/search" element={<Navigate to="/listado" replace />} />
+        <Route path="/saved" element={<Navigate to="/listado" replace />} />
+        <Route path="/profile" element={<Navigate to="/listado" replace />} />
       </Routes>
     </AppShell>
   );

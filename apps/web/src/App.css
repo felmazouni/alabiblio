@@ -602,15 +602,76 @@
   grid-template-columns: 1fr;
 }
 
+.top-picks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.top-picks-header__copy {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.top-picks-header__copy h1 {
+  margin: 0;
+}
+
+.top-picks-header__copy p {
+  margin: 0;
+  color: var(--color-text-3);
+}
+
+.top-picks-header__actions {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.top-picks-summary {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-4);
+}
+
+.top-picks-grid {
+  display: grid;
+  gap: var(--sp-3);
+  grid-template-columns: 1fr;
+}
+
+.top-pick-card__surface {
+  height: 100%;
+}
+
+.list-topbar__link,
+.top-picks-header__link {
+  min-height: 42px;
+}
+
 @media (min-width: 620px) {
   .center-list__grid {
     grid-template-columns: repeat(2, 1fr);
     align-items: start;
   }
+
+  .top-picks-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (min-width: 960px) {
   .center-list__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .top-picks-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }

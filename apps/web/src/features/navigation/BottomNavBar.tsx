@@ -1,11 +1,13 @@
 import Dock from "../../components/reactbits/Dock";
 import {
+  Sparkles,
   List,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const ITEMS = [
-  { to: "/", label: "Lista", icon: List },
+  { to: "/", label: "Top 3", icon: Sparkles },
+  { to: "/listado", label: "Listado", icon: List },
 ];
 
 export function BottomNavBar() {
