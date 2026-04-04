@@ -480,7 +480,7 @@ function buildMobilityHighlights(input: { car: CarModuleV1; bus: BusModuleV1; bi
       input.car.distance_m !== null
         ? input.car.distance_m < 1000
           ? `${Math.round(input.car.distance_m)} m`
-          : `${input.car.distance_m.toFixed(1)} km`
+          : `${(input.car.distance_m / 1000).toFixed(1)} km`
         : null,
       input.car.ser_enabled ? `SER ${input.car.ser_zone_name ?? "activa"}` : null,
     ]

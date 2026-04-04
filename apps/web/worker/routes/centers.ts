@@ -419,20 +419,13 @@ async function loadListWindowRecords(
   };
 }
 
-async function countOpenCentersForQuery(
+async function countScheduleStateSummaryForQuery(
   env: WorkerEnv,
   query: ReturnType<typeof parseListCentersQuery>,
-): Promise<number> {
-  if (query.open_now === true) {
-    return countCenters(env.DB, buildCenterFilters(query));
-  }
-
-  if (query.open_now === false) {
-    return 0;
-  }
-
+): Promise<{ open_count: number; closed_count: number }> {
   const filters = buildCenterFilters(query);
   let openCount = 0;
+  let closedCount = 0;
   let offset = 0;
 
   while (true) {
@@ -454,6 +447,8 @@ async function countOpenCentersForQuery(
       const schedule = buildScheduleFromRecord(scheduleMap.get(center.id) ?? null, null);
       if (schedule.is_open_now) {
         openCount += 1;
+      } else if (schedule.is_open_now === false) {
+        closedCount += 1;
       }
     }
 
@@ -464,7 +459,10 @@ async function countOpenCentersForQuery(
     }
   }
 
-  return openCount;
+  return {
+    open_count: openCount,
+    closed_count: closedCount,
+  };
 }
 
 async function enrichDecisionRecords(
@@ -550,11 +548,12 @@ export async function handleListCenters(
           query.user_lat !== undefined && query.user_lon !== undefined
             ? { lat: query.user_lat, lon: query.user_lon }
             : null;
-        const [totalMatchingCenters, totalOpenCenters, listWindow] = await Promise.all([
+        const [totalMatchingCenters, scheduleStateSummary, listWindow] = await Promise.all([
           countCenters(env.DB, buildCenterFilters(query)),
-          countOpenCentersForQuery(env, query),
+          countScheduleStateSummaryForQuery(env, query),
           loadListWindowRecords(env, query, userLocation),
         ]);
+        const totalOpenCenters = scheduleStateSummary.open_count;
         const sortedRecords = listWindow.records;
 
         const pagedRecords = sortedRecords.slice(query.offset, query.offset + query.limit);
@@ -579,9 +578,9 @@ export async function handleListCenters(
           total:
             query.open_now === undefined
               ? totalMatchingCenters
-              : listWindow.exhausted
-                ? sortedRecords.length
-                : Math.max(sortedRecords.length, query.offset + pagedRecords.length + 1),
+              : query.open_now
+                ? scheduleStateSummary.open_count
+                : scheduleStateSummary.closed_count,
           open_count: totalOpenCenters,
           limit: query.limit,
           offset: query.offset,
@@ -589,9 +588,9 @@ export async function handleListCenters(
             query.offset + query.limit <
             (query.open_now === undefined
               ? totalMatchingCenters
-              : listWindow.exhausted
-                ? sortedRecords.length
-                : Math.max(sortedRecords.length, query.offset + pagedRecords.length + 1))
+              : query.open_now
+                ? scheduleStateSummary.open_count
+                : scheduleStateSummary.closed_count)
               ? query.offset + query.limit
               : null,
         };
@@ -652,7 +651,8 @@ export async function handleGetTopMobilityCenters(
         originBucket: buildOriginBucket(query.user_lat, query.user_lon),
       },
       async (dataVersion) => {
-        const totalOpenCenters = await countOpenCentersForQuery(env, query);
+        const scheduleStateSummary = await countScheduleStateSummaryForQuery(env, query);
+        const totalOpenCenters = scheduleStateSummary.open_count;
         const rankingQuery =
           totalOpenCenters > 0
             ? {

@@ -916,10 +916,10 @@ function CatalogScreen() {
             </div>
             <div className="list-topbar__meta">
               <span className="list-topbar__pill">
-                <strong>{total}</strong> centros
+                <strong>{total}</strong> resultados
               </span>
               <span className="list-topbar__pill list-topbar__pill--open">
-                <strong>{serverOpenCount}</strong> abiertos ahora
+                <strong>{serverOpenCount}</strong> {openNowOnly ? "abiertos en este filtro" : "abiertos ahora"}
               </span>
               <span className="list-topbar__pill">
                 <strong>{items.length}</strong> cargados
