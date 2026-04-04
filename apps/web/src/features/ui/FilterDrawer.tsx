@@ -39,8 +39,6 @@ export type FilterDrawerProps = {
   onOpenNowChange: (v: boolean) => void;
   wifiOnly: boolean;
   onWifiChange: (v: boolean) => void;
-  socketsOnly: boolean;
-  onSocketsChange: (v: boolean) => void;
   accessibleOnly: boolean;
   onAccessibleChange: (v: boolean) => void;
   serOnly: boolean;
@@ -119,8 +117,6 @@ export function FilterDrawer({
   onOpenNowChange,
   wifiOnly,
   onWifiChange,
-  socketsOnly,
-  onSocketsChange,
   accessibleOnly,
   onAccessibleChange,
   serOnly,
@@ -208,7 +204,6 @@ export function FilterDrawer({
             <div className="filter-drawer__toggles">
               <ToggleRow label="Abierto ahora" sub="Solo centros activos" checked={openNowOnly} onChange={onOpenNowChange} />
               <ToggleRow label="WiFi" sub="Con cobertura wifi" checked={wifiOnly} onChange={onWifiChange} />
-              <ToggleRow label="Enchufes" sub="Con tomas de corriente" checked={socketsOnly} onChange={onSocketsChange} />
               <ToggleRow label="Accesible" sub="Accesibilidad confirmada" checked={accessibleOnly} onChange={onAccessibleChange} />
               <ToggleRow label="Zona SER" sub="Dentro de zona SER de Madrid" checked={serOnly} onChange={onSerChange} />
             </div>

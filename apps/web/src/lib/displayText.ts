@@ -1,4 +1,4 @@
-const SUSPICIOUS_MOJIBAKE_PATTERN = /(?:Ãƒ.|Ã‚.|Ã¢.|ï¿½)/;
+const SUSPICIOUS_MOJIBAKE_PATTERN = /(?:Ã.|Â.|â.|�)/;
 const HTML_ENTITY_PATTERN = /&(?:#\d+|#x[0-9a-fA-F]+|[a-zA-Z]+);/g;
 
 const HTML_ENTITY_MAP: Record<string, string> = {

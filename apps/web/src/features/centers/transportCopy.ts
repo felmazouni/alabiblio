@@ -7,6 +7,7 @@ import type {
   MobilityHighlightV1,
   MobilityMode,
 } from "@alabiblio/contracts/mobility";
+import { repairMojibake } from "../../lib/displayText";
 
 export type SecondaryCardHighlightRow = {
   label: string;
@@ -40,9 +41,8 @@ function buildBoardDetail(
 }
 
 function cleanText(value: string | null | undefined): string {
-  return (value ?? "")
-    .replace(/[Â·â€¢]/g, "-")
-    .replace(/[Ã×]/g, "x")
+  return repairMojibake(value ?? "")
+    .replace(/[��]/g, "-")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -591,3 +591,5 @@ export function buildHighlightRow(
   if (!highlight) return null;
   return buildHighlightRowFromSummary(highlight);
 }
+
+

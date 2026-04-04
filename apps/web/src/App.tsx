@@ -133,7 +133,6 @@ function buildCentersListQuery(input: {
   offset?: number;
   openNowOnly: boolean;
   wifiOnly: boolean;
-  socketsOnly: boolean;
   accessibleOnly: boolean;
   serOnly: boolean;
   districtFilter: string;
@@ -149,7 +148,6 @@ function buildCentersListQuery(input: {
     offset: input.offset,
     open_now: input.openNowOnly || undefined,
     has_wifi: input.wifiOnly || undefined,
-    has_sockets: input.socketsOnly || undefined,
     accessible: input.accessibleOnly || undefined,
     has_ser: input.serOnly || undefined,
     district: input.districtFilter || undefined,
@@ -309,7 +307,6 @@ function TopPicksScreen() {
         offset: 0,
         openNowOnly: false,
         wifiOnly: false,
-        socketsOnly: false,
         accessibleOnly: false,
         serOnly: false,
         districtFilter: "",
@@ -693,7 +690,6 @@ function CatalogScreen() {
   const deferredSearch = useDeferredValue(searchText.trim());
   const [openNowOnly, setOpenNowOnly] = useState(false);
   const [wifiOnly, setWifiOnly] = useState(false);
-  const [socketsOnly, setSocketsOnly] = useState(false);
   const [accessibleOnly, setAccessibleOnly] = useState(false);
   const [serOnly, setSerOnly] = useState(false);
   const [districtFilter, setDistrictFilter] = useState<string>("");
@@ -727,7 +723,7 @@ function CatalogScreen() {
 
   // Active filter count (for badge)
   const activeFilterCount = [
-    openNowOnly, wifiOnly, socketsOnly, accessibleOnly, serOnly,
+    openNowOnly, wifiOnly, accessibleOnly, serOnly,
     districtFilter !== "", neighborhoodFilter !== "",
   ].filter(Boolean).length;
 
@@ -755,7 +751,6 @@ function CatalogScreen() {
         offset,
         openNowOnly,
         wifiOnly,
-        socketsOnly,
         accessibleOnly,
         serOnly,
         districtFilter,
@@ -799,7 +794,6 @@ function CatalogScreen() {
     kindFilter,
     offset,
     openNowOnly,
-    socketsOnly,
     serOnly,
     origin?.lat,
     origin?.lon,
@@ -820,7 +814,6 @@ function CatalogScreen() {
   function clearAllFilters(): void {
     setOpenNowOnly(false);
     setWifiOnly(false);
-    setSocketsOnly(false);
     setAccessibleOnly(false);
     setSerOnly(false);
     setDistrictFilter("");
@@ -1012,11 +1005,6 @@ function CatalogScreen() {
                   WiFi <X size={11} />
                 </button>
               ) : null}
-              {socketsOnly ? (
-                <button type="button" className="active-pill" onClick={() => { setSocketsOnly(false); resetListState(); }}>
-                  Enchufes <X size={11} />
-                </button>
-              ) : null}
               {accessibleOnly ? (
                 <button type="button" className="active-pill" onClick={() => { setAccessibleOnly(false); resetListState(); }}>
                   Accesible <X size={11} />
@@ -1188,8 +1176,6 @@ function CatalogScreen() {
         onOpenNowChange={(v) => { setOpenNowOnly(v); resetListState(); }}
         wifiOnly={wifiOnly}
         onWifiChange={(v) => { setWifiOnly(v); resetListState(); }}
-        socketsOnly={socketsOnly}
-        onSocketsChange={(v) => { setSocketsOnly(v); resetListState(); }}
         accessibleOnly={accessibleOnly}
         onAccessibleChange={(v) => { setAccessibleOnly(v); resetListState(); }}
         serOnly={serOnly}
