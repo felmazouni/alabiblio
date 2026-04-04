@@ -1,0 +1,16 @@
+{
+  "name": "@alabiblio/schedule-engine",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./parse": "./src/parse.ts",
+    "./state": "./src/state.ts",
+    "./types": "./src/types.ts"
+  },
+  "dependencies": {
+    "@alabiblio/contracts": "workspace:*",
+    "@alabiblio/domain": "workspace:*"
+  }
+}

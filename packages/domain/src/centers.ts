@@ -1,12 +1,19 @@
 import type {
-  CenterDetailItem,
+  CenterDetailDecisionItem,
   CenterKind,
-  CenterListItem,
   CenterRecord,
-  ScheduleConfidenceLabel,
-  CenterSchedulePayload,
+  CenterSerInfo,
   CenterSourceSummary,
+  CenterDecisionCardItem,
+  CenterDecisionSummary,
+  CenterSchedulePayload,
+  CenterServicesV1,
 } from "@alabiblio/contracts/centers";
+import type { CenterFeature } from "@alabiblio/contracts/features";
+import type {
+  MobilityHighlightsV1,
+  StaticTransportAnchorsV1,
+} from "@alabiblio/contracts/mobility";
 
 const KIND_LABELS: Record<CenterKind, string> = {
   study_room: "Sala de estudio",
@@ -19,7 +26,7 @@ export function getCenterKindLabel(kind: CenterKind): string {
 
 export function getScheduleConfidenceLabel(
   confidence: number | null,
-): ScheduleConfidenceLabel {
+): "high" | "medium" | "low" {
   if (confidence !== null && confidence >= 0.75) {
     return "high";
   }
@@ -31,9 +38,14 @@ export function getScheduleConfidenceLabel(
   return "low";
 }
 
-export function buildContactSummary(center: Pick<CenterRecord, "phone" | "email" | "website_url">): string | null {
-  const parts = [center.phone, center.email, center.website_url ? "Web oficial" : null]
-    .filter((value): value is string => Boolean(value));
+export function buildContactSummary(
+  center: Pick<CenterRecord, "phone" | "email" | "website_url">,
+): string | null {
+  const parts = [
+    center.phone,
+    center.email,
+    center.website_url ? "Web oficial" : null,
+  ].filter((value): value is string => Boolean(value));
 
   return parts.length > 0 ? parts.join(" | ") : null;
 }
@@ -66,11 +78,27 @@ export function slugifyCenterName(value: string): string {
     .replace(/-{2,}/g, "-");
 }
 
-export function toCenterListItem(
-  center: CenterRecord,
-  schedule: CenterSchedulePayload,
-  sourceLastUpdated: string | null,
-): CenterListItem {
+export function buildCenterServices(center: Pick<
+  CenterRecord,
+  "wifi_flag" | "sockets_flag" | "accessibility_flag" | "open_air_flag"
+>): CenterServicesV1 {
+  return {
+    wifi: center.wifi_flag,
+    sockets: center.sockets_flag,
+    accessible: center.accessibility_flag,
+    open_air: center.open_air_flag,
+  };
+}
+
+export function toCenterDecisionCardItem(input: {
+  center: CenterRecord;
+  schedule: CenterSchedulePayload;
+  ser: { enabled: boolean; zone_name: string | null } | null;
+  decision: CenterDecisionSummary;
+  mobilityHighlights: MobilityHighlightsV1;
+}): CenterDecisionCardItem {
+  const { center, schedule, ser, decision, mobilityHighlights } = input;
+
   return {
     id: center.id,
     slug: center.slug,
@@ -80,18 +108,9 @@ export function toCenterListItem(
     district: center.district,
     neighborhood: center.neighborhood,
     address_line: center.address_line,
-    phone: center.phone,
-    email: center.email,
-    website_url: center.website_url,
-    contact_summary: buildContactSummary(center),
-    lat: center.lat,
-    lon: center.lon,
-    coord_status: center.coord_status,
-    capacity_text: center.capacity_text,
-    wifi_flag: center.wifi_flag,
-    sockets_flag: center.sockets_flag,
-    accessibility_flag: center.accessibility_flag,
-    open_air_flag: center.open_air_flag,
+    capacity_value: center.capacity_value,
+    ser,
+    services: buildCenterServices(center),
     is_open_now: schedule.is_open_now,
     next_change_at: schedule.next_change_at,
     today_human_schedule: schedule.today_human_schedule,
@@ -101,17 +120,30 @@ export function toCenterListItem(
     ),
     opens_today: schedule.opens_today,
     closes_today: schedule.closes_today,
-    source_last_updated: sourceLastUpdated,
-    data_freshness: formatDataFreshness(sourceLastUpdated),
+    decision,
+    mobility_highlights: mobilityHighlights,
   };
 }
 
-export function toCenterDetailItem(
-  center: CenterRecord,
-  schedule: CenterSchedulePayload,
-  sources: CenterSourceSummary[],
-  sourceLastUpdated: string | null,
-): CenterDetailItem {
+export function toCenterDetailDecisionItem(input: {
+  center: CenterRecord;
+  schedule: CenterSchedulePayload;
+  sources: CenterSourceSummary[];
+  sourceLastUpdated: string | null;
+  ser: CenterSerInfo;
+  staticTransport: StaticTransportAnchorsV1;
+  features: CenterFeature[];
+}): CenterDetailDecisionItem {
+  const {
+    center,
+    schedule,
+    sources,
+    sourceLastUpdated,
+    ser,
+    staticTransport,
+    features,
+  } = input;
+
   return {
     id: center.id,
     slug: center.slug,
@@ -131,15 +163,16 @@ export function toCenterDetailItem(
     lon: center.lon,
     coord_status: center.coord_status,
     capacity_value: center.capacity_value,
-    capacity_text: center.capacity_text,
-    wifi_flag: center.wifi_flag,
-    sockets_flag: center.sockets_flag,
-    accessibility_flag: center.accessibility_flag,
-    open_air_flag: center.open_air_flag,
     notes_raw: center.notes_raw,
-    source_last_updated: sourceLastUpdated,
-    data_freshness: formatDataFreshness(sourceLastUpdated),
-    sources,
+    ser,
+    services: buildCenterServices(center),
     schedule,
+    static_transport: staticTransport,
+    features,
+    data_freshness: {
+      center_updated_at: formatDataFreshness(sourceLastUpdated),
+      mobility_static_updated_at: formatDataFreshness(sourceLastUpdated),
+    },
+    sources,
   };
 }

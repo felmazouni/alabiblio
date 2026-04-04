@@ -35,9 +35,12 @@
 - [x] Crear entorno Cloudflare `production`
 - [x] Asociar `production` a `alabiblio.org`
 - [x] Asociar `staging` a `staging.alabiblio.org`
-- [ ] Configurar bindings `D1`, `KV` y `R2` por entorno
+- [x] Configurar binding `D1` por entorno
+- [ ] Configurar binding `KV` por entorno
+- [ ] Configurar binding `R2` por entorno
 - [ ] Configurar secretos por entorno para Google Identity
-- [ ] Configurar secretos por entorno para EMT
+- [x] Configurar secretos por entorno para EMT
+- [x] Documentar credenciales EMT necesarias por entorno
 - [ ] Configurar secretos por entorno para Turnstile
 - [x] Configurar rutas del Worker para servir frontend en `/`
 - [x] Configurar rutas del Worker para servir API en `/api/*`
@@ -52,10 +55,11 @@
 - [x] Detectar anomalias iniciales de codificacion, entidades HTML y campos incompletos en fuentes de centros
 - [x] Definir mapping real `study_rooms` -> `Center`
 - [x] Definir mapping real `libraries` -> `Center`
-- [ ] Descargar muestras actuales de EMT API y EMT realtime
-- [ ] Descargar muestras actuales de Bicimad
-- [ ] Descargar muestras actuales de parkings EMT
-- [ ] Descargar geometria oficial SER del Geoportal
+- [x] Verificar autenticacion real de EMT OpenAPI
+- [x] Descargar muestras actuales de EMT API y EMT realtime
+- [x] Descargar muestras actuales de Bicimad
+- [x] Descargar muestras actuales de parkings EMT
+- [x] Descargar geometria oficial SER del Geoportal
 - [ ] Descargar callejero para fallback de direcciones y coordenadas
 - [ ] Localizar dataset oficial de agenda o eventos de bibliotecas
 - [ ] Verificar que campos faltan, que campos son corruptos y que campos requieren override manual
@@ -75,8 +79,13 @@
 - [x] Crear tabla `schedule_parse_anomalies`
 - [ ] Crear tablas `seasonal_rules` y `exam_extension_rules`
 - [ ] Crear tabla `schedule_manual_overrides`
-- [ ] Crear tabla `center_ser_coverage`
-- [ ] Crear tablas `transport_nodes`, `transport_routes` y `center_transport_links`
+- [x] Crear tabla `center_ser_coverage`
+- [x] Crear tabla `transport_nodes`
+- [x] Crear tabla `center_transport_links`
+- [x] Crear tabla `transport_routes`
+- [x] Crear tabla `transport_route_stops`
+- [x] Crear tabla `center_features`
+- [x] Crear tabla `center_feature_evidence`
 - [ ] Crear tabla `library_events`
 - [ ] Crear tablas `users`, `user_identities`, `sessions`, `center_reviews` y `center_review_aggregates`
 - [ ] Crear vista de version activa de horario
@@ -118,17 +127,18 @@
 - [ ] Bloquear cierre de fase sin suite verde del parser
 
 ## 5. Ingenieria geoespacial
+- [x] Implementar geolocalizacion del usuario en cliente para decision por cercania
 - [ ] Normalizar latitud y longitud de todas las fuentes
 - [ ] Detectar coordenadas corruptas, truncadas o invertidas
 - [ ] Resolver centros sin coordenadas usando direccion y callejero
 - [ ] Registrar metodo de resolucion de coordenadas por centro
-- [ ] Cargar geometrias oficiales SER
-- [ ] Ejecutar proceso batch de interseccion centro-poligono SER
-- [ ] Persistir resultado precomputado en `center_ser_coverage`
-- [ ] Calcular proximidad a paradas EMT
-- [ ] Calcular proximidad a estaciones Bicimad
-- [ ] Calcular proximidad a parkings EMT
-- [ ] Persistir enlaces precomputados en `center_transport_links`
+- [x] Cargar geometrias oficiales SER
+- [x] Ejecutar proceso batch de proximidad centro-banda SER
+- [x] Persistir resultado precomputado en `center_ser_coverage`
+- [x] Calcular proximidad a paradas EMT
+- [x] Calcular proximidad a estaciones Bicimad
+- [x] Calcular proximidad a parkings EMT
+- [x] Persistir enlaces precomputados en `center_transport_links`
 - [ ] Preparar basemap libre para MapLibre servido desde Cloudflare
 - [ ] Unificar SER en dominio y API como objeto estructurado `{ enabled, zone_name }`
 - [ ] Crear tests de normalizacion de coordenadas
@@ -136,44 +146,53 @@
 - [ ] Crear tests de precomputacion SER
 
 ## 6. Integracion de movilidad
-- [ ] Implementar cliente de autenticacion EMT
+- [x] Implementar cliente de autenticacion EMT
 - [ ] Implementar cliente de lineas EMT
-- [ ] Implementar cliente de paradas EMT
-- [ ] Implementar cliente de tiempos reales EMT
+- [x] Implementar cliente de paradas EMT
+- [x] Implementar cliente de tiempos reales EMT
+- [x] Revisar heuristica visible de ETA para evitar recomendaciones absurdas
 - [ ] Implementar cliente de travel plan EMT
-- [ ] Implementar cliente de Bicimad
-- [ ] Implementar cliente de parkings EMT
-- [ ] Ingerir y persistir lineas EMT y nodos de movilidad
+- [x] Implementar cliente de Bicimad
+- [x] Implementar cliente de parkings EMT
+- [x] Ingerir y persistir nodos de movilidad
 - [ ] Validar uso de GTFS abierto donde aporte fallback util
-- [ ] Crear heuristica de recomendacion de transporte sin IA
-- [ ] Calcular `best_arrival_eta`
-- [ ] Calcular `recommended_transport`
-- [ ] Calcular lista de alternativas cercanas
+- [x] Crear heuristica de recomendacion de transporte sin IA
+- [x] Calcular `best_arrival_eta`
+- [x] Calcular `recommended_transport`
+- [x] Calcular lista de alternativas cercanas
 - [ ] Cachear snapshots de movilidad en KV
-- [ ] Tipar `nearest_stops`
-- [ ] Tipar `realtime_arrivals`
+- [x] Tipar `nearest_stops`
+- [x] Tipar `realtime_arrivals`
 - [ ] Tipar `travel_plan`
-- [ ] Tipar `nearest_stations` de Bicimad
-- [ ] Tipar `nearest_parkings` de parkings EMT
+- [x] Tipar `nearest_stations` de Bicimad
+- [x] Tipar `nearest_parkings` de parkings EMT
+- [x] Construir top 2 trip-centric de `bus` por origen y destino
+- [x] Construir top 2 trip-centric de `bike` por origen y destino
+- [x] Exponer `CenterMobility` como modelo publico trip-centric
 - [ ] Crear tests de clientes externos con fixtures
-- [ ] Crear tests del motor heuristico de recomendacion
+- [x] Crear tests del motor heuristico de recomendacion
 
 ## 7. API y logica de dominio
 - [x] Implementar endpoint `GET /api/health`
 - [x] Asegurar que ninguna ruta `/api/*` cae en el fallback SPA
 - [x] Servir `GET /api/health` con `cache-control: no-store`
 - [x] Definir contratos TypeScript compartidos de request y response para centros
+- [x] Definir contratos TypeScript de origen manual y geocoding
 - [x] Implementar endpoint de listado de centros
 - [x] Conectar `GET /api/centers` a D1 con datos canonicos persistidos
 - [x] Implementar endpoint de detalle de centro
 - [x] Implementar endpoint de horario operativo de centro
-- [ ] Implementar endpoint de movilidad de centro
+- [x] Implementar endpoint de movilidad de centro
+- [x] Implementar endpoint `GET /api/geocode`
+- [x] Implementar endpoint `GET /api/origin/presets`
 - [ ] Implementar endpoint de eventos de centro
 - [ ] Implementar endpoint de comparador de centros
 - [ ] Implementar endpoint de metadatos de filtros
 - [ ] Implementar busqueda textual por nombre, barrio, distrito y direccion
 - [ ] Implementar filtros `abierto ahora`, `distancia`, `rating` y servicios
-- [ ] Implementar ordenaciones `distancia`, `mejor llegada` y `mejor valoracion`
+- [ ] Implementar filtros `distancia` y `rating`
+- [x] Implementar ordenaciones `distancia` y `mejor llegada`
+- [ ] Implementar ordenacion `mejor valoracion`
 - [x] Exponer `schedule_confidence` desde horario activo
 - [x] Exponer `source_last_updated` desde vinculo fuente-centro
 - [x] Exponer `contact_summary` derivado desde contacto canonico
@@ -181,6 +200,11 @@
 - [x] Exponer `closes_today`
 - [x] Exponer `schedule_confidence_label` derivado en dominio y API
 - [x] Exponer `data_freshness` derivado para UI
+- [x] Exponer `distance_m`, `estimated_arrival_minutes` y `best_arrival_mode` cuando hay ubicacion valida
+- [x] Exponer `best_mobility_summary` como ayuda de decision
+- [x] Soportar origen manual geocodificado ademas de GPS en las queries de decision
+- [x] Exponer summary trip-centric de decision y `transport_summary` para cards
+- [x] Exponer prestaciones inferidas y evidencia en detalle
 - [ ] Exponer `recommendation_score` como campo contextual por request
 - [ ] Exponer `quick_flags` como campos derivados
 - [ ] Definir `recommendation_score = null` cuando no exista contexto de ubicacion valido
@@ -192,39 +216,51 @@
 
 ## 8. UI publica
 - [x] Sustituir la plantilla base de Vite por una home inicial de `alabiblio`
-- [ ] Integrar React Bits open source en la UI visible
-- [ ] Crear sistema visual propio para piezas no cubiertas por React Bits
+- [x] Integrar React Bits open source en la UI visible
+- [x] Crear sistema visual propio para piezas no cubiertas por React Bits
 - [x] Sustituir la home placeholder por un explorador real conectado a `/api/centers`
 - [ ] Crear vista lista + mapa sincronizados
+- [x] Implementar geolocalizacion real del usuario con CTA y fallback honesto
+- [x] Permitir direccion manual como origen de decision
+- [x] Implementar selector visible de direccion con resultados geocodificados
+- [x] Implementar selector serio de origen con `GPS`, direccion manual y preset areas
 - [x] Crear barra de busqueda principal
 - [x] Crear panel de filtros rapidos
 - [ ] Crear panel de filtros avanzados
-- [ ] Crear ordenacion por distancia
-- [ ] Crear ordenacion por mejor llegada
+- [x] Crear ordenacion por distancia
+- [x] Crear ordenacion por mejor llegada
 - [ ] Crear ordenacion por mejor valoracion
 - [x] Crear cards de centro con datos reales basicos
+- [x] Simplificar cards para decision rapida con ETA y contexto minimo
+- [x] Hacer visible el aforo en la card principal cuando exista
+- [x] Crear bloque visible `mejor opcion ahora`
 - [x] Crear vista de detalle minima con contacto, coordenadas y horario raw
 - [x] Mostrar `abierto/cerrado` en cards y bloque superior del detalle
 - [ ] Mostrar `cierra en X` en bloque superior
 - [ ] Mostrar `aforo` en bloque superior
-- [ ] Mostrar `tiempo de llegada` en bloque superior
-- [ ] Mostrar CTA `como llegar` en bloque superior
+- [x] Mostrar `tiempo de llegada` en bloque superior
+- [x] Mostrar CTA `como llegar` en bloque superior
 - [ ] Mostrar `quick_flags` en cards
 - [x] Mostrar `schedule_confidence` cuando el dato operativo tenga baja fiabilidad
 - [x] Crear bloque visible de horario de hoy
 - [x] Crear bloque visible de aforo, contacto y servicios
 - [x] Priorizar estado operativo, horario y contacto en el bloque superior del detalle
+- [x] Priorizar llegada y movilidad antes que datos tecnicos secundarios
 - [x] Mover datos tecnicos secundarios a bloques inferiores del detalle
 - [x] Mejorar legibilidad visual de avisos y anomalias
-- [ ] Crear bloque visible de movilidad y como llegar
-- [ ] Crear bloque visible de zona SER
+- [x] Crear bloque visible de movilidad y como llegar
+- [x] Crear bloque visible de zona SER
+- [x] Crear mapa real visible en el detalle con centro y movilidad cercana
 - [ ] Crear bloque visible de eventos
 - [ ] Crear comparador de centros
-- [ ] Crear iconografia clara para metricas de valoracion y servicios
+- [x] Crear iconografia clara para metricas de valoracion y servicios
 - [x] Crear estados de carga, vacio y error
 - [x] Mostrar apertura o cierre del dia cuando sea posible en cards y detalle
-- [ ] Ajustar UX movil y desktop con foco en decision inmediata
+- [x] Ajustar UX movil y desktop con foco en decision inmediata
 - [x] Mejorar layout movil del explorador y del panel de detalle
+- [x] Mover detalle a pantalla full-screen con ruta propia
+- [x] Crear bottom nav tipo app
+- [x] Rehacer cards compactas trip-centric para comparacion rapida
 
 ## 9. Identidad y valoraciones
 - [ ] Implementar login con Google Identity
@@ -263,18 +299,20 @@
 - [ ] Completar suite de integracion de conectores de datos
 - [ ] Completar suite de integracion de API
 - [ ] Completar suite E2E de listado, detalle, login y valoracion
+- [x] Añadir smoke test publico del endpoint de geocoding
 - [x] Definir TTL por endpoint publico
 - [ ] Definir TTL por endpoint admin
 - [ ] Definir estrategia de cache key por bucket geografico de lat/lon
 - [x] Definir invalidacion tras `ingestion_run` completado
 - [ ] Medir TTFB, payload y latencia de filtros
-- [ ] Reducir payload de listado y detalle
+- [x] Reducir payload visual del listado para decision rapida
 - [ ] Optimizar cache de queries calientes
 - [ ] Optimizar refresco de snapshots externos
 - [ ] Validar accesibilidad basica de filtros, mapa y formularios
 - [ ] Validar comportamiento movil en escenarios reales
 - [x] Anadir smoke test de despliegue `staging`
 - [x] Anadir smoke test de despliegue `production`
+- [x] Actualizar smoke publico para `origin/presets` y movilidad trip-centric
 - [ ] Bloquear cierre de fase sin budgets de rendimiento cumplidos
 
 ## 12. Despliegue y entrega
@@ -283,6 +321,8 @@
 - [x] Verificar convivencia de SPA en `/` y API en `/api/*`
 - [x] Configurar migraciones D1 por entorno
 - [x] Ejecutar ingesta inicial de centros en `local`, `staging` y `production`
+- [x] Ejecutar sync de movilidad en `staging` y `production`
+- [x] Ejecutar sync de cobertura SER en `staging` y `production`
 - [ ] Configurar buckets R2 por entorno
 - [ ] Configurar namespaces KV por entorno
 - [ ] Configurar secretos por entorno
@@ -291,5 +331,6 @@
 - [ ] Ejecutar seed inicial de datos validados
 - [x] Ejecutar smoke tests en `staging`
 - [x] Ejecutar smoke tests en `production`
-- [ ] Marcar checks reales del roadmap segun avance
+- [x] Desplegar ETA, ordenacion por llegada y UX de decision en `staging` y `production`
+- [x] Marcar checks reales del roadmap segun avance
 - [ ] Preparar build final y assets de entrega del proyecto

@@ -1,0 +1,19 @@
+{
+  "name": "@alabiblio/ingestion",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./sources/libraries": "./src/sources/libraries.ts",
+    "./sources/studyRooms": "./src/sources/studyRooms.ts",
+    "./normalizers/center": "./src/normalizers/center.ts",
+    "./pipelines/ingestCenters": "./src/pipelines/ingestCenters.ts"
+  },
+  "dependencies": {
+    "@alabiblio/contracts": "workspace:*",
+    "@alabiblio/domain": "workspace:*",
+    "he": "^1.2.0"
+  }
+}

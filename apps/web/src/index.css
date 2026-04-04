@@ -1,36 +1,81 @@
-:root {
-  font-family: "Segoe UI Variable", "Segoe UI", "Trebuchet MS", sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #f6f8fc;
-  background:
-    radial-gradient(circle at top left, rgba(255, 146, 43, 0.18), transparent 24%),
-    radial-gradient(circle at top right, rgba(81, 176, 255, 0.18), transparent 22%),
-    linear-gradient(180deg, #07101b 0%, #0d1827 42%, #111d2c 100%);
+/* ============================================================
+   ALABIBLIO — Base Styles
+   Entry point CSS. Imports tokens, sets global defaults.
+   ============================================================ */
+
+@import './styles/tokens.css';
+
+/* ── Reset ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  min-width: 320px;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(138, 115, 255, 0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 0%, rgba(94, 200, 255, 0.05) 0%, transparent 42%);
+  background-attachment: fixed;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  box-sizing: border-box;
+#root {
+  min-height: 100dvh;
+  isolation: isolate;
 }
 
-html {
-  min-width: 320px;
+/* ── Typography defaults ────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
 }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  color: #f6f8fc;
+p {
+  color: var(--color-text-2);
+  line-height: var(--leading-normal);
 }
 
+strong {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+small {
+  font-size: var(--text-sm);
+  color: var(--color-text-3);
+}
+
+/* ── Interactive resets ─────────────────────────────────────── */
 a {
   color: inherit;
   text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
 }
 
 button,
@@ -38,6 +83,31 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
-#root {
-  min-height: 100vh;
+/* ── Focus visible (accessibility) ─────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Selection ──────────────────────────────────────────────── */
+::selection {
+  background: var(--color-accent-surface);
+  color: var(--color-text);
+}
+
+/* ── Scrollbar (webkit) ─────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(106, 118, 168, 0.22);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(106, 118, 168, 0.38);
 }

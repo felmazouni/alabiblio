@@ -1,5 +1,6 @@
 import type {
   CenterRecord,
+  CenterSerInfo,
   CenterSourceSummary,
   ListCentersQuery,
   ScheduleHolidayClosure,
@@ -7,12 +8,21 @@ import type {
   SchedulePartialDayOverride,
   ScheduleRegularRule,
 } from "@alabiblio/contracts/centers";
+import type {
+  CenterFeature,
+  CenterFeatureEvidence,
+} from "@alabiblio/contracts/features";
+import type { TransportNodeKind } from "@alabiblio/contracts/mobility";
 import type { ActiveScheduleRecord } from "@alabiblio/schedule-engine/types";
 
 export type WorkerEnv = Env & {
   APP_ENV: string;
   ASSETS: Fetcher;
   DB: D1Database;
+  EMT_CLIENT_ID?: string;
+  EMT_PASS_KEY?: string;
+  EMT_EMAIL?: string;
+  EMT_PASSWORD?: string;
 };
 
 type CenterRow = {
@@ -76,6 +86,63 @@ type SourceFreshnessRow = {
   source_last_updated: string | null;
 };
 
+type CenterIdentifierRow = {
+  id: string;
+  slug: string;
+};
+
+export type TransportNodeRow = {
+  center_id?: string;
+  id: string;
+  kind: TransportNodeKind;
+  external_id: string;
+  name: string;
+  address_line: string | null;
+  lat: number;
+  lon: number;
+  metadata_json: string | null;
+  distance_m: number;
+  rank_order: number;
+};
+
+export type ActiveTransportNodeRow = {
+  id: string;
+  kind: TransportNodeKind;
+  external_id: string;
+  name: string;
+  address_line: string | null;
+  lat: number;
+  lon: number;
+  metadata_json: string | null;
+};
+
+type CenterFeatureRow = {
+  center_id: string;
+  feature_code: string;
+  label: string;
+  icon_name: string;
+  confidence: CenterFeature["confidence"];
+  is_card_visible: number;
+  is_filterable: number;
+};
+
+type CenterFeatureEvidenceRow = {
+  center_id: string;
+  feature_code: string;
+  source_type: CenterFeatureEvidence["source_type"];
+  source_field: string;
+  excerpt: string;
+  confidence: CenterFeatureEvidence["confidence"];
+};
+
+type SerCoverageRow = {
+  center_id: string;
+  enabled: number;
+  zone_name: string | null;
+  coverage_method: string | null;
+  distance_m: number | null;
+};
+
 function hydrateCenter(row: CenterRow): CenterRecord {
   return {
     ...row,
@@ -88,7 +155,18 @@ function hydrateCenter(row: CenterRow): CenterRecord {
 }
 
 function buildWhereClause(
-  filters: Pick<ListCentersQuery, "kind" | "q" | "has_wifi" | "accessible" | "open_air">,
+  filters: Pick<
+    ListCentersQuery,
+    | "kind"
+    | "q"
+    | "has_wifi"
+    | "has_sockets"
+    | "accessible"
+    | "open_air"
+    | "has_ser"
+    | "district"
+    | "neighborhood"
+  >,
 ): {
   clause: string;
   bindings: Array<number | string>;
@@ -104,12 +182,16 @@ function buildWhereClause(
   const query = filters.q?.trim().toLowerCase();
 
   if (query) {
-    clauses.push("LOWER(name) LIKE ?");
-    bindings.push(`%${query}%`);
+    clauses.push("(LOWER(name) LIKE ? OR LOWER(neighborhood) LIKE ? OR LOWER(district) LIKE ?)");
+    bindings.push(`%${query}%`, `%${query}%`, `%${query}%`);
   }
 
   if (filters.has_wifi) {
     clauses.push("wifi_flag = 1");
+  }
+
+  if (filters.has_sockets) {
+    clauses.push("sockets_flag = 1");
   }
 
   if (filters.accessible) {
@@ -118,6 +200,22 @@ function buildWhereClause(
 
   if (filters.open_air) {
     clauses.push("open_air_flag = 1");
+  }
+
+  if (filters.has_ser) {
+    clauses.push(
+      "id IN (SELECT center_id FROM center_ser_coverage WHERE enabled = 1)",
+    );
+  }
+
+  if (filters.district) {
+    clauses.push("LOWER(district) = ?");
+    bindings.push(filters.district.trim().toLowerCase());
+  }
+
+  if (filters.neighborhood) {
+    clauses.push("LOWER(neighborhood) LIKE ?");
+    bindings.push(`%${filters.neighborhood.trim().toLowerCase()}%`);
   }
 
   return {
@@ -399,6 +497,48 @@ export async function loadSourceFreshnessByCenterIds(
   );
 }
 
+function hydrateSerCoverage(
+  row: SerCoverageRow | null,
+): CenterSerInfo {
+  if (!row) {
+    return {
+      enabled: false,
+      zone_name: null,
+      coverage_method: null,
+      distance_m: null,
+    };
+  }
+
+  return {
+    enabled: row.enabled === 1,
+    zone_name: row.zone_name,
+    coverage_method: row.coverage_method,
+    distance_m: row.distance_m,
+  };
+}
+
+function hydrateFeature(row: CenterFeatureRow): CenterFeature {
+  return {
+    code: row.feature_code,
+    label: row.label,
+    icon: row.icon_name,
+    confidence: row.confidence,
+    card_visible: row.is_card_visible === 1,
+    filterable: row.is_filterable === 1,
+  };
+}
+
+function hydrateFeatureEvidence(
+  row: CenterFeatureEvidenceRow,
+): CenterFeatureEvidence {
+  return {
+    source_type: row.source_type,
+    source_field: row.source_field,
+    excerpt: row.excerpt,
+    confidence: row.confidence,
+  };
+}
+
 export async function getLatestDataVersion(
   db: D1Database,
 ): Promise<string | null> {
@@ -417,7 +557,15 @@ export async function listCenters(
   db: D1Database,
   query: Pick<
     ListCentersQuery,
-    "kind" | "q" | "has_wifi" | "accessible" | "open_air"
+    | "kind"
+    | "q"
+    | "has_wifi"
+    | "has_sockets"
+    | "accessible"
+    | "open_air"
+    | "has_ser"
+    | "district"
+    | "neighborhood"
   >,
 ): Promise<CenterRecord[]> {
   const where = buildWhereClause(query);
@@ -491,4 +639,296 @@ export async function getCenterBySlug(
     sources: sourcesResult.results ?? [],
     source_last_updated: sourceFreshnessMap.get(center.id) ?? null,
   };
+}
+
+export async function getCenterSerCoverageByCenterId(
+  db: D1Database,
+  centerId: string,
+): Promise<CenterSerInfo> {
+  const result = await db
+    .prepare(
+      `SELECT
+        center_id,
+        enabled,
+        zone_name,
+        coverage_method,
+        distance_m
+      FROM center_ser_coverage
+      WHERE center_id = ?
+      LIMIT 1`,
+    )
+    .bind(centerId)
+    .first<SerCoverageRow>();
+
+  return hydrateSerCoverage(result ?? null);
+}
+
+export async function loadSerCoverageByCenterIds(
+  db: D1Database,
+  centerIds: string[],
+): Promise<Map<string, CenterSerInfo>> {
+  if (centerIds.length === 0) {
+    return new Map();
+  }
+
+  const rows: SerCoverageRow[] = [];
+
+  for (const centerIdChunk of chunkValues(centerIds)) {
+    const placeholders = buildPlaceholders(centerIdChunk);
+    const result = await db
+      .prepare(
+        `SELECT
+          center_id,
+          enabled,
+          zone_name,
+          coverage_method,
+          distance_m
+        FROM center_ser_coverage
+        WHERE center_id IN (${placeholders})`,
+      )
+      .bind(...centerIdChunk)
+      .all<SerCoverageRow>();
+
+    rows.push(...(result.results ?? []));
+  }
+
+  return new Map(rows.map((row) => [row.center_id, hydrateSerCoverage(row)]));
+}
+
+export async function getCenterIdentifierBySlug(
+  db: D1Database,
+  slug: string,
+): Promise<CenterIdentifierRow | null> {
+  const result = await db
+    .prepare(
+      `SELECT id, slug
+      FROM centers
+      WHERE slug = ?
+      LIMIT 1`,
+    )
+    .bind(slug)
+    .first<CenterIdentifierRow>();
+
+  return result ?? null;
+}
+
+export async function listTransportNodesByCenterId(
+  db: D1Database,
+  centerId: string,
+): Promise<TransportNodeRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT
+        tn.id,
+        tn.kind,
+        tn.external_id,
+        tn.name,
+        tn.address_line,
+        tn.lat,
+        tn.lon,
+        tn.metadata_json,
+        ctl.distance_m,
+        ctl.rank_order
+      FROM center_transport_links ctl
+      JOIN transport_nodes tn ON tn.id = ctl.transport_node_id
+      WHERE ctl.center_id = ?
+        AND tn.is_active = 1
+      ORDER BY
+        CASE tn.kind
+          WHEN 'emt_stop' THEN 0
+          WHEN 'metro_station' THEN 1
+          WHEN 'bicimad_station' THEN 2
+          WHEN 'parking' THEN 3
+          ELSE 4
+        END ASC,
+        ctl.rank_order ASC,
+        ctl.distance_m ASC`,
+    )
+    .bind(centerId)
+    .all<TransportNodeRow>();
+
+  return result.results ?? [];
+}
+
+export async function loadTransportNodesByCenterIds(
+  db: D1Database,
+  centerIds: string[],
+): Promise<Map<string, TransportNodeRow[]>> {
+  if (centerIds.length === 0) {
+    return new Map();
+  }
+
+  const rows: TransportNodeRow[] = [];
+
+  for (const centerIdChunk of chunkValues(centerIds)) {
+    const placeholders = buildPlaceholders(centerIdChunk);
+    const result = await db
+      .prepare(
+        `SELECT
+          ctl.center_id,
+          tn.id,
+          tn.kind,
+          tn.external_id,
+          tn.name,
+          tn.address_line,
+          tn.lat,
+          tn.lon,
+          tn.metadata_json,
+          ctl.distance_m,
+          ctl.rank_order
+        FROM center_transport_links ctl
+        JOIN transport_nodes tn ON tn.id = ctl.transport_node_id
+        WHERE ctl.center_id IN (${placeholders})
+          AND tn.is_active = 1
+        ORDER BY
+          ctl.center_id ASC,
+          CASE tn.kind
+            WHEN 'emt_stop' THEN 0
+            WHEN 'metro_station' THEN 1
+            WHEN 'bicimad_station' THEN 2
+            WHEN 'parking' THEN 3
+            ELSE 4
+          END ASC,
+          ctl.rank_order ASC,
+          ctl.distance_m ASC`,
+      )
+      .bind(...centerIdChunk)
+      .all<TransportNodeRow>();
+
+    rows.push(...(result.results ?? []));
+  }
+
+  const grouped = new Map<string, TransportNodeRow[]>();
+
+  for (const row of rows) {
+    const centerId = row.center_id;
+
+    if (!centerId) {
+      continue;
+    }
+
+    const current = grouped.get(centerId) ?? [];
+    current.push(row);
+    grouped.set(centerId, current);
+  }
+
+  return grouped;
+}
+
+export async function listActiveTransportNodesByKinds(
+  db: D1Database,
+  kinds: TransportNodeKind[],
+): Promise<ActiveTransportNodeRow[]> {
+  if (kinds.length === 0) {
+    return [];
+  }
+
+  const placeholders = buildPlaceholders(kinds);
+  const result = await db
+    .prepare(
+      `SELECT
+        id,
+        kind,
+        external_id,
+        name,
+        address_line,
+        lat,
+        lon,
+        metadata_json
+      FROM transport_nodes
+      WHERE is_active = 1
+        AND kind IN (${placeholders})
+      ORDER BY kind ASC, name ASC`,
+    )
+    .bind(...kinds)
+    .all<ActiveTransportNodeRow>();
+
+  return result.results ?? [];
+}
+
+export async function loadCenterFeaturesByCenterIds(
+  db: D1Database,
+  centerIds: string[],
+): Promise<Map<string, CenterFeature[]>> {
+  if (centerIds.length === 0) {
+    return new Map();
+  }
+
+  const rows: CenterFeatureRow[] = [];
+
+  for (const centerIdChunk of chunkValues(centerIds)) {
+    const placeholders = buildPlaceholders(centerIdChunk);
+    const result = await db
+      .prepare(
+        `SELECT
+          center_id,
+          feature_code,
+          label,
+          icon_name,
+          confidence,
+          is_card_visible,
+          is_filterable
+        FROM center_features
+        WHERE center_id IN (${placeholders})
+        ORDER BY center_id ASC, is_card_visible DESC, feature_code ASC`,
+      )
+      .bind(...centerIdChunk)
+      .all<CenterFeatureRow>();
+
+    rows.push(...(result.results ?? []));
+  }
+
+  const grouped = new Map<string, CenterFeature[]>();
+
+  for (const row of rows) {
+    const current = grouped.get(row.center_id) ?? [];
+    current.push(hydrateFeature(row));
+    grouped.set(row.center_id, current);
+  }
+
+  return grouped;
+}
+
+export async function loadCenterFeatureEvidenceByCenterIds(
+  db: D1Database,
+  centerIds: string[],
+): Promise<Map<string, Record<string, CenterFeatureEvidence[]>>> {
+  if (centerIds.length === 0) {
+    return new Map();
+  }
+
+  const rows: CenterFeatureEvidenceRow[] = [];
+
+  for (const centerIdChunk of chunkValues(centerIds)) {
+    const placeholders = buildPlaceholders(centerIdChunk);
+    const result = await db
+      .prepare(
+        `SELECT
+          center_id,
+          feature_code,
+          source_type,
+          source_field,
+          excerpt,
+          confidence
+        FROM center_feature_evidence
+        WHERE center_id IN (${placeholders})
+        ORDER BY center_id ASC, feature_code ASC, id ASC`,
+      )
+      .bind(...centerIdChunk)
+      .all<CenterFeatureEvidenceRow>();
+
+    rows.push(...(result.results ?? []));
+  }
+
+  const grouped = new Map<string, Record<string, CenterFeatureEvidence[]>>();
+
+  for (const row of rows) {
+    const centerRecord = grouped.get(row.center_id) ?? {};
+    const evidenceList = centerRecord[row.feature_code] ?? [];
+    evidenceList.push(hydrateFeatureEvidence(row));
+    centerRecord[row.feature_code] = evidenceList;
+    grouped.set(row.center_id, centerRecord);
+  }
+
+  return grouped;
 }

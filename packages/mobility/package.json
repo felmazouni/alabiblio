@@ -1,0 +1,24 @@
+{
+  "name": "@alabiblio/mobility",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./centers": "./src/centers.ts",
+    "./emtApi": "./src/emtApi.ts",
+    "./linking": "./src/linking.ts",
+    "./sync": "./src/sync.ts",
+    "./types": "./src/types.ts",
+    "./sources/bicimadStations": "./src/sources/bicimadStations.ts",
+    "./sources/emtStops": "./src/sources/emtStops.ts",
+    "./sources/metroStations": "./src/sources/metroStations.ts",
+    "./sources/parkings": "./src/sources/parkings.ts"
+  },
+  "dependencies": {
+    "@alabiblio/contracts": "workspace:*",
+    "@alabiblio/geo": "workspace:*",
+    "@alabiblio/ingestion": "workspace:*",
+    "csv-parse": "^6.2.1"
+  }
+}

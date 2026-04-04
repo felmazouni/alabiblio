@@ -1,0 +1,13 @@
+{
+  "name": "@alabiblio/contracts",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./centers": "./src/centers.ts",
+    "./features": "./src/features.ts",
+    "./mobility": "./src/mobility.ts",
+    "./origin": "./src/origin.ts"
+  }
+}

@@ -1,0 +1,8 @@
+/* @alabiblio/ui — token re-export
+   Canonical tokens live in apps/web/src/styles/tokens.css during
+   the current monorepo phase. This file exists to mark the boundary
+   and will be the single source once the design system is promoted.
+
+   Usage (once promoted):
+     @import '@alabiblio/ui/tokens.css';
+*/

@@ -13,6 +13,7 @@
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "skipLibCheck": true,
+    "ignoreDeprecations": "5.0",
     "baseUrl": ".",
     "paths": {
       "@alabiblio/contracts/*": [
@@ -21,11 +22,20 @@
       "@alabiblio/domain/*": [
         "packages/domain/src/*"
       ],
+      "@alabiblio/geo/*": [
+        "packages/geo/src/*"
+      ],
       "@alabiblio/ingestion/*": [
         "packages/ingestion/src/*"
       ],
+      "@alabiblio/mobility/*": [
+        "packages/mobility/src/*"
+      ],
       "@alabiblio/schedule-engine/*": [
         "packages/schedule-engine/src/*"
+      ],
+      "@alabiblio/ui/*": [
+        "packages/ui/src/*"
       ]
     }
   }

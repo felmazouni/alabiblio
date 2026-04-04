@@ -1,0 +1,16 @@
+{
+  "name": "@alabiblio/domain",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./centers": "./src/centers.ts",
+    "./features": "./src/features.ts",
+    "./mobility": "./src/mobility.ts"
+  },
+  "dependencies": {
+    "@alabiblio/contracts": "workspace:*",
+    "@alabiblio/geo": "workspace:*"
+  }
+}

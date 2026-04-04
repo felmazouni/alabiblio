@@ -1,4 +1,8 @@
 import type { CenterCoordStatus, CenterKind, CenterRecord } from "@alabiblio/contracts/centers";
+import type {
+  CenterFeature,
+  CenterFeatureEvidence,
+} from "@alabiblio/contracts/features";
 
 export type SourceCode = "study_rooms" | "libraries";
 
@@ -55,13 +59,14 @@ export interface NormalizedCenterLink {
   external_id: string;
   is_primary: boolean;
   source_record_updated_at: string | null;
-  raw_payload_r2_key: string | null;
 }
 
 export interface NormalizedCenterEnvelope {
   center: NormalizedCenterInput;
   link: NormalizedCenterLink;
   rawScheduleText: string | null;
+  features: CenterFeature[];
+  featureEvidence: Record<string, CenterFeatureEvidence[]>;
 }
 
 export interface IngestionRunSummary {

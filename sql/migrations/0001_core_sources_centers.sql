@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS ingestion_runs (
   warning_count INTEGER NOT NULL DEFAULT 0,
   error_count INTEGER NOT NULL DEFAULT 0,
   checksum TEXT NOT NULL,
-  snapshot_r2_key TEXT,
   triggered_by TEXT NOT NULL,
   meta_json TEXT,
   FOREIGN KEY (source_id) REFERENCES sources(id)
@@ -67,7 +66,6 @@ CREATE TABLE IF NOT EXISTS center_source_links (
   run_id TEXT NOT NULL,
   is_primary INTEGER NOT NULL DEFAULT 0,
   source_record_updated_at TEXT,
-  raw_payload_r2_key TEXT,
   PRIMARY KEY (center_id, source_id, external_id),
   FOREIGN KEY (center_id) REFERENCES centers(id),
   FOREIGN KEY (source_id) REFERENCES sources(id),

@@ -14,11 +14,20 @@ export default defineConfig({
       "@alabiblio/domain": fileURLToPath(
         new URL("../../packages/domain/src", import.meta.url),
       ),
+      "@alabiblio/geo": fileURLToPath(
+        new URL("../../packages/geo/src", import.meta.url),
+      ),
       "@alabiblio/ingestion": fileURLToPath(
         new URL("../../packages/ingestion/src", import.meta.url),
       ),
+      "@alabiblio/mobility": fileURLToPath(
+        new URL("../../packages/mobility/src", import.meta.url),
+      ),
       "@alabiblio/schedule-engine": fileURLToPath(
         new URL("../../packages/schedule-engine/src", import.meta.url),
+      ),
+      "@alabiblio/ui": fileURLToPath(
+        new URL("../../packages/ui/src", import.meta.url),
       ),
     },
   },

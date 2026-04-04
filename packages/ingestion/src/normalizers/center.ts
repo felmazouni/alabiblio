@@ -1,5 +1,6 @@
 import { decode } from "he";
 import { slugifyCenterName } from "../../../domain/src/centers";
+import { inferCenterFeatures } from "../../../domain/src/features";
 import type {
   CenterMappingContext,
   CoordinateNormalization,
@@ -195,6 +196,19 @@ export function normalizeMadridCenterRecord(
 
   const coordinates = normalizeCoordinates(record);
   const capacity = extractCapacity(record.EQUIPAMIENTO);
+  const descriptionText = toNullableString(record.DESCRIPCION);
+  const rawScheduleText = toNullableString(record.HORARIO);
+  const features = inferCenterFeatures({
+    wifiFlag: hasWifi(record),
+    socketsFlag: hasSockets(record),
+    accessibilityFlag: toNullableString(record.ACCESIBILIDAD) === "1",
+    openAirFlag: isOpenAir(record),
+    capacityValue: capacity.value,
+    equipmentText: toNullableString(record.EQUIPAMIENTO),
+    descriptionText,
+    notesText: descriptionText,
+    rawScheduleText,
+  });
 
   return {
     center: {
@@ -222,7 +236,7 @@ export function normalizeMadridCenterRecord(
       sockets_flag: hasSockets(record),
       accessibility_flag: toNullableString(record.ACCESIBILIDAD) === "1",
       open_air_flag: isOpenAir(record),
-      notes_raw: toNullableString(record.DESCRIPCION),
+      notes_raw: descriptionText,
       is_active: true,
     },
     link: {
@@ -231,8 +245,9 @@ export function normalizeMadridCenterRecord(
       external_id: externalId,
       is_primary: true,
       source_record_updated_at: context.sourceRecordUpdatedAt,
-      raw_payload_r2_key: null,
     },
-    rawScheduleText: toNullableString(record.HORARIO),
+    rawScheduleText,
+    features: features.features,
+    featureEvidence: features.evidenceByCode,
   };
 }

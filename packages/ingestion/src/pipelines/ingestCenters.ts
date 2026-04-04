@@ -98,23 +98,66 @@ function buildRunSql(summary: IngestionRunSummary): string {
 
   const linkStatements = summary.records.map(({ link }) => {
     return `INSERT INTO center_source_links (
-      center_id, source_id, external_id, run_id, is_primary,
-      source_record_updated_at, raw_payload_r2_key
+      center_id, source_id, external_id, run_id, is_primary, source_record_updated_at
     ) VALUES (
       ${sqlValue(link.center_id)},
       ${sqlValue(link.source_id)},
       ${sqlValue(link.external_id)},
       ${sqlValue(summary.id)},
       ${sqlValue(link.is_primary)},
-      ${sqlValue(link.source_record_updated_at)},
-      ${sqlValue(link.raw_payload_r2_key)}
+      ${sqlValue(link.source_record_updated_at)}
     )
     ON CONFLICT(center_id, source_id, external_id) DO UPDATE SET
       run_id = excluded.run_id,
       is_primary = excluded.is_primary,
-      source_record_updated_at = excluded.source_record_updated_at,
-      raw_payload_r2_key = excluded.raw_payload_r2_key;`;
+      source_record_updated_at = excluded.source_record_updated_at;`;
   });
+
+  const featureCleanupStatements = summary.records.flatMap(({ center }) => [
+    `DELETE FROM center_feature_evidence WHERE center_id = ${sqlValue(center.id)};`,
+    `DELETE FROM center_features WHERE center_id = ${sqlValue(center.id)};`,
+  ]);
+
+  const featureStatements = summary.records.flatMap(
+    ({ center, features, featureEvidence }) => {
+      return features.flatMap((feature) => {
+        const insertFeature = `INSERT INTO center_features (
+          center_id, feature_code, label, icon_name, confidence, is_card_visible, is_filterable,
+          source_summary, created_at, updated_at
+        ) VALUES (
+          ${sqlValue(center.id)},
+          ${sqlValue(feature.code)},
+          ${sqlValue(feature.label)},
+          ${sqlValue(feature.icon)},
+          ${sqlValue(feature.confidence)},
+          ${sqlValue(feature.card_visible)},
+          ${sqlValue(feature.filterable)},
+          NULL,
+          ${sqlValue(summary.finishedAt)},
+          ${sqlValue(summary.finishedAt)}
+        );`;
+        const evidenceRows = featureEvidence[feature.code] ?? [];
+        const insertEvidence = evidenceRows.map((evidence) => {
+          return `INSERT INTO center_feature_evidence (
+            id, center_id, feature_code, source_id, run_id, source_type, source_field, excerpt, confidence, created_at
+          ) VALUES (
+            ${sqlValue(`feature_evidence_${center.id}_${feature.code}_${randomUUID()}`)},
+            ${sqlValue(center.id)},
+            ${sqlValue(feature.code)},
+            ${sqlValue(summary.sourceCode)},
+            ${sqlValue(summary.id)},
+            ${sqlValue(evidence.source_type)},
+            ${sqlValue(evidence.source_field)},
+            ${sqlValue(evidence.excerpt)},
+            ${sqlValue(evidence.confidence)},
+            ${sqlValue(summary.finishedAt)}
+          );`;
+        });
+
+        return [insertFeature, ...insertEvidence];
+      });
+    },
+  );
 
   const scheduleStatements = summary.records.flatMap(({ center, rawScheduleText }) => {
     const parsedSchedule = parseSchedule({
@@ -205,7 +248,7 @@ function buildRunSql(summary: IngestionRunSummary): string {
   return [
     `INSERT INTO ingestion_runs (
       id, source_id, status, started_at, finished_at, row_count_raw, row_count_valid,
-      row_count_rejected, warning_count, error_count, checksum, snapshot_r2_key,
+      row_count_rejected, warning_count, error_count, checksum,
       triggered_by, meta_json
     ) VALUES (
       ${sqlValue(summary.id)},
@@ -219,13 +262,14 @@ function buildRunSql(summary: IngestionRunSummary): string {
       0,
       0,
       ${sqlValue(summary.checksum)},
-      NULL,
       'script',
       NULL
     )
     ON CONFLICT(id) DO NOTHING;`,
     ...centerStatements,
     ...linkStatements,
+    ...featureCleanupStatements,
+    ...featureStatements,
     ...scheduleStatements,
     `UPDATE ingestion_runs SET
       status = 'completed',

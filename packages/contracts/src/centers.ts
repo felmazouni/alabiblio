@@ -1,3 +1,11 @@
+import type { CenterFeature } from "./features";
+import type {
+  MobilityConfidence,
+  MobilityHighlightsV1,
+  MobilityMode,
+  StaticTransportAnchorsV1,
+} from "./mobility";
+
 export type CenterKind = "study_room" | "library";
 
 export type CenterCoordStatus = "provided" | "missing" | "invalid";
@@ -7,6 +15,27 @@ export type ScheduleAudience = "sala" | "centro" | "secretaria" | "otros";
 export type ScheduleAnomalySeverity = "info" | "warning" | "error";
 
 export type ScheduleConfidenceLabel = "high" | "medium" | "low";
+
+export type CenterSortBy = "recommended" | "distance" | "arrival" | "open_now";
+
+export interface CenterSerInfo {
+  enabled: boolean;
+  zone_name: string | null;
+  coverage_method: string | null;
+  distance_m: number | null;
+}
+
+export interface CenterServicesV1 {
+  wifi: boolean;
+  sockets: boolean;
+  accessible: boolean;
+  open_air: boolean;
+}
+
+export interface UserLocationInput {
+  lat: number;
+  lon: number;
+}
 
 export type ScheduleAnomalyCode =
   | "schedule_missing"
@@ -28,8 +57,15 @@ export interface ListCentersQuery {
   q?: string;
   open_now?: boolean;
   has_wifi?: boolean;
+  has_sockets?: boolean;
   accessible?: boolean;
   open_air?: boolean;
+  has_ser?: boolean;
+  district?: string;
+  neighborhood?: string;
+  sort_by?: CenterSortBy;
+  user_lat?: number;
+  user_lon?: number;
 }
 
 export interface CenterRecord {
@@ -106,36 +142,13 @@ export interface CenterScheduleSummary {
   closes_today: string | null;
 }
 
-export interface CenterListItem extends CenterScheduleSummary {
-  id: string;
-  slug: string;
-  kind: CenterKind;
-  kind_label: string;
-  name: string;
-  district: string | null;
-  neighborhood: string | null;
-  address_line: string | null;
-  phone: string | null;
-  email: string | null;
-  website_url: string | null;
-  contact_summary: string | null;
-  lat: number | null;
-  lon: number | null;
-  coord_status: CenterCoordStatus;
-  capacity_text: string | null;
-  wifi_flag: boolean;
-  sockets_flag: boolean;
-  accessibility_flag: boolean;
-  open_air_flag: boolean;
-  source_last_updated: string | null;
-  data_freshness: string | null;
-}
-
-export interface ListCentersResponse {
-  items: CenterListItem[];
-  total: number;
-  limit: number;
-  offset: number;
+export interface CenterDecisionSummary {
+  best_mode: "walk" | MobilityMode | null;
+  best_time_minutes: number | null;
+  distance_m: number | null;
+  confidence: MobilityConfidence;
+  rationale: string[];
+  summary_label: string | null;
 }
 
 export interface CenterSourceSummary {
@@ -155,7 +168,26 @@ export interface CenterSchedulePayload extends CenterScheduleSummary {
   data_freshness: string | null;
 }
 
-export interface CenterDetailItem {
+export interface CenterListCardV1 extends CenterScheduleSummary {
+  id: string;
+  slug: string;
+  kind: CenterKind;
+  kind_label: string;
+  name: string;
+  district: string | null;
+  neighborhood: string | null;
+  address_line: string | null;
+  capacity_value: number | null;
+  ser: {
+    enabled: boolean;
+    zone_name: string | null;
+  } | null;
+  services: CenterServicesV1;
+  decision: CenterDecisionSummary;
+  mobility_highlights: MobilityHighlightsV1;
+}
+
+export interface CenterDetailBaseV1 {
   id: string;
   slug: string;
   kind: CenterKind;
@@ -174,20 +206,35 @@ export interface CenterDetailItem {
   lon: number | null;
   coord_status: CenterCoordStatus;
   capacity_value: number | null;
-  capacity_text: string | null;
-  wifi_flag: boolean;
-  sockets_flag: boolean;
-  accessibility_flag: boolean;
-  open_air_flag: boolean;
   notes_raw: string | null;
-  source_last_updated: string | null;
-  data_freshness: string | null;
-  sources: CenterSourceSummary[];
+  ser: CenterSerInfo;
+  services: CenterServicesV1;
   schedule: CenterSchedulePayload;
+  static_transport: StaticTransportAnchorsV1;
+  features: CenterFeature[];
+  data_freshness: {
+    center_updated_at: string | null;
+    mobility_static_updated_at: string | null;
+  };
+  sources: CenterSourceSummary[];
+}
+
+export type CenterDecisionCardItem = CenterListCardV1;
+export type CenterListItem = CenterListCardV1;
+export type CenterDetailDecisionItem = CenterDetailBaseV1;
+export type CenterDetailItem = CenterDetailBaseV1;
+
+export interface ListCentersResponse {
+  items: CenterListCardV1[];
+  total: number;
+  open_count: number;
+  limit: number;
+  offset: number;
+  next_offset?: number | null;
 }
 
 export interface GetCenterDetailResponse {
-  item: CenterDetailItem;
+  item: CenterDetailBaseV1;
 }
 
 export interface GetCenterScheduleResponse {
