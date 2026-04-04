@@ -108,20 +108,35 @@ export function buildHumanReason(mobility: CenterMobility | null): string {
   const meaningful = mobility.summary.rationale
     .map((entry) => cleanText(entry))
     .filter((entry): entry is string => entry.length > 0);
+  const specific = meaningful.filter(
+    (entry) =>
+      entry !== "Centro abierto ahora" &&
+      entry !== "Revisa horario" &&
+      entry !== "Sin origen suficiente" &&
+      entry !== "Fallback andando",
+  );
+  const lead = specific[0] ?? null;
 
-  if (meaningful.length === 0) {
-    return "Mostramos la mejor alternativa util con los datos disponibles.";
+  switch (mobility.summary.best_mode) {
+    case "car":
+      return lead === "Coche con contexto SER"
+        ? "La opcion mas rapida ahora es coche por tiempo total y contexto SER."
+        : "La opcion mas rapida ahora es coche por tiempo total.";
+    case "bus":
+      return lead === "EMT con llegada proxima"
+        ? "EMT queda arriba por espera corta y trayecto util."
+        : "EMT sigue siendo util con la mejor llegada estimada disponible.";
+    case "bike":
+      return lead === "BiciMAD con stock y anclaje"
+        ? "BiciMAD queda arriba por tiempo total y stock util."
+        : "BiciMAD queda arriba por tiempo total.";
+    case "metro":
+      return "Metro compensa mejor el acceso y el tiempo total.";
+    case "walk":
+      return "Ir andando sigue siendo la opcion mas directa desde tu origen.";
+    default:
+      return "Mostramos la mejor alternativa util con los datos disponibles.";
   }
-
-  if (meaningful.length === 1) {
-    const first = meaningful[0] ?? "Mostramos una alternativa util.";
-    return first.endsWith(".") ? first : `${first}.`;
-  }
-
-  const first = meaningful[0] ?? "Mostramos una alternativa util";
-  const second = meaningful[1] ?? "con los datos disponibles";
-  const sentence = `${first}. ${second}.`;
-  return sentence.replace(/\.\./g, ".");
 }
 
 export function buildCarCopy(mobility: CenterMobility | null): string {
@@ -140,8 +155,29 @@ export function buildCarCopy(mobility: CenterMobility | null): string {
 }
 
 function buildBusDegradation(bus: BusModuleV1): string {
+  if (bus.selected_line && bus.origin_stop) {
+    const parts = [
+      `Linea ${bus.selected_line}`,
+      `subida en ${trimLabel(bus.origin_stop.name, 22)}`,
+    ];
+
+    if (bus.destination_stop) {
+      parts.push(`bajada en ${trimLabel(bus.destination_stop.name, 22)}`);
+    }
+
+    if (bus.estimated_total_min !== null) {
+      parts.push(`llegada estimada ${bus.estimated_total_min} min`);
+    }
+
+    if (bus.estimated_travel_min !== null) {
+      parts.push(`viaje ${bus.estimated_travel_min} min`);
+    }
+
+    return parts.join(" - ");
+  }
+
   if (bus.origin_stop && bus.realtime_status !== "available") {
-    return `Parada ${trimLabel(bus.origin_stop.name, 22)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - tiempo real no disponible`;
+    return `Parada ${trimLabel(bus.origin_stop.name, 22)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - llegada estimada`;
   }
 
   if (bus.origin_stop) {
@@ -171,8 +207,10 @@ export function buildBusCopy(mobility: CenterMobility | null): string {
 
     if (bus.next_arrival_min !== null) {
       parts.push(`espera ${bus.next_arrival_min} min`);
+    } else if (bus.estimated_total_min !== null) {
+      parts.push(`llegada estimada ${bus.estimated_total_min} min`);
     } else {
-      parts.push("tiempo real no disponible");
+      parts.push("llegada estimada");
     }
 
     if (bus.estimated_travel_min !== null) {
@@ -257,20 +295,20 @@ export function buildModuleNote(
 
   const state = mobility.modules[mode].state;
   if (state === "degraded_upstream") {
-    if (mode === "bus") return "EMT no esta devolviendo tiempo real ahora mismo.";
+    if (mode === "bus") return "Mostramos llegada estimada mientras EMT no responde a tiempo.";
     if (mode === "bike") return "BiciMAD no esta devolviendo disponibilidad en tiempo real.";
     return "Mostramos una estimacion util con datos parciales.";
   }
 
   if (state === "degraded_missing_anchor") {
-    if (mode === "bus") return "Mostramos la mejor parada cercana aunque no haya una linea directa clara.";
+    if (mode === "bus") return "Usamos la mejor parada cercana aunque no haya linea directa clara.";
     if (mode === "bike") return "Falta una estacion util para cerrar el trayecto completo.";
     if (mode === "metro") return "Falta una estacion clara para completar el trayecto.";
     return "Faltan datos para cerrar esta estimacion.";
   }
 
   if (state === "partial") {
-    if (mode === "bus") return "Mostramos la mejor alternativa EMT con datos parciales.";
+    if (mode === "bus") return "Mostramos la mejor alternativa EMT con llegada estimada.";
     if (mode === "bike") return "Mostramos estaciones utiles aunque falte parte del tiempo real.";
     if (mode === "metro") return "Mostramos estaciones y lineas aunque el tiempo sea aproximado.";
     return "Mostramos una estimacion util con datos parciales.";
@@ -372,7 +410,14 @@ function buildBusBoardContent(bus: BusModuleV1): Pick<TransportBoardRow, "headli
               ? `Destino: ${trimLabel(bus.selected_destination, 20)}`
               : null,
         ),
-        buildBoardDetail("time", bus.next_arrival_min !== null ? `Espera ${bus.next_arrival_min} min` : "Tiempo real no disponible"),
+        buildBoardDetail(
+          "time",
+          bus.next_arrival_min !== null
+            ? `Espera ${bus.next_arrival_min} min`
+            : bus.estimated_total_min !== null
+              ? `Llegada estimada ${bus.estimated_total_min} min`
+              : "Llegada estimada",
+        ),
         buildBoardDetail("route", bus.estimated_travel_min !== null ? `Viaje ${bus.estimated_travel_min} min` : null),
       ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
     };
@@ -383,7 +428,7 @@ function buildBusBoardContent(bus: BusModuleV1): Pick<TransportBoardRow, "headli
       headline: trimLabel(bus.origin_stop.name, 20),
       details: [
         buildBoardDetail("origin", `Parada a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"}`),
-        buildBoardDetail("time", "Tiempo real no disponible"),
+        buildBoardDetail("time", bus.estimated_total_min !== null ? `Llegada estimada ${bus.estimated_total_min} min` : "Llegada estimada"),
       ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
     };
   }

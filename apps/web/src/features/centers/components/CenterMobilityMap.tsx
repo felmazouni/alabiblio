@@ -90,6 +90,9 @@ function buildMapData(
   const points: FeaturePoint[] = [];
   const lines: FeatureLine[] = [];
   const legend: RouteLegendItem[] = [];
+  const addLegend = (kind: string, label: string) => {
+    legend.push({ kind, label });
+  };
 
   if (center.lat === null || center.lon === null) {
     return {
@@ -104,6 +107,7 @@ function buildMapData(
     geometry: { type: "Point", coordinates: [center.lon, center.lat] },
     properties: { kind: "center", label: center.name },
   });
+  addLegend("center", "Destino");
 
   if (origin) {
     points.push({
@@ -111,6 +115,7 @@ function buildMapData(
       geometry: { type: "Point", coordinates: [origin.lon, origin.lat] },
       properties: { kind: "origin", label: origin.label },
     });
+    addLegend("origin", "Origen");
   }
   const bestMode = mobility.summary.best_mode ?? "walk";
 
@@ -126,6 +131,22 @@ function buildMapData(
       geometry: { type: "Point", coordinates: [lon, lat] },
       properties: { kind, label },
     });
+    addLegend(
+      kind,
+      kind === "bus-origin"
+        ? "Subida EMT"
+        : kind === "bus-destination"
+          ? "Bajada EMT"
+          : kind === "metro-origin"
+            ? "Entrada metro"
+            : kind === "metro-destination"
+              ? "Salida metro"
+              : kind === "bike-origin"
+                ? "BiciMAD origen"
+                : kind === "bike-destination"
+                  ? "BiciMAD destino"
+                  : label,
+    );
   };
 
   const centerCoords: [number, number] = [center.lon, center.lat];
@@ -245,9 +266,10 @@ export function CenterMobilityMap({ center, mobility, ser, origin }: CenterMobil
         data: mapData.lines,
       });
       map.addLayer({
-        id: "route-lines",
+        id: "route-lines-main",
         type: "line",
         source: "route-lines",
+        filter: ["!=", ["get", "kind"], "walk"],
         paint: {
           "line-color": [
             "match",
@@ -264,8 +286,20 @@ export function CenterMobilityMap({ center, mobility, ser, origin }: CenterMobil
             "#ffb45d",
             "#98a5c3",
           ],
+          "line-width": 4,
+          "line-opacity": 0.82,
+        },
+      });
+      map.addLayer({
+        id: "route-lines-walk",
+        type: "line",
+        source: "route-lines",
+        filter: ["==", ["get", "kind"], "walk"],
+        paint: {
+          "line-color": "#d6ddff",
           "line-width": 3,
-          "line-opacity": 0.68,
+          "line-opacity": 0.92,
+          "line-dasharray": [1.2, 1.2],
         },
       });
 
@@ -282,10 +316,22 @@ export function CenterMobilityMap({ center, mobility, ser, origin }: CenterMobil
             "match",
             ["get", "kind"],
             "center",
-            8,
+            9,
             "origin",
+            8,
+            "bus-origin",
             7,
-            6,
+            "bus-destination",
+            7,
+            "metro-origin",
+            7,
+            "metro-destination",
+            7,
+            "bike-origin",
+            7,
+            "bike-destination",
+            7,
+            6.5,
           ],
           "circle-color": [
             "match",
@@ -309,7 +355,7 @@ export function CenterMobilityMap({ center, mobility, ser, origin }: CenterMobil
             "#98a5c3",
           ],
           "circle-stroke-color": "#08101b",
-          "circle-stroke-width": 2,
+          "circle-stroke-width": 2.5,
         },
       });
     });
@@ -364,7 +410,7 @@ export function CenterMobilityMap({ center, mobility, ser, origin }: CenterMobil
       <div className="detail-screen__section-copy">
         <span className="detail-screen__section-label">Mapa util</span>
         <h3>Ruta estimada segun la mejor opcion</h3>
-        <p>{origin ? `${origin.label} visible / ${getSerLabel(ser)}` : getSerLabel(ser)}</p>
+        <p>{origin ? `${origin.label} / ${getSerLabel(ser)}` : getSerLabel(ser)}</p>
       </div>
       <div ref={containerRef} className="detail-screen__map" />
       {mapData.legend.length > 0 ? (

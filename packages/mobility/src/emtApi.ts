@@ -24,8 +24,9 @@ type EmtLoginAttempt = {
   headers: Record<string, string>;
 };
 
-const EMT_LOGIN_TIMEOUT_MS = 3500;
-const EMT_REALTIME_TIMEOUT_MS = 4000;
+const EMT_LOGIN_TIMEOUT_MS = 1200;
+const EMT_REALTIME_TIMEOUT_MS = 1100;
+const EMT_RETRY_DELAY_MS = 180;
 
 let cachedAccessToken:
   | {
@@ -51,6 +52,37 @@ async function fetchWithTimeout(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchWithTimeoutRetry(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number,
+  fetchImpl: typeof fetch,
+  retries = 1,
+): Promise<Response> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(input, init, timeoutMs, fetchImpl);
+
+      if (response.status >= 500 && response.status < 600 && attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, EMT_RETRY_DELAY_MS));
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= retries) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, EMT_RETRY_DELAY_MS));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("emt_fetch_failed");
 }
 
 function getJsonValue(
@@ -125,7 +157,7 @@ async function loginEmt(
   const errors: string[] = [];
 
   for (const attempt of attempts) {
-    const response = await fetchWithTimeout(
+    const response = await fetchWithTimeoutRetry(
       "https://openapi.emtmadrid.es/v1/mobilitylabs/user/login/",
       {
         method: "GET",
@@ -133,6 +165,7 @@ async function loginEmt(
       },
       EMT_LOGIN_TIMEOUT_MS,
       fetchImpl,
+      1,
     );
 
     if (!response.ok) {
@@ -248,7 +281,7 @@ export async function fetchEmtRealtimeForStopIds(
 
   const results = await Promise.allSettled(
     stopIds.slice(0, 6).map(async (stopId) => {
-      const response = await fetchWithTimeout(
+      const response = await fetchWithTimeoutRetry(
         `https://openapi.emtmadrid.es/v1/transport/busemtmad/stops/${encodeURIComponent(stopId)}/arrives/all/`,
         {
           method: "POST",
@@ -267,6 +300,7 @@ export async function fetchEmtRealtimeForStopIds(
         },
         EMT_REALTIME_TIMEOUT_MS,
         fetchImpl,
+        1,
       );
 
       if (!response.ok) {

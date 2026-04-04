@@ -91,12 +91,12 @@ export function CenterDetailScreen({
         <section className="detail-screen__section">
           <div className="detail-screen__section-copy">
             <span className="detail-screen__section-label">Como llegar</span>
-            <h3>Preparando transporte y contexto</h3>
-            <p>Mostramos primero la base del centro y cargamos la movilidad aparte.</p>
+            <h3>Cargando movilidad</h3>
+            <p>Mostramos la base del centro primero y resolvemos el trayecto aparte.</p>
           </div>
           <div className="transport-v1-list transport-v1-list--board">
-            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Cargando bloques de coche, EMT, BiciMAD y metro...</div>
-            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Preparando mapa y trazado de llegada...</div>
+            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Cargando coche, EMT, BiciMAD y metro...</div>
+            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Preparando el mapa de llegada...</div>
           </div>
         </section>
       </section>
@@ -188,13 +188,13 @@ export function CenterDetailScreen({
       <section className="detail-screen__section">
         <div className="detail-screen__section-copy">
           <span className="detail-screen__section-label">Como llegar</span>
-          <h3>{mobility?.summary.rationale[0] ?? "Decision de movilidad"}</h3>
+          <h3>{mobility?.summary.best_mode ? `Opcion recomendada: ${modeLabel(mobility.summary.best_mode)}` : "Movilidad"}</h3>
           <p>{mobility ? reason : "Cargamos la movilidad de forma independiente para no bloquear el detalle."}</p>
         </div>
         {!mobility && mobilityLoading ? (
           <div className="transport-v1-list transport-v1-list--board">
             <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Calculando coche, EMT, BiciMAD y metro...</div>
-            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Cargando anchors y tiempos del origen activo...</div>
+            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Cargando anchors y tiempos del origen...</div>
           </div>
         ) : mobility ? (
           <div className="transport-v1-list transport-v1-list--board">
