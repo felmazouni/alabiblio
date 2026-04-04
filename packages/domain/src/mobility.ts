@@ -206,6 +206,11 @@ function buildCarEtaMinutes(input: TripCentricMobilityInput): number | null {
   return roundMinutes(haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon) / CAR_METERS_PER_MINUTE);
 }
 
+function buildDirectDistanceMeters(input: TripCentricMobilityInput): number | null {
+  if (!input.userLocation || input.center.lat === null || input.center.lon === null) return null;
+  return roundDistance(haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon));
+}
+
 function scoreOption(totalMinutes: number, confidence: MobilityConfidence, accessPenalty: number, realtimeBonus: number): number {
   return Number((1000 - totalMinutes * 12 - accessPenalty * 0.25 - confidenceRank(confidence) * 90 + realtimeBonus).toFixed(2));
 }
@@ -248,7 +253,7 @@ function buildBusOptions(input: TripCentricMobilityInput): MobilityOption[] {
           },
           route_label: line,
           estimated_access_minutes: accessOrigin + accessDestination,
-          estimated_in_vehicle_minutes: inVehicleMinutes + waitMinutes,
+          estimated_in_vehicle_minutes: inVehicleMinutes,
           estimated_total_minutes: totalMinutes,
         });
       }
@@ -358,16 +363,22 @@ function buildRealtimeLayer(input: TripCentricMobilityInput, busOption: Mobility
 
 function buildCarModule(originLayer: OriginDependentLayerV1, ser: Pick<CenterSerInfo, "enabled" | "zone_name"> | null | undefined): CarModuleV1 {
   if (originLayer.estimated_car_eta_min === null) {
-    return { state: "unavailable", eta_min: null, ser_enabled: ser?.enabled ?? false, ser_zone_name: ser?.zone_name ?? null };
+    return { state: "unavailable", eta_min: null, ser_enabled: ser?.enabled ?? false, ser_zone_name: ser?.zone_name ?? null, distance_m: null };
   }
-  return { state: ser ? "ok" : "partial", eta_min: originLayer.estimated_car_eta_min, ser_enabled: ser?.enabled ?? false, ser_zone_name: ser?.zone_name ?? null };
+  return {
+    state: ser ? "ok" : "partial",
+    eta_min: originLayer.estimated_car_eta_min,
+    ser_enabled: ser?.enabled ?? false,
+    ser_zone_name: ser?.zone_name ?? null,
+    distance_m: null,
+  };
 }
 
 function buildBusModule(input: TripCentricMobilityInput, bestBus: MobilityOption | null): BusModuleV1 {
   const originStop = toStopAnchor(bestBus ? { id: bestBus.origin.id ?? "origin-stop", name: bestBus.origin.name, distance_m: bestBus.origin.distance_m, lat: bestBus.origin.lat ?? 0, lon: bestBus.origin.lon ?? 0, lines: bestBus.route_label ? [bestBus.route_label] : [] } : input.originEmtStops[0] ?? null);
   const destinationStop = toStopAnchor(bestBus ? { id: bestBus.destination.id ?? "destination-stop", name: bestBus.destination.name, distance_m: bestBus.destination.distance_m, lat: bestBus.destination.lat ?? 0, lon: bestBus.destination.lon ?? 0, lines: bestBus.route_label ? [bestBus.route_label] : [] } : input.destinationEmtStops[0] ?? null);
   if (!originStop && !destinationStop) {
-    return { state: "unavailable", selected_line: null, selected_destination: null, origin_stop: null, destination_stop: null, next_arrival_min: null, realtime_status: input.emtRealtimeStatus ?? "unconfigured", fetched_at: input.emtRealtimeFetchedAt ?? null };
+    return { state: "unavailable", selected_line: null, selected_destination: null, origin_stop: null, destination_stop: null, next_arrival_min: null, estimated_travel_min: null, estimated_total_min: null, realtime_status: input.emtRealtimeStatus ?? "unconfigured", fetched_at: input.emtRealtimeFetchedAt ?? null };
   }
   if (!bestBus) {
     const fallbackOriginRaw = input.originEmtStops.find((stop) => getBestRealtimeArrivalByStop(stop.id, input.realtimeByStopId)) ?? input.originEmtStops[0] ?? null;
@@ -380,6 +391,8 @@ function buildBusModule(input: TripCentricMobilityInput, bestBus: MobilityOption
       origin_stop: fallbackOriginStop ?? originStop,
       destination_stop: null,
       next_arrival_min: fallbackArrival?.minutes ?? null,
+      estimated_travel_min: null,
+      estimated_total_min: null,
       realtime_status: fallbackArrival ? "available" : input.emtRealtimeStatus ?? "unconfigured",
       fetched_at: input.emtRealtimeFetchedAt ?? null,
     };
@@ -392,6 +405,8 @@ function buildBusModule(input: TripCentricMobilityInput, bestBus: MobilityOption
     origin_stop: originStop,
     destination_stop: destinationStop,
     next_arrival_min: arrival?.minutes ?? null,
+    estimated_travel_min: bestBus.estimated_in_vehicle_minutes,
+    estimated_total_min: bestBus.estimated_total_minutes,
     realtime_status: bestBus.realtime?.status ?? input.emtRealtimeStatus ?? "unconfigured",
     fetched_at: input.emtRealtimeFetchedAt ?? null,
   };
@@ -419,22 +434,94 @@ function buildBikeModule(input: TripCentricMobilityInput, bestBike: MobilityOpti
 function buildMetroModule(input: TripCentricMobilityInput, bestMetro: MobilityOption | null): MetroModuleV1 {
   const originStation = bestMetro ? input.originMetroStations?.find((v) => v.id === bestMetro.origin.id) ?? null : input.originMetroStations?.[0] ?? null;
   const destinationStation = bestMetro ? input.destinationMetroStations?.find((v) => v.id === bestMetro.destination.id) ?? null : input.destinationMetroStations?.[0] ?? null;
+  const lineLabels = Array.from(
+    new Set(
+      [
+        ...(originStation?.lines ?? []),
+        ...(destinationStation?.lines ?? []),
+      ].filter(Boolean),
+    ),
+  ).slice(0, 3);
   if (!originStation && !destinationStation) {
-    return { state: "unavailable", eta_min: null, origin_station: null, destination_station: null, realtime_status: "unconfigured" };
+    return { state: "unavailable", eta_min: null, origin_station: null, destination_station: null, line_labels: [], realtime_status: "unconfigured" };
   }
-  return { state: bestMetro ? "ok" : "partial", eta_min: bestMetro?.estimated_total_minutes ?? null, origin_station: toStationAnchor(originStation), destination_station: toStationAnchor(destinationStation), realtime_status: "unconfigured" };
+  return {
+    state: bestMetro ? "ok" : "partial",
+    eta_min: bestMetro?.estimated_total_minutes ?? null,
+    origin_station: toStationAnchor(originStation),
+    destination_station: toStationAnchor(destinationStation),
+    line_labels: lineLabels,
+    realtime_status: "unconfigured",
+  };
 }
 
 function buildHighlight(mode: MobilityHighlightV1["mode"], label: string, confidence: MobilityConfidence): MobilityHighlightV1 {
   return { mode, label, confidence };
 }
 
-function buildMobilityHighlights(input: { car: CarModuleV1; bus: BusModuleV1; bike: BikeModuleV1; metro: MetroModuleV1 }) {
+function buildMobilityHighlightsLegacy(input: { car: CarModuleV1; bus: BusModuleV1; bike: BikeModuleV1; metro: MetroModuleV1 }) {
   const candidates: Array<{ rank: number; item: MobilityHighlightV1 }> = [];
   if (input.car.eta_min !== null) candidates.push({ rank: moduleStateRank(input.car.state) * 100 + input.car.eta_min, item: buildHighlight("car", `Coche ${input.car.eta_min} min · ${input.car.ser_enabled ? `SER ${input.car.ser_zone_name ?? "activa"}` : "SER sin dato"}`, input.car.state === "ok" ? "medium" : "low") });
   if (input.bus.selected_line || input.bus.origin_stop) candidates.push({ rank: moduleStateRank(input.bus.state) * 100 + (input.bus.next_arrival_min ?? 99), item: buildHighlight("bus", input.bus.selected_line ? `Bus ${input.bus.selected_line} · ${input.bus.next_arrival_min !== null ? `${input.bus.next_arrival_min} min` : "sin realtime"}` : "Bus · sin linea util", input.bus.state === "ok" ? "high" : input.bus.state === "partial" ? "medium" : "low") });
   if (input.bike.origin_station || input.bike.destination_station) candidates.push({ rank: moduleStateRank(input.bike.state) * 100 + (input.bike.eta_min ?? 99), item: buildHighlight("bike", input.bike.eta_min !== null ? `Bici ${input.bike.eta_min} min · ×${input.bike.bikes_available ?? "-"}` : `Bici · ×${input.bike.bikes_available ?? "-"}`, input.bike.state === "ok" ? "medium" : "low") });
   if (input.metro.origin_station || input.metro.destination_station) candidates.push({ rank: moduleStateRank(input.metro.state) * 100 + (input.metro.eta_min ?? 99), item: buildHighlight("metro", input.metro.eta_min !== null ? `Metro ${input.metro.eta_min} min` : `Metro · ${input.metro.origin_station?.name ?? "sin dato"} -> ${input.metro.destination_station?.name ?? "sin dato"}`, input.metro.state === "ok" ? "medium" : "low") });
+  const sorted = candidates.sort((a, b) => a.rank - b.rank).map((v) => v.item);
+  return { primary: sorted[0] ?? null, secondary: sorted[1] ?? null };
+}
+
+void buildMobilityHighlightsLegacy;
+
+function buildMobilityHighlights(input: { car: CarModuleV1; bus: BusModuleV1; bike: BikeModuleV1; metro: MetroModuleV1 }) {
+  const candidates: Array<{ rank: number; item: MobilityHighlightV1 }> = [];
+
+  if (input.car.eta_min !== null) {
+    const carLabel = [
+      `Coche ${input.car.eta_min} min`,
+      input.car.distance_m !== null
+        ? input.car.distance_m < 1000
+          ? `${Math.round(input.car.distance_m)} m`
+          : `${input.car.distance_m.toFixed(1)} km`
+        : null,
+      input.car.ser_enabled ? `SER ${input.car.ser_zone_name ?? "activa"}` : null,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" - ");
+    candidates.push({
+      rank: moduleStateRank(input.car.state) * 100 + input.car.eta_min,
+      item: buildHighlight("car", carLabel, input.car.state === "ok" ? "medium" : "low"),
+    });
+  }
+
+  if (input.bus.selected_line || input.bus.origin_stop) {
+    const busLabel = input.bus.selected_line
+      ? `Bus ${input.bus.selected_line} - ${input.bus.next_arrival_min !== null ? `espera ${input.bus.next_arrival_min} min` : "sin tiempo real"}`
+      : "Bus - parada cercana";
+    candidates.push({
+      rank: moduleStateRank(input.bus.state) * 100 + (input.bus.estimated_total_min ?? input.bus.next_arrival_min ?? 99),
+      item: buildHighlight("bus", busLabel, input.bus.state === "ok" ? "high" : input.bus.state === "partial" ? "medium" : "low"),
+    });
+  }
+
+  if (input.bike.origin_station || input.bike.destination_station) {
+    const bikeLabel = input.bike.eta_min !== null
+      ? `Bici ${input.bike.eta_min} min - ${input.bike.bikes_available ?? "-"} bicis cerca`
+      : `Bici - ${input.bike.bikes_available ?? "-"} bicis cerca`;
+    candidates.push({
+      rank: moduleStateRank(input.bike.state) * 100 + (input.bike.eta_min ?? 99),
+      item: buildHighlight("bike", bikeLabel, input.bike.state === "ok" ? "medium" : "low"),
+    });
+  }
+
+  if (input.metro.origin_station || input.metro.destination_station) {
+    const metroLabel = input.metro.eta_min !== null
+      ? `Metro ${input.metro.eta_min} min - estacion cercana`
+      : `Metro - ${input.metro.origin_station?.name ?? "sin estacion clara"}`;
+    candidates.push({
+      rank: moduleStateRank(input.metro.state) * 100 + (input.metro.eta_min ?? 99),
+      item: buildHighlight("metro", metroLabel, input.metro.state === "ok" ? "medium" : "low"),
+    });
+  }
+
   const sorted = candidates.sort((a, b) => a.rank - b.rank).map((v) => v.item);
   return { primary: sorted[0] ?? null, secondary: sorted[1] ?? null };
 }
@@ -469,6 +556,7 @@ export function buildCenterMobility(input: TripCentricMobilityInput): CenterMobi
   const bikeOptions = buildBikeOptions(input);
   const metroOptions = buildMetroOptions(input);
   const car = buildCarModule(origin_dependent, input.ser);
+  car.distance_m = buildDirectDistanceMeters(input);
   const bus = buildBusModule(input, busOptions[0] ?? null);
   const bike = buildBikeModule(input, bikeOptions[0] ?? null);
   const metro = buildMetroModule(input, metroOptions[0] ?? null);

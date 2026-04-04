@@ -19,6 +19,40 @@ async function readSanitizedJson<T>(response: Response): Promise<T> {
   return sanitizeApiPayload(payload);
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit & { signal?: AbortSignal } = {},
+): Promise<Response> {
+  const attempts = 2;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      if (response.status >= 500 && response.status < 600 && attempt < attempts - 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+        continue;
+      }
+      return response;
+    } catch (error) {
+      if (isAbortError(error) || init.signal?.aborted) {
+        throw error;
+      }
+      lastError = error;
+      if (!(error instanceof TypeError) || attempt >= attempts - 1) {
+        throw error;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("fetch_failed");
+}
+
 function buildListCentersUrl(query: ListCentersQuery): string {
   const url = new URL("/api/centers", window.location.origin);
   applyListCentersQuery(url, query);
@@ -91,7 +125,7 @@ export async function fetchCenters(
   query: ListCentersQuery,
   signal?: AbortSignal,
 ): Promise<ListCentersResponse> {
-  const response = await fetch(buildListCentersUrl(query), { signal });
+  const response = await fetchWithRetry(buildListCentersUrl(query), { signal });
 
   if (!response.ok) {
     throw new Error(`centers_list_${response.status}`);
@@ -107,7 +141,7 @@ export async function fetchTopMobilityCenters(
   const url = new URL("/api/centers/top-mobility", window.location.origin);
   applyListCentersQuery(url, query);
 
-  const response = await fetch(url.pathname + url.search, { signal });
+  const response = await fetchWithRetry(url.pathname + url.search, { signal });
 
   if (!response.ok) {
     throw new Error(`top_mobility_${response.status}`);
@@ -122,7 +156,7 @@ export async function fetchCenterDetail(
 ): Promise<GetCenterDetailResponse> {
   const url = new URL(`/api/centers/${encodeURIComponent(slug)}`, window.location.origin);
 
-  const response = await fetch(url.pathname + url.search, {
+  const response = await fetchWithRetry(url.pathname + url.search, {
     signal,
   });
 
@@ -151,7 +185,7 @@ export async function fetchCenterMobility(
     url.searchParams.set("user_lon", String(options.userLon));
   }
 
-  const response = await fetch(url.pathname + url.search, {
+  const response = await fetchWithRetry(url.pathname + url.search, {
     signal,
   });
 
@@ -180,7 +214,7 @@ export async function fetchCenterMobilitySummary(
     url.searchParams.set("user_lon", String(options.userLon));
   }
 
-  const response = await fetch(url.pathname + url.search, {
+  const response = await fetchWithRetry(url.pathname + url.search, {
     signal,
   });
 
@@ -198,7 +232,7 @@ export async function fetchGeocodeOptions(
   const url = new URL("/api/geocode", window.location.origin);
   url.searchParams.set("q", query);
 
-  const response = await fetch(url.pathname + url.search, { signal });
+  const response = await fetchWithRetry(url.pathname + url.search, { signal });
 
   if (!response.ok) {
     throw new Error(`geocode_${response.status}`);
@@ -210,7 +244,7 @@ export async function fetchGeocodeOptions(
 export async function fetchOriginPresets(
   signal?: AbortSignal,
 ): Promise<GetOriginPresetsResponse> {
-  const response = await fetch("/api/origin/presets", { signal });
+  const response = await fetchWithRetry("/api/origin/presets", { signal });
 
   if (!response.ok) {
     throw new Error(`origin_presets_${response.status}`);

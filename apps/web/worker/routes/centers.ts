@@ -587,7 +587,7 @@ export async function handleGetTopMobilityCenters(
       : null;
 
   if (!userLocation) {
-    const emptyPayload: GetTopMobilityCentersResponse = { items: [] };
+    const emptyPayload: GetTopMobilityCentersResponse = { items: [], open_count: 0 };
     return Response.json(emptyPayload, {
       headers: buildNoStoreHeaders(),
     });
@@ -623,13 +623,30 @@ export async function handleGetTopMobilityCenters(
           enrichedCandidates,
           listWindow.sortMode,
         ).slice(0, TOP_MOBILITY_COUNT);
+        const serMap = await loadSerCoverageByCenterIds(
+          env.DB,
+          rankedCandidates.map((record) => record.center.id),
+        );
 
         const payload: GetTopMobilityCentersResponse = {
           items: rankedCandidates.map((record, index) => ({
             slug: record.center.slug,
             rank: index + 1,
+            center: toCenterDecisionCardItem({
+              center: record.center,
+              schedule: record.schedule,
+              ser: serMap.has(record.center.id)
+                ? {
+                    enabled: serMap.get(record.center.id)?.enabled ?? false,
+                    zone_name: serMap.get(record.center.id)?.zone_name ?? null,
+                  }
+                : null,
+              decision: record.decision,
+              mobilityHighlights: record.mobility.highlights,
+            }),
             item: record.mobility,
           })),
+          open_count: listWindow.records.filter((record) => record.schedule.is_open_now).length,
         };
 
         return Response.json(payload, {

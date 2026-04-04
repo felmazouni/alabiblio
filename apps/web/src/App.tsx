@@ -4,7 +4,11 @@
   CenterSortBy,
   GetCenterDetailResponse,
 } from "@alabiblio/contracts/centers";
-import type { CenterMobility, CenterTopMobilityItem } from "@alabiblio/contracts/mobility";
+import type {
+  CenterMobility,
+  CenterTopMobilityCardV1,
+  CenterTopMobilityItem,
+} from "@alabiblio/contracts/mobility";
 import type {
   GeocodeAddressOption,
   OriginPreset,
@@ -69,10 +73,30 @@ import "./App.css";
 type KindFilter = "all" | CenterKind;
 type ViewMode = "cards" | "rows";
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 18;
 
 function buildMotivo(mobility: CenterMobility | null): string {
   return buildHumanReason(mobility);
+}
+
+function formatFetchError(scope: "top" | "catalog", error: Error): string {
+  if (error.message === "Failed to fetch") {
+    return scope === "catalog"
+      ? "No se pudo cargar el listado. La conexion no respondio a tiempo."
+      : "No se pudo cargar el Top 3. La conexion no respondio a tiempo.";
+  }
+
+  if (error.message.startsWith("centers_list_500")) {
+    return "No se pudo cargar el listado base. El endpoint devolvio un error interno.";
+  }
+
+  if (error.message.startsWith("top_mobility_500")) {
+    return "No se pudieron resolver las mejores opciones. El endpoint devolvio un error interno.";
+  }
+
+  return scope === "catalog"
+    ? `No se pudo cargar el listado (${error.message}).`
+    : `No se pudieron cargar las mejores opciones (${error.message}).`;
 }
 
 function getOriginStatusText(
@@ -134,7 +158,7 @@ function buildCentersListQuery(input: {
 }
 
 function buildFeaturedCardFrame(
-  center: CenterListItem | null,
+  center: Pick<CenterTopMobilityCardV1, "is_open_now" | "opens_today" | "decision"> | null,
   recommendedMode: CenterMobility["summary"]["best_mode"],
   serverOpenCount: number,
 ): {
@@ -229,7 +253,6 @@ function TopPicksScreen() {
   const [originSearchError, setOriginSearchError] = useState<string | null>(null);
   const [originPresets, setOriginPresets] = useState<OriginPreset[]>([]);
   const [originPresetsError, setOriginPresetsError] = useState<string | null>(null);
-  const [items, setItems] = useState<CenterListItem[]>([]);
   const [serverOpenCount, setServerOpenCount] = useState(0);
   const [topMobilityItems, setTopMobilityItems] = useState<CenterTopMobilityItem[]>([]);
   const [topPicksResolvedKey, setTopPicksResolvedKey] = useState<string | null>(null);
@@ -244,14 +267,12 @@ function TopPicksScreen() {
 
   const originActive = origin !== null;
   const requestKey = originActive ? `${origin?.lat ?? "none"}:${origin?.lon ?? "none"}` : null;
-  const topMobilityMap = new Map(topMobilityItems.map((entry) => [entry.slug, entry.item] as const));
   const topPicks = topMobilityItems
     .map((entry) => ({
       rank: entry.rank,
-      center: items.find((item) => item.slug === entry.slug) ?? null,
+      center: entry.center,
       mobility: entry.item,
-    }))
-    .filter((entry): entry is { rank: number; center: CenterListItem; mobility: CenterMobility } => entry.center !== null);
+    }));
   const hasCurrentTopPicksError =
     topPicksErrorState !== null && topPicksErrorState.key === requestKey;
   const loading = originActive && topPicksResolvedKey !== requestKey && !hasCurrentTopPicksError;
@@ -277,50 +298,28 @@ function TopPicksScreen() {
     const controller = new AbortController();
     const resolvedRequestKey = requestKey ?? "none";
 
-    void Promise.all([
-      fetchCenters(
-        buildCentersListQuery({
-          kindFilter: "all",
-          deferredSearch: "",
-          limit: 12,
-          offset: 0,
-          openNowOnly: false,
-          wifiOnly: false,
-          socketsOnly: false,
-          accessibleOnly: false,
-          serOnly: false,
-          districtFilter: "",
-          neighborhoodFilter: "",
-          sortBy: "recommended",
-          userLat: origin?.lat,
-          userLon: origin?.lon,
-        }),
-        controller.signal,
-      ),
-      fetchTopMobilityCenters(
-        buildCentersListQuery({
-          kindFilter: "all",
-          deferredSearch: "",
-          limit: 12,
-          offset: 0,
-          openNowOnly: false,
-          wifiOnly: false,
-          socketsOnly: false,
-          accessibleOnly: false,
-          serOnly: false,
-          districtFilter: "",
-          neighborhoodFilter: "",
-          sortBy: "recommended",
-          userLat: origin?.lat,
-          userLon: origin?.lon,
-        }),
-        controller.signal,
-      ),
-    ])
-      .then(([centersResponse, topResponse]) => {
+    void fetchTopMobilityCenters(
+      buildCentersListQuery({
+        kindFilter: "all",
+        deferredSearch: "",
+        limit: 12,
+        offset: 0,
+        openNowOnly: false,
+        wifiOnly: false,
+        socketsOnly: false,
+        accessibleOnly: false,
+        serOnly: false,
+        districtFilter: "",
+        neighborhoodFilter: "",
+        sortBy: "recommended",
+        userLat: origin?.lat,
+        userLon: origin?.lon,
+      }),
+      controller.signal,
+    )
+      .then((topResponse) => {
         if (!controller.signal.aborted) {
-          setItems(centersResponse.items);
-          setServerOpenCount(centersResponse.open_count);
+          setServerOpenCount(topResponse.open_count);
           setTopMobilityItems(topResponse.items);
           setTopPicksResolvedKey(resolvedRequestKey);
           setTopPicksErrorState(null);
@@ -328,12 +327,11 @@ function TopPicksScreen() {
       })
       .catch((nextError: Error) => {
         if (!controller.signal.aborted) {
-          setItems([]);
           setTopMobilityItems([]);
           setTopPicksResolvedKey(resolvedRequestKey);
           setTopPicksErrorState({
             key: resolvedRequestKey,
-            message: `No se pudieron cargar las mejores opciones (${nextError.message}).`,
+            message: formatFetchError("top", nextError),
           });
         }
       });
@@ -508,7 +506,7 @@ function TopPicksScreen() {
                   <TopPickCard
                     key={entry.center.id}
                     center={entry.center}
-                    mobility={topMobilityMap.get(entry.center.slug) ?? entry.mobility}
+                    mobility={entry.mobility}
                     rank={entry.rank}
                     serverOpenCount={serverOpenCount}
                     onSelect={(slug) => navigate(`/centers/${slug}`)}
@@ -570,7 +568,7 @@ function TopPickCard({
   serverOpenCount,
   onSelect,
 }: {
-  center: CenterListItem;
+  center: CenterTopMobilityCardV1;
   mobility: CenterMobility;
   rank: number;
   serverOpenCount: number;
@@ -750,10 +748,15 @@ function CatalogScreen() {
         );
         setTotal(response.total);
         if (isFirstPage) setServerOpenCount(response.open_count);
+        setListError(null);
       })
       .catch((error: Error) => {
         if (!controller.signal.aborted) {
-          setListError(`No se pudo cargar el listado (${error.message}).`);
+          setListError(
+            isFirstPage
+              ? formatFetchError("catalog", error)
+              : "No se pudieron cargar mas centros. Intentalo de nuevo.",
+          );
         }
       })
       .finally(() => {
@@ -1055,11 +1058,11 @@ function CatalogScreen() {
                 <LoadingCard count={6} />
               </div>
             ) : null}
-            {!loading && listError ? <EmptyStateCard title="Error de listado" body={listError} /> : null}
+            {!loading && listError && items.length === 0 ? <EmptyStateCard title="Error de listado" body={listError} /> : null}
             {!loading && !listError && items.length === 0 ? (
               <EmptyStateCard title="Sin resultados" body="Prueba a quitar filtros o cambiar el origen." />
             ) : null}
-            {!loading && !listError ? (
+            {!loading && items.length > 0 ? (
               viewMode === "rows" ? (
                 <div className="center-list__rows">
                   {items.map((center) => (
@@ -1086,7 +1089,10 @@ function CatalogScreen() {
                 </div>
               )
             ) : null}
-            {!loading && !listError && hasMore ? (
+            {!loading && listError && items.length > 0 ? (
+              <p className="screen__inline-error">{listError}</p>
+            ) : null}
+            {!loading && hasMore ? (
               <button
                 type="button"
                 className="center-list__more"

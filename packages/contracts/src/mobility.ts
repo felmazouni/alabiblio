@@ -144,6 +144,7 @@ export interface CarModuleV1 {
   eta_min: number | null;
   ser_enabled: boolean;
   ser_zone_name: string | null;
+  distance_m: number | null;
 }
 
 export interface BusModuleV1 {
@@ -153,6 +154,8 @@ export interface BusModuleV1 {
   origin_stop: StaticTransportStopAnchorV1 | null;
   destination_stop: StaticTransportStopAnchorV1 | null;
   next_arrival_min: number | null;
+  estimated_travel_min: number | null;
+  estimated_total_min: number | null;
   realtime_status: MobilityRealtimeStatus;
   fetched_at: string | null;
 }
@@ -173,6 +176,7 @@ export interface MetroModuleV1 {
   eta_min: number | null;
   origin_station: StaticTransportStationAnchorV1 | null;
   destination_station: StaticTransportStationAnchorV1 | null;
+  line_labels: string[];
   realtime_status: MobilityRealtimeStatus;
 }
 
@@ -219,14 +223,43 @@ export interface GetCenterMobilityResponse {
   item: CenterMobilityRuntimeV1;
 }
 
+export interface CenterTopMobilityCardV1 {
+  id: string;
+  slug: string;
+  kind: "study_room" | "library";
+  kind_label: string;
+  name: string;
+  district: string | null;
+  neighborhood: string | null;
+  address_line: string | null;
+  is_open_now: boolean | null;
+  opens_today: string | null;
+  closes_today: string | null;
+  today_human_schedule: string | null;
+  decision: {
+    best_mode: MobilityMode | "walk" | null;
+    best_time_minutes: number | null;
+    distance_m: number | null;
+    confidence: MobilityConfidence;
+    rationale: string[];
+    summary_label: string | null;
+  };
+  ser: {
+    enabled: boolean;
+    zone_name: string | null;
+  } | null;
+}
+
 export interface CenterTopMobilityItem {
   slug: string;
   rank: number;
+  center: CenterTopMobilityCardV1;
   item: CenterMobilityRuntimeV1;
 }
 
 export interface GetTopMobilityCentersResponse {
   items: CenterTopMobilityItem[];
+  open_count: number;
 }
 
 export interface GetCenterMobilitySummaryResponse {
