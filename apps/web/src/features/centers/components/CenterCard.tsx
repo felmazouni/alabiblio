@@ -83,9 +83,9 @@ export function CenterCard({ center, onSelect }: CenterCardProps) {
 
         <div className="decision-card__board">
           {highlightRows.length > 0 ? highlightRows.map((line) => (
-            <div key={`${center.id}-${line}`} className="decision-card__board-row">
-              <span className="decision-card__board-label">{line.split(" · ")[0]}</span>
-              <span className="decision-card__board-body">{line.split(" · ").slice(1).join(" · ")}</span>
+            <div key={`${center.id}-${line.label}-${line.body}`} className="decision-card__board-row">
+              <span className="decision-card__board-label">{line.label}</span>
+              <span className="decision-card__board-body">{line.body}</span>
             </div>
           )) : (
             <div className="decision-card__board-row decision-card__board-row--fallback">

@@ -8,28 +8,36 @@ import type {
   MobilityMode,
 } from "@alabiblio/contracts/mobility";
 
-export function formatDistanceCompact(distanceM: number | null | undefined): string {
-  if (distanceM === null || distanceM === undefined) return "sin dato";
-  if (distanceM < 1000) return `${Math.round(distanceM)} m`;
-  return `${(distanceM / 1000).toFixed(1)} km`;
-}
+export type SecondaryCardHighlightRow = {
+  label: string;
+  body: string;
+};
 
-export function formatWalkMinutesFromMeters(distanceM: number | null | undefined): string {
-  if (distanceM === null || distanceM === undefined) return "sin dato";
-  return `${Math.max(1, Math.round(distanceM / 83))} min`;
-}
+export type TransportBoardRow = {
+  mode: "metro" | "bus" | "bike";
+  label: string;
+  body: string;
+  eta: string | null;
+  recommended: boolean;
+};
 
-function fixInline(text: string): string {
-  return text
-    .replace(/[Â·â€¢]/g, "·")
+export type TransportFooterTile = {
+  mode: "car" | "walk";
+  label: string;
+  body: string;
+};
+
+function cleanText(value: string | null | undefined): string {
+  return (value ?? "")
+    .replace(/[Â·â€¢]/g, "-")
     .replace(/[Ã×]/g, "x")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function trimLabel(value: string | null | undefined, max = 34): string {
-  const clean = fixInline(value ?? "");
-  if (!clean) return "sin dato";
+  const clean = cleanText(value);
+  if (!clean) return "";
   if (clean.length <= max) return clean;
   return `${clean.slice(0, max - 1).trim()}...`;
 }
@@ -38,7 +46,31 @@ function stationRef(
   number: string | null | undefined,
   fallback: string | null | undefined,
 ): string {
-  return number ? `estacion ${number}` : trimLabel(fallback ?? "sin dato", 24);
+  if (number) return `estacion ${number}`;
+  const label = trimLabel(fallback, 24);
+  return label || "estacion cercana";
+}
+
+function buildSerCopy(enabled: boolean, zoneName: string | null): string | null {
+  if (!enabled) return null;
+  if (zoneName) return `SER ${zoneName}`;
+  return "zona SER";
+}
+
+export function formatDistanceCompact(distanceM: number | null | undefined): string | null {
+  if (distanceM === null || distanceM === undefined) return null;
+  if (distanceM < 1000) return `${Math.round(distanceM)} m`;
+  return `${(distanceM / 1000).toFixed(1)} km`;
+}
+
+export function formatWalkMinutesFromMeters(distanceM: number | null | undefined): string | null {
+  if (distanceM === null || distanceM === undefined) return null;
+  return `${Math.max(1, Math.round(distanceM / 83))} min`;
+}
+
+function formatEta(etaMin: number | null | undefined): string | null {
+  if (etaMin === null || etaMin === undefined) return null;
+  return `${etaMin} min`;
 }
 
 export function modeLabel(mode: CenterMobility["summary"]["best_mode"]): string {
@@ -54,126 +86,179 @@ export function modeLabel(mode: CenterMobility["summary"]["best_mode"]): string 
     case "walk":
       return "a pie";
     default:
-      return "sin modo";
+      return "trayecto";
   }
 }
 
 export function buildHumanReason(mobility: CenterMobility | null): string {
-  if (!mobility) return "Estamos actualizando la mejor opcion de llegada.";
-  const [context, reason] = mobility.summary.rationale;
-  if (reason && context) return `${reason}. ${context}.`;
-  return reason ?? context ?? "Sin recomendacion dominante.";
+  if (!mobility) return "Estamos actualizando la mejor alternativa de llegada.";
+
+  const meaningful = mobility.summary.rationale
+    .map((entry) => cleanText(entry))
+    .filter((entry): entry is string => entry.length > 0);
+
+  if (meaningful.length === 0) {
+    return "Mostramos la mejor alternativa util con los datos disponibles.";
+  }
+
+  if (meaningful.length === 1) {
+    const first = meaningful[0] ?? "Mostramos una alternativa util.";
+    return first.endsWith(".") ? first : `${first}.`;
+  }
+
+  const first = meaningful[0] ?? "Mostramos una alternativa util";
+  const second = meaningful[1] ?? "con los datos disponibles";
+  const sentence = `${first}. ${second}.`;
+  return sentence.replace(/\.\./g, ".");
 }
 
 export function buildCarCopy(mobility: CenterMobility | null): string {
-  if (!mobility) return "Calculando trayecto en coche";
+  if (!mobility) return "Calculando trayecto en coche.";
+
   const car = mobility.modules.car;
-  if (car.eta_min === null) return "Sin origen suficiente para estimar el trayecto en coche";
-  return `${car.eta_min} min · ${car.ser_enabled ? `SER ${car.ser_zone_name ?? "activa"}` : "SER sin dato"}`;
+  if (car.eta_min === null) return "No hay una estimacion fiable en coche para este origen.";
+
+  const parts = [`${car.eta_min} min`];
+  const serCopy = buildSerCopy(car.ser_enabled, car.ser_zone_name);
+  if (serCopy) parts.push(serCopy);
+  return parts.join(" - ");
+}
+
+function buildBusDegradation(bus: BusModuleV1): string {
+  if (bus.origin_stop && bus.realtime_status !== "available") {
+    return `Parada ${trimLabel(bus.origin_stop.name, 22)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - tiempo real no disponible`;
+  }
+
+  if (bus.origin_stop) {
+    return `Parada ${trimLabel(bus.origin_stop.name, 22)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - sin linea directa util desde tu origen`;
+  }
+
+  if (bus.destination_stop) {
+    return "No vemos una parada de salida clara cerca de tu origen.";
+  }
+
+  return "No encontramos una opcion EMT clara para este trayecto.";
 }
 
 export function buildBusCopy(mobility: CenterMobility | null): string {
-  if (!mobility) return "Calculando opcion EMT";
+  if (!mobility) return "Calculando opcion EMT.";
+
   const bus = mobility.modules.bus;
   if (bus.selected_line && bus.origin_stop) {
-    const pieces = [
+    const parts = [
       `Linea ${bus.selected_line}`,
-      `parada ${trimLabel(bus.origin_stop.name, 22)} a ${formatDistanceCompact(bus.origin_stop.distance_m)}`,
-      bus.next_arrival_min !== null ? `llega en ${bus.next_arrival_min} min` : "sin tiempo real",
+      `parada ${trimLabel(bus.origin_stop.name, 22)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"}`,
+      bus.next_arrival_min !== null ? `llega en ${bus.next_arrival_min} min` : "tiempo real no disponible",
     ];
+
     if (bus.destination_stop) {
-      pieces.push(`bajada a ${formatDistanceCompact(bus.destination_stop.distance_m)}`);
+      parts.push(`bajada a ${formatDistanceCompact(bus.destination_stop.distance_m) ?? "distancia corta"}`);
     }
-    return pieces.join(" · ");
+
+    return parts.join(" - ");
   }
-  if (bus.origin_stop) {
-    return `Parada ${trimLabel(bus.origin_stop.name, 22)} a ${formatDistanceCompact(bus.origin_stop.distance_m)} · sin linea directa clara`;
-  }
-  return "Sin parada EMT util desde tu origen";
+
+  return buildBusDegradation(bus);
 }
 
 export function buildBikeCopy(mobility: CenterMobility | null): string {
-  if (!mobility) return "Calculando opcion BiciMAD";
+  if (!mobility) return "Calculando opcion BiciMAD.";
+
   const bike = mobility.modules.bike;
   if (!bike.origin_station && !bike.destination_station) {
-    return "Sin estacion BiciMAD util";
+    return "No vemos una combinacion BiciMAD clara para este trayecto.";
   }
 
   const parts: string[] = [];
-  if (bike.eta_min !== null) {
-    parts.push(`${bike.eta_min} min`);
-  }
+  if (bike.eta_min !== null) parts.push(`${bike.eta_min} min`);
+
   if (bike.origin_station) {
-    parts.push(
-      `origen: ${stationRef(bike.origin_station.station_number, bike.origin_station.name)} a ${formatDistanceCompact(bike.origin_station.distance_m)}${bike.bikes_available !== null ? ` con ${bike.bikes_available} bicis` : ""}`,
-    );
+    const distance = formatDistanceCompact(bike.origin_station.distance_m) ?? "poca distancia";
+    const bikes = bike.bikes_available !== null ? ` con ${bike.bikes_available} bicis` : "";
+    parts.push(`origen: ${stationRef(bike.origin_station.station_number, bike.origin_station.name)} a ${distance}${bikes}`);
   } else {
     parts.push("origen sin estacion util");
   }
+
   if (bike.destination_station) {
-    parts.push(
-      `destino: ${stationRef(bike.destination_station.station_number, bike.destination_station.name)} a ${formatDistanceCompact(bike.destination_station.distance_m)}${bike.docks_available !== null ? ` con ${bike.docks_available} anclajes` : ""}`,
-    );
+    const distance = formatDistanceCompact(bike.destination_station.distance_m) ?? "poca distancia";
+    const docks = bike.docks_available !== null ? ` con ${bike.docks_available} anclajes` : "";
+    parts.push(`destino: ${stationRef(bike.destination_station.station_number, bike.destination_station.name)} a ${distance}${docks}`);
   } else {
     parts.push("destino sin estacion util");
   }
 
-  return parts.join(" · ");
+  return parts.join(" - ");
 }
 
 export function buildMetroCopy(mobility: CenterMobility | null): string {
-  if (!mobility) return "Calculando opcion de metro";
+  if (!mobility) return "Calculando opcion de metro.";
+
   const metro = mobility.modules.metro;
   if (!metro.origin_station && !metro.destination_station) {
-    return "Sin estacion de metro util";
+    return "No vemos una combinacion de metro clara para este trayecto.";
   }
 
   const parts: string[] = [];
-  if (metro.eta_min !== null) {
-    parts.push(`${metro.eta_min} min`);
-  }
+  if (metro.eta_min !== null) parts.push(`${metro.eta_min} min`);
 
   if (metro.origin_station) {
-    const originLines = metro.origin_station.lines.slice(0, 2).join(", ");
+    const lines = metro.origin_station.lines.slice(0, 2).join(", ");
+    const walk = formatWalkMinutesFromMeters(metro.origin_station.distance_m);
     parts.push(
-      `${trimLabel(metro.origin_station.name, 20)}${originLines ? ` (${originLines})` : ""} a ${formatWalkMinutesFromMeters(metro.origin_station.distance_m)} andando`,
+      `${trimLabel(metro.origin_station.name, 20)}${lines ? ` (${lines})` : ""}${walk ? ` a ${walk} andando` : ""}`,
     );
   } else {
-    parts.push("origen sin estacion");
+    parts.push("origen sin estacion util");
   }
 
   if (metro.destination_station) {
-    const destinationLines = metro.destination_station.lines.slice(0, 2).join(", ");
+    const lines = metro.destination_station.lines.slice(0, 2).join(", ");
+    const walk = formatWalkMinutesFromMeters(metro.destination_station.distance_m);
     parts.push(
-      `salida ${trimLabel(metro.destination_station.name, 20)}${destinationLines ? ` (${destinationLines})` : ""} a ${formatWalkMinutesFromMeters(metro.destination_station.distance_m)}`,
+      `salida ${trimLabel(metro.destination_station.name, 20)}${lines ? ` (${lines})` : ""}${walk ? ` a ${walk}` : ""}`,
     );
   } else {
-    parts.push("salida sin dato");
+    parts.push("destino sin estacion clara");
   }
 
-  return parts.join(" · ");
+  return parts.join(" - ");
 }
 
 export function buildModuleNote(
   mode: "car" | "bus" | "bike" | "metro",
   mobility: CenterMobility | null,
 ): string | null {
-  if (!mobility) return "Actualizando datos";
+  if (!mobility) return "Actualizando datos.";
+
   const state = mobility.modules[mode].state;
-  if (state === "degraded_upstream") return "Los datos en tiempo real no estan respondiendo ahora.";
+  if (state === "degraded_upstream") {
+    if (mode === "bus") return "EMT no esta devolviendo tiempo real ahora mismo.";
+    if (mode === "bike") return "BiciMAD no esta devolviendo disponibilidad en tiempo real.";
+    return "Mostramos una estimacion util con datos parciales.";
+  }
+
   if (state === "degraded_missing_anchor") {
-    if (mode === "bus") return "Mostramos la mejor parada cercana aunque no haya linea directa clara.";
+    if (mode === "bus") return "Mostramos la mejor parada cercana aunque no haya una linea directa clara.";
     if (mode === "bike") return "Falta una estacion util para cerrar el trayecto completo.";
-    if (mode === "metro") return "Falta una estacion util para completar el recorrido.";
+    if (mode === "metro") return "Falta una estacion clara para completar el trayecto.";
     return "Faltan datos para cerrar esta estimacion.";
   }
+
   if (state === "partial") {
-    if (mode === "bus") return "Mostramos la mejor opcion EMT disponible con datos parciales.";
+    if (mode === "bus") return "Mostramos la mejor alternativa EMT con datos parciales.";
     if (mode === "bike") return "Mostramos estaciones utiles aunque falte parte del tiempo real.";
     if (mode === "metro") return "Mostramos estaciones y lineas aunque el tiempo sea aproximado.";
     return "Mostramos una estimacion util con datos parciales.";
   }
-  if (state === "unavailable") return "Este modo no se puede estimar con el origen actual.";
+
+  if (state === "unavailable") {
+    if (mode === "bus") return "No hay una alternativa EMT suficiente con el origen actual.";
+    if (mode === "bike") return "No hay una combinacion BiciMAD suficiente con el origen actual.";
+    if (mode === "metro") return "No hay una alternativa de metro suficiente con el origen actual.";
+    return "No hay datos suficientes para este modo.";
+  }
+
   return null;
 }
 
@@ -195,99 +280,98 @@ function modeTag(mode: MobilityMode | "walk"): string {
 }
 
 export function humanizeHighlightLabel(label: string): string {
-  const normalized = fixInline(label);
+  const normalized = cleanText(label);
 
   return normalized
-    .replace(/Bus\s+([A-Z0-9]+)\s*[·-]\s*(\d+)\s*min/i, "Bus $1 · llega en $2 min")
-    .replace(/Bus\s*[·-]\s*sin linea util/i, "Bus · sin linea directa util")
-    .replace(/Bici\s+(\d+)\s*min\s*[·-]\s*x(\d+)/i, "Bici $1 min · $2 bicis cerca")
-    .replace(/Metro\s+(\d+)\s*min$/i, "Metro $1 min · estacion cercana")
-    .replace(/Coche\s+(\d+)\s*min\s*[·-]\s*SER\s*(.+)$/i, "Coche $1 min · SER $2")
+    .replace(/Bus\s+([A-Z0-9]+)\s*[-]\s*(\d+)\s*min/i, "Bus $1 - llega en $2 min")
+    .replace(/Bus\s+([A-Z0-9]+)\s*[·-]\s*(\d+)\s*min/i, "Bus $1 - llega en $2 min")
+    .replace(/Bus\s*[·-]\s*sin linea util/i, "Sin linea directa util desde tu origen")
+    .replace(/Bici\s+(\d+)\s*min\s*[·-]\s*x(\d+)/i, "Bici $1 min - $2 bicis cerca")
+    .replace(/Metro\s+(\d+)\s*min$/i, "Metro $1 min - estacion cercana")
+    .replace(/Coche\s+(\d+)\s*min\s*[·-]\s*SER\s*(.+)$/i, "Coche $1 min - SER $2")
     .trim();
 }
 
-export function buildSecondaryCardHighlights(center: CenterDecisionCardItem): string[] {
-  const highlights = [
-    center.mobility_highlights.primary,
-    center.mobility_highlights.secondary,
-  ].filter((value): value is NonNullable<typeof value> => value !== null);
-  const result = highlights.map(
-    (highlight) => `${modeTag(highlight.mode)} · ${humanizeHighlightLabel(highlight.label)}`,
-  );
-
-  if (
-    result.length < 3 &&
-    center.decision.best_mode !== "car" &&
-    center.decision.best_time_minutes !== null &&
-    center.ser?.enabled
-  ) {
-    result.push(`COCHE · ${center.decision.best_time_minutes} min · SER ${center.ser.zone_name ?? "activa"}`);
-  }
-
-  if (result.length < 3 && center.decision.distance_m !== null) {
-    result.push(
-      `A PIE · ${center.decision.distance_m < 1000 ? `${Math.round(center.decision.distance_m)} m` : `${(center.decision.distance_m / 1000).toFixed(1)} km`}`,
-    );
-  }
-
-  return result.slice(0, 3);
+function buildHighlightRowFromSummary(highlight: MobilityHighlightV1): SecondaryCardHighlightRow {
+  const label = modeTag(highlight.mode);
+  const body = humanizeHighlightLabel(highlight.label);
+  return { label, body };
 }
 
-export type TransportBoardRow = {
-  mode: "metro" | "bus" | "bike";
-  label: string;
-  body: string;
-  eta: string;
-  recommended: boolean;
-};
+export function buildSecondaryCardHighlights(center: CenterDecisionCardItem): SecondaryCardHighlightRow[] {
+  const rows = [
+    center.mobility_highlights.primary,
+    center.mobility_highlights.secondary,
+  ]
+    .filter((value): value is MobilityHighlightV1 => value !== null)
+    .map((highlight) => buildHighlightRowFromSummary(highlight));
 
-export type TransportFooterTile = {
-  mode: "car" | "walk";
-  label: string;
-  body: string;
-};
+  const usedLabels = new Set(rows.map((row) => row.label));
+
+  if (
+    rows.length < 3 &&
+    !usedLabels.has("COCHE") &&
+    center.decision.best_mode === "car" &&
+    center.decision.best_time_minutes !== null
+  ) {
+    const serCopy = buildSerCopy(center.ser?.enabled ?? false, center.ser?.zone_name ?? null);
+    rows.push({
+      label: "COCHE",
+      body: [`${center.decision.best_time_minutes} min`, serCopy].filter(Boolean).join(" - "),
+    });
+    usedLabels.add("COCHE");
+  }
+
+  if (rows.length < 3 && !usedLabels.has("A PIE") && center.decision.distance_m !== null) {
+    const walkMinutes = formatWalkMinutesFromMeters(center.decision.distance_m);
+    const distance = formatDistanceCompact(center.decision.distance_m);
+    rows.push({
+      label: "A PIE",
+      body: [walkMinutes, distance].filter(Boolean).join(" - "),
+    });
+  }
+
+  return rows.slice(0, 3);
+}
 
 function buildBusBoardBody(bus: BusModuleV1): string {
   if (bus.selected_line && bus.origin_stop) {
-    return [
+    const parts = [
       `Linea ${bus.selected_line}`,
-      `parada ${trimLabel(bus.origin_stop.name, 18)} a ${formatDistanceCompact(bus.origin_stop.distance_m)}`,
-      bus.next_arrival_min !== null ? `llega en ${bus.next_arrival_min} min` : "sin tiempo real",
-      bus.destination_stop ? `bajada a ${formatDistanceCompact(bus.destination_stop.distance_m)}` : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+      `parada ${trimLabel(bus.origin_stop.name, 18)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"}`,
+    ];
+    if (bus.next_arrival_min !== null) {
+      parts.push(`llega en ${bus.next_arrival_min} min`);
+    } else if (bus.realtime_status !== "available") {
+      parts.push("tiempo real no disponible");
+    }
+    if (bus.destination_stop) {
+      parts.push(`bajada a ${formatDistanceCompact(bus.destination_stop.distance_m) ?? "distancia corta"}`);
+    }
+    return parts.join(" - ");
   }
 
-  if (bus.origin_stop) {
-    return `Parada ${trimLabel(bus.origin_stop.name, 18)} a ${formatDistanceCompact(bus.origin_stop.distance_m)} · sin linea directa clara`;
-  }
-
-  return "Sin parada EMT util desde tu origen";
+  return buildBusDegradation(bus);
 }
 
 function buildBikeBoardBody(bike: BikeModuleV1): string {
   const origin = bike.origin_station
-    ? `Origen: ${stationRef(bike.origin_station.station_number, bike.origin_station.name)}${bike.bikes_available !== null ? ` · ${bike.bikes_available} bicis` : ""}`
-    : "Origen sin estacion";
+    ? `Origen: ${stationRef(bike.origin_station.station_number, bike.origin_station.name)}${bike.bikes_available !== null ? ` - ${bike.bikes_available} bicis` : ""}`
+    : "Origen sin estacion util";
   const destination = bike.destination_station
-    ? `Destino: ${stationRef(bike.destination_station.station_number, bike.destination_station.name)}${bike.docks_available !== null ? ` · ${bike.docks_available} anclajes` : ""}`
-    : "Destino sin estacion";
-  return `${origin} · ${destination}`;
+    ? `Destino: ${stationRef(bike.destination_station.station_number, bike.destination_station.name)}${bike.docks_available !== null ? ` - ${bike.docks_available} anclajes` : ""}`
+    : "Destino sin estacion util";
+  return `${origin} - ${destination}`;
 }
 
 function buildMetroBoardBody(metro: MetroModuleV1): string {
   const origin = metro.origin_station
     ? `${trimLabel(metro.origin_station.name, 18)}${metro.origin_station.lines.length > 0 ? ` (${metro.origin_station.lines.slice(0, 2).join(", ")})` : ""}`
-    : "Origen sin estacion";
+    : "Origen sin estacion util";
   const destination = metro.destination_station
     ? `${trimLabel(metro.destination_station.name, 18)}${metro.destination_station.lines.length > 0 ? ` (${metro.destination_station.lines.slice(0, 2).join(", ")})` : ""}`
-    : "Destino sin dato";
-  return `${origin} → ${destination}`;
-}
-
-function etaLabel(etaMin: number | null, fallback = "sin dato"): string {
-  return etaMin !== null ? `${etaMin} min` : fallback;
+    : "Destino sin estacion clara";
+  return `${origin} -> ${destination}`;
 }
 
 export function buildFeaturedTransportRows(
@@ -302,22 +386,22 @@ export function buildFeaturedTransportRows(
     {
       mode: "metro",
       label: "METRO",
-      body: metro ? buildMetroBoardBody(metro) : "Sin datos de metro",
-      eta: etaLabel(metro?.eta_min ?? null),
+      body: metro ? buildMetroBoardBody(metro) : "Sin una alternativa clara de metro",
+      eta: formatEta(metro?.eta_min ?? null),
       recommended: bestMode === "metro",
     },
     {
       mode: "bus",
       label: "BUS",
-      body: bus ? buildBusBoardBody(bus) : "Sin datos EMT",
-      eta: bus && bus.next_arrival_min !== null ? `${bus.next_arrival_min} min` : etaLabel(null),
+      body: bus ? buildBusBoardBody(bus) : "Sin una alternativa EMT clara",
+      eta: bus && bus.next_arrival_min !== null ? `${bus.next_arrival_min} min` : null,
       recommended: bestMode === "bus",
     },
     {
       mode: "bike",
       label: "BICIMAD",
-      body: bike ? buildBikeBoardBody(bike) : "Sin datos BiciMAD",
-      eta: etaLabel(bike?.eta_min ?? null),
+      body: bike ? buildBikeBoardBody(bike) : "Sin una alternativa BiciMAD clara",
+      eta: formatEta(bike?.eta_min ?? null),
       recommended: bestMode === "bike",
     },
   ];
@@ -330,6 +414,8 @@ export function buildFeaturedFooterTiles(
   const car = mobility?.modules.car ?? null;
   const walkingMinutes = mobility?.origin_dependent.walking_eta_min ?? null;
   const distance = center?.decision.distance_m ?? null;
+  const serCopy = buildSerCopy(car?.ser_enabled ?? false, car?.ser_zone_name ?? null)
+    ?? buildSerCopy(center?.ser?.enabled ?? false, center?.ser?.zone_name ?? null);
 
   return [
     {
@@ -337,18 +423,16 @@ export function buildFeaturedFooterTiles(
       label: "COCHE",
       body:
         car && car.eta_min !== null
-          ? `${car.eta_min} min · ${car.ser_enabled ? `SER ${car.ser_zone_name ?? "activa"}` : "SER sin dato"}`
-          : "Sin origen para calcular coche",
+          ? [`${car.eta_min} min`, serCopy].filter(Boolean).join(" - ")
+          : serCopy ?? "Trayecto en coche sin estimacion fiable",
     },
     {
       mode: "walk",
       label: walkingMinutes !== null ? "A PIE" : "DISTANCIA",
       body:
         walkingMinutes !== null
-          ? `${walkingMinutes} min · ${distance !== null ? formatDistanceCompact(distance) : "sin dato"}`
-          : distance !== null
-            ? formatDistanceCompact(distance)
-            : "Sin distancia estimada",
+          ? [`${walkingMinutes} min`, formatDistanceCompact(distance)].filter(Boolean).join(" - ")
+          : formatDistanceCompact(distance) ?? "Sin distancia estimada",
     },
   ];
 }
@@ -371,10 +455,7 @@ export function buildDetailModeSummary(
 
 export function buildHighlightRow(
   highlight: MobilityHighlightV1 | null,
-): { label: string; body: string } | null {
+): SecondaryCardHighlightRow | null {
   if (!highlight) return null;
-  return {
-    label: modeTag(highlight.mode),
-    body: humanizeHighlightLabel(highlight.label),
-  };
+  return buildHighlightRowFromSummary(highlight);
 }

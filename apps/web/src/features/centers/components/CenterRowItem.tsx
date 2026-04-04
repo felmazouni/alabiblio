@@ -51,8 +51,8 @@ export function CenterRowItem({ center, onSelect }: CenterRowItemProps) {
       </div>
       <div className="center-row-item__features">
         {highlights.slice(0, 2).map((highlight) => (
-          <span key={`${center.id}-${highlight}`} className="center-row-item__highlight">
-            {highlight}
+          <span key={`${center.id}-${highlight.label}-${highlight.body}`} className="center-row-item__highlight">
+            {highlight.label} - {highlight.body}
           </span>
         ))}
       </div>

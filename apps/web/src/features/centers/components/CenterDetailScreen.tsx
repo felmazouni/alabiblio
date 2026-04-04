@@ -172,7 +172,7 @@ export function CenterDetailScreen({
                 </span>
                 {buildModuleNote(row.mode, mobility) ? <span className="transport-v1-row__note">{buildModuleNote(row.mode, mobility)}</span> : null}
               </div>
-              {row.eta !== "sin dato" ? <span className="transport-v1-row__eta">{row.eta}</span> : null}
+              {row.eta ? <span className="transport-v1-row__eta">{row.eta}</span> : null}
             </div>
           ))}
           <div className="transport-v1-footer-grid">

@@ -4,101 +4,100 @@ Fecha: 2026-04-04
 
 ## Sintoma
 
-- usuarios y navegadores de auditoria reportan `ERR_CONNECTION_TIMED_OUT` al abrir `https://alabiblio.org/`
-- el flujo real de producto que mas castigaba al worker era `GET /api/centers` con origen activo
-- la capa visible de cards no seguia una jerarquia clara y mezclaba resumentes con detalle tecnico
+- durante la auditoria se observaron `ERR_CONNECTION_TIMED_OUT` e intermitencia al abrir `https://alabiblio.org/`
+- el flujo mas exigente de la app era `GET /api/centers` con origen activo y movilidad visible
+- la card principal podia titularse `Mejor opcion ahora` aun cuando el centro destacado estaba cerrado
 
-## Causa raiz de runtime
+## Causa raiz aplicativa demostrada
 
-Se detectaron tres causas aplicativas concretas:
+Se demostraron tres problemas reales dentro del runtime de la app:
 
-1. `GET /api/centers` seguia cargando demasiados datos antes de paginar
-   - listaba todos los centros filtrados
-   - cargaba horarios para todo el set cargado
-   - construia decision base para todo el set
-   - solo despues cortaba la pagina visible
+1. `GET /api/centers` hacia demasiado trabajo antes de responder
+   - cargaba demasiados centros antes de cortar la pagina
+   - calculaba decision base para demasiados registros por request
+   - enriquecia mas movilidad de la necesaria
 
-2. el calculo de origen repetia trabajo caro en cada request
-   - `transport_nodes` activos de `emt_stop`, `bicimad_station` y `metro_station` se consultaban enteros para cada listado y cada detalle de movilidad
+2. el calculo de origen repetia trabajo caro
+   - los nodos activos de EMT, BiciMAD y metro se recalculaban para listado y detalle
 
-3. EMT realtime no tenia timeout duro ni degradacion parcial por parada
-   - un login lento o una parada lenta podia mantener bloqueado el lote completo
+3. EMT realtime no tenia limite duro suficiente
+   - una parada lenta podia degradar el lote entero
 
 ## Fix aplicado
 
-### Backend
+### Runtime
 
 - `apps/web/worker/routes/centers.ts`
-  - el listado ahora trabaja en ventanas
-  - escanea por bloques de 48 y corta en un maximo de 144 centros por request
-  - calcula la decision base solo para la ventana necesaria
-  - enriquece con movilidad completa solo la ventana candidata visible
+  - escaneo visible-first por ventanas
+  - corte acotado por request
+  - enriquecimiento completo solo para la ventana candidata
 
 - `apps/web/worker/lib/db.ts`
-  - nuevo `countCenters(...)`
-  - `listCenters(...)` admite `limit` y `offset`
+  - paginacion real y `countCenters(...)`
 
 - `apps/web/worker/lib/originTransport.ts`
-  - nuevo helper compartido para origen
-  - cache en memoria del worker para nodos activos de transporte durante 5 minutos
-  - elimina duplicacion entre listado y detalle
+  - cache en memoria del worker para nodos de origen
 
 - `apps/web/worker/routes/mobility.ts`
-  - reutiliza el helper cacheado de origen
-
-### Upstream EMT
+  - reutiliza el helper cacheado
 
 - `packages/mobility/src/emtApi.ts`
-  - timeout de login: 3.5 s
-  - timeout de realtime por parada: 4 s
-  - si una parada falla, se degrada parcialmente
-  - solo se devuelve `error` duro si todo el lote falla
+  - timeout duro para login y realtime EMT
+  - degradacion parcial en vez de bloqueo total
 
-### UI
+### UI / ranking
 
-- card principal reorganizada como board oscuro
-  - cabecera
-  - filas limpias de `METRO`, `BUS`, `BICIMAD`
-  - franja inferior partida `COCHE` / `A PIE` o `DISTANCIA`
-  - una sola linea de motivo
+- `apps/web/src/App.tsx`
+  - la card principal ya no puede titularse `Mejor opcion ahora` si el centro esta cerrado
+  - si el centro destacado esta cerrado, el framing cambia a `Mejor opcion proxima`, `Mejor opcion cercana` u `Opcion destacada`
 
-- cards secundarias
-  - filas compactas de movilidad, ya sin dumps tecnicos
+- `apps/web/src/features/centers/transportCopy.ts`
+  - degradacion publica y copy humano para BUS, SER y highlights
 
-- detalle
-  - bloque `Como llegar` alineado con la misma semantica visual
+## Que esta demostrado
 
-## Evidencia de validacion
+- habia una causa aplicativa real en el listado y en EMT realtime
+- esos fixes estan implementados en codigo y desplegados
+- desde esta maquina, tanto `production` como `staging` presentan timeout de conexion incluso contra `/api/health`
+- por tanto, el timeout observado desde esta maquina no prueba por si solo un fallo exclusivo del worker de produccion
 
-### Validacion de codigo
+## Que no esta demostrado
+
+- no esta demostrado que el edge de Cloudflare este caido globalmente
+- no esta demostrado que el problema restante sea solo de red local de esta maquina
+- no esta demostrado que todos los usuarios sigan viendo el mismo timeout en home, listado y detalle
+- no esta demostrado que HTML y API fallen de la misma manera desde una red externa distinta
+
+## Siguiente prueba minima para aislar la causa
+
+1. lanzar una sonda externa desde una segunda red o runner contra:
+   - `GET /api/health`
+   - `GET /api/centers?limit=1`
+   - `GET /`
+
+2. ejecutar `wrangler tail` durante esa sonda
+   - si no entran requests, el problema esta antes del worker
+   - si entran requests con latencia alta o error, el problema sigue en runtime/upstream
+
+3. repetir la misma sonda sobre `staging` y `production`
+   - si fallan las dos igual, el problema apunta a edge/ruta/red
+   - si falla solo `production`, el problema queda acotado al entorno productivo
+
+## Validacion de codigo
 
 - `pnpm typecheck`: OK
 - `pnpm lint`: OK
 - `pnpm test`: OK
 - `pnpm build`: OK
 
-### Deploy real
+## Deploy mas reciente
 
 - entorno: `production`
-- comando: `pnpm deploy:production`
-- version desplegada: `ff5b1b81-c970-4036-9ef2-a88e590bb23b`
+- version desplegada: `18c7d654-86dc-4fb1-b049-196aeb584645`
 
-### Evidencia de reachability desde la maquina de auditoria
+## Evidencia adicional desde esta maquina
 
-Desde esta maquina persiste un timeout de conexion TCP tanto contra `production` como contra `staging`:
+- `Invoke-WebRequest https://alabiblio.org/api/health -TimeoutSec 20` -> timeout
+- `Invoke-WebRequest https://alabiblio.org/api/centers?limit=1 -TimeoutSec 25` -> timeout
 
-- `Invoke-WebRequest https://alabiblio.org/api/health -TimeoutSec 15` -> timeout
-- `Invoke-WebRequest https://staging.alabiblio.org/api/health -TimeoutSec 15` -> timeout
-- captura headless de `https://alabiblio.org/` -> pagina de timeout de Edge
-
-Interpretacion:
-
-- el problema de app runtime que sobrecargaba el worker ha sido corregido en codigo y desplegado
-- la imposibilidad de abrir `production` y `staging` desde esta maquina no apunta al worker ni a D1, porque afecta tambien a `staging` y a `/api/health`
-- esa parte restante es un problema de reachability externa / edge / red entre esta maquina y Cloudflare, no un bloqueo del runtime del worker
-
-## Estado final honesto
-
-- incidente de runtime del listado: mitigado y corregido en codigo desplegado
-- timeout de conexion observado desde la maquina de auditoria: sigue presente y queda fuera del runtime de la app
-- rediseño funcional de cards y detalle: aplicado y desplegado
+Estos dos timeouts, por si solos, siguen sin demostrar si el problema restante esta en edge, red intermedia o reachability desde esta maquina.

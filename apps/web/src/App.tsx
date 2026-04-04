@@ -106,6 +106,59 @@ function buildListSubtitle(origin: UserOrigin | null): string {
   return `Saliendo desde ${origin.label}`;
 }
 
+function pickFeaturedCenter(items: CenterListItem[], originActive: boolean): CenterListItem | null {
+  if (!originActive || items.length === 0) return null;
+  return items.find((item) => item.is_open_now) ?? items[0] ?? null;
+}
+
+function buildFeaturedCardFrame(
+  center: CenterListItem | null,
+  recommendedMode: CenterMobility["summary"]["best_mode"],
+  serverOpenCount: number,
+): {
+  eyebrow: string;
+  sectionTitle: string;
+  sectionSummary: string;
+} {
+  const timingSummary =
+    center && center.decision.best_time_minutes !== null && recommendedMode
+      ? `${center.decision.best_time_minutes} min en ${modeLabel(recommendedMode)}`
+      : "Sin origen suficiente";
+
+  if (!center) {
+    return {
+      eyebrow: "Opcion destacada",
+      sectionTitle: "Planifica el trayecto",
+      sectionSummary: timingSummary,
+    };
+  }
+
+  if (center.is_open_now) {
+    return {
+      eyebrow: "Mejor opcion ahora",
+      sectionTitle: "Llegar ahora",
+      sectionSummary: timingSummary,
+    };
+  }
+
+  if (center.opens_today) {
+    return {
+      eyebrow: serverOpenCount === 0 ? "Mejor opcion proxima" : "Opcion destacada",
+      sectionTitle: "Preparala para cuando abra",
+      sectionSummary:
+        timingSummary === "Sin origen suficiente"
+          ? `Abre a las ${center.opens_today}`
+          : `Abre a las ${center.opens_today} - ${timingSummary}`,
+    };
+  }
+
+  return {
+    eyebrow: "Mejor opcion cercana",
+    sectionTitle: "Planifica el trayecto",
+    sectionSummary: timingSummary,
+  };
+}
+
 function buildFallbackMobilityFromDetail(item: GetCenterDetailResponse["item"]): CenterMobility {
   return {
     origin: { available: false, kind: null, label: null, lat: null, lon: null },
@@ -268,7 +321,7 @@ function ExplorerScreen() {
   const originActive = origin !== null;
   const showEntry = !originActive && !exploreWithoutOrigin;
   const hasMore = items.length < total;
-  const bestOption = originActive && items.length > 0 ? items[0] : null;
+  const bestOption = pickFeaturedCenter(items, originActive);
   const featuredTargetSlug = bestOption?.slug ?? null;
   const featuredOriginLat = origin?.lat ?? null;
   const featuredOriginLon = origin?.lon ?? null;
@@ -279,6 +332,7 @@ function ExplorerScreen() {
   const recommendedMode = featuredMobilityDisplay?.summary.best_mode ?? bestOption?.decision.best_mode ?? null;
   const featuredTransportRows = buildFeaturedTransportRows(featuredMobilityDisplay);
   const featuredFooterTiles = buildFeaturedFooterTiles(featuredMobilityDisplay, bestOption ?? null);
+  const featuredCardFrame = buildFeaturedCardFrame(bestOption, recommendedMode, serverOpenCount);
 
   // Active filter count (for badge)
   const activeFilterCount = [
@@ -738,7 +792,7 @@ function ExplorerScreen() {
                   <div className="best-option-card__eyebrow-row">
                     <span className="best-option-card__eyebrow">
                       <Sparkles size={11} />
-                      Mejor opcion ahora
+                      {featuredCardFrame.eyebrow}
                     </span>
                     <span className="best-option-card__kind-badge">{bestOption.kind_label}</span>
                     <span className={bestOption.is_open_now ? "decision-card__status decision-card__status--open" : "decision-card__status decision-card__status--closed"}>
@@ -767,12 +821,8 @@ function ExplorerScreen() {
 
                   <div className="best-option-card__section-head">
                     <div>
-                      <strong>Llegar ahora</strong>
-                      <span>
-                        {bestOption.decision.best_time_minutes !== null && recommendedMode
-                          ? `${bestOption.decision.best_time_minutes} min en ${modeLabel(recommendedMode)}`
-                          : "Sin origen suficiente"}
-                      </span>
+                      <strong>{featuredCardFrame.sectionTitle}</strong>
+                      <span>{featuredCardFrame.sectionSummary}</span>
                     </div>
                   </div>
 
