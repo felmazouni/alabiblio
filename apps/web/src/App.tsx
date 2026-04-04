@@ -4,7 +4,7 @@
   CenterSortBy,
   GetCenterDetailResponse,
 } from "@alabiblio/contracts/centers";
-import type { CenterMobility } from "@alabiblio/contracts/mobility";
+import type { CenterMobility, CenterTopMobilityItem } from "@alabiblio/contracts/mobility";
 import type {
   GeocodeAddressOption,
   OriginPreset,
@@ -46,9 +46,11 @@ import ShinyText from "./components/reactbits/ShinyText";
 import {
   fetchCenterDetail,
   fetchCenterMobility,
+  fetchCenterMobilitySummary,
   fetchCenters,
   fetchGeocodeOptions,
   fetchOriginPresets,
+  fetchTopMobilityCenters,
 } from "./features/centers/api";
 import {
   buildFeaturedFooterTiles,
@@ -106,6 +108,40 @@ function buildListSubtitle(origin: UserOrigin | null): string {
   return `Saliendo desde ${origin.label}`;
 }
 
+function buildCentersListQuery(input: {
+  kindFilter: KindFilter;
+  deferredSearch: string;
+  limit?: number;
+  offset?: number;
+  openNowOnly: boolean;
+  wifiOnly: boolean;
+  socketsOnly: boolean;
+  accessibleOnly: boolean;
+  serOnly: boolean;
+  districtFilter: string;
+  neighborhoodFilter: string;
+  sortBy: CenterSortBy;
+  userLat?: number;
+  userLon?: number;
+}) {
+  return {
+    kind: input.kindFilter === "all" ? undefined : input.kindFilter,
+    q: input.deferredSearch === "" ? undefined : input.deferredSearch,
+    limit: input.limit,
+    offset: input.offset,
+    open_now: input.openNowOnly || undefined,
+    has_wifi: input.wifiOnly || undefined,
+    has_sockets: input.socketsOnly || undefined,
+    accessible: input.accessibleOnly || undefined,
+    has_ser: input.serOnly || undefined,
+    district: input.districtFilter || undefined,
+    neighborhood: input.neighborhoodFilter || undefined,
+    sort_by: input.sortBy,
+    user_lat: input.userLat,
+    user_lon: input.userLon,
+  };
+}
+
 function pickFeaturedCenter(items: CenterListItem[], originActive: boolean): CenterListItem | null {
   if (!originActive || items.length === 0) return null;
   return items.find((item) => item.is_open_now) ?? items[0] ?? null;
@@ -156,74 +192,6 @@ function buildFeaturedCardFrame(
     eyebrow: "Mejor opcion cercana",
     sectionTitle: "Planifica el trayecto",
     sectionSummary: timingSummary,
-  };
-}
-
-function buildFallbackMobilityFromDetail(item: GetCenterDetailResponse["item"]): CenterMobility {
-  return {
-    origin: { available: false, kind: null, label: null, lat: null, lon: null },
-    origin_dependent: {
-      origin_coordinates: null,
-      origin_emt_stops: [],
-      origin_metro_station: null,
-      origin_bicimad_station: null,
-      estimated_car_eta_min: null,
-      walking_eta_min: null,
-    },
-    realtime: {
-      emt_next_arrivals: [],
-      emt_realtime_status: "unconfigured",
-      emt_realtime_fetched_at: null,
-      bicimad_bikes_available: null,
-      bicimad_docks_available: null,
-      bicimad_realtime_status: "unavailable",
-      bicimad_realtime_fetched_at: null,
-      metro_realtime_status: "unconfigured",
-    },
-    highlights: { primary: null, secondary: null },
-    modules: {
-      car: {
-        state: "unavailable",
-        eta_min: null,
-        ser_enabled: item.ser.enabled,
-        ser_zone_name: item.ser.zone_name,
-      },
-      bus: {
-        state: item.static_transport.emt_destination_stops[0] ? "degraded_missing_anchor" : "unavailable",
-        selected_line: item.static_transport.emt_destination_stops[0]?.lines[0] ?? null,
-        selected_destination: null,
-        origin_stop: null,
-        destination_stop: item.static_transport.emt_destination_stops[0] ?? null,
-        next_arrival_min: null,
-        realtime_status: "unconfigured",
-        fetched_at: null,
-      },
-      bike: {
-        state: item.static_transport.bicimad_destination_station ? "degraded_missing_anchor" : "unavailable",
-        eta_min: null,
-        origin_station: null,
-        destination_station: item.static_transport.bicimad_destination_station,
-        bikes_available: null,
-        docks_available: null,
-        realtime_status: "unavailable",
-        fetched_at: null,
-      },
-      metro: {
-        state: item.static_transport.metro_destination_stations[0] ? "degraded_missing_anchor" : "unavailable",
-        eta_min: null,
-        origin_station: null,
-        destination_station: item.static_transport.metro_destination_stations[0] ?? null,
-        realtime_status: "unconfigured",
-      },
-    },
-    degraded_modes: ["car", "bus", "bike", "metro"],
-    summary: {
-      best_mode: null,
-      best_time_minutes: null,
-      confidence: "low",
-      rationale: ["Sin origen suficiente"],
-    },
-    fetched_at: new Date().toISOString(),
   };
 }
 
@@ -307,8 +275,10 @@ function ExplorerScreen() {
   const [originSearchError, setOriginSearchError] = useState<string | null>(null);
   const [originPresets, setOriginPresets] = useState<OriginPreset[]>([]);
   const [originPresetsError, setOriginPresetsError] = useState<string | null>(null);
-  const [featuredMobility, setFeaturedMobility] = useState<CenterMobility | null>(null);
-  const [featuredMobilitySlug, setFeaturedMobilitySlug] = useState<string | null>(null);
+  const [topMobilityItems, setTopMobilityItems] = useState<CenterTopMobilityItem[]>([]);
+  const [topMobilityResolvedKey, setTopMobilityResolvedKey] = useState<string | null>(null);
+  const [cardMobilityBySlug, setCardMobilityBySlug] = useState<Record<string, CenterMobility>>({});
+  const [cardMobilityLoadingBySlug, setCardMobilityLoadingBySlug] = useState<Record<string, boolean>>({});
   const originSearchController = useRef<AbortController | null>(null);
   const {
     origin,
@@ -321,18 +291,38 @@ function ExplorerScreen() {
   const originActive = origin !== null;
   const showEntry = !originActive && !exploreWithoutOrigin;
   const hasMore = items.length < total;
-  const bestOption = pickFeaturedCenter(items, originActive);
+  const topMobilityKey = originActive
+    ? JSON.stringify(buildCentersListQuery({
+      kindFilter,
+      deferredSearch,
+      openNowOnly,
+      wifiOnly,
+      socketsOnly,
+      accessibleOnly,
+      serOnly,
+      districtFilter,
+      neighborhoodFilter,
+      sortBy,
+      userLat: origin?.lat,
+      userLon: origin?.lon,
+    }))
+    : null;
+  const topMobilityItemsDisplay = topMobilityResolvedKey === topMobilityKey ? topMobilityItems : [];
+  const topMobilityLoading = originActive && topMobilityResolvedKey !== topMobilityKey;
+  const topMobilityMap = new Map(topMobilityItemsDisplay.map((entry) => [entry.slug, entry.item] as const));
+  const bestOption =
+    (topMobilityItemsDisplay[0]
+      ? items.find((item) => item.slug === topMobilityItemsDisplay[0]?.slug) ?? null
+      : null) ?? pickFeaturedCenter(items, originActive);
   const featuredTargetSlug = bestOption?.slug ?? null;
-  const featuredOriginLat = origin?.lat ?? null;
-  const featuredOriginLon = origin?.lon ?? null;
   const featuredMobilityDisplay =
-    featuredTargetSlug && featuredMobilitySlug === featuredTargetSlug ? featuredMobility : null;
-  const featuredMobilityLoading =
-    featuredTargetSlug !== null && featuredMobilitySlug !== featuredTargetSlug;
+    featuredTargetSlug ? topMobilityMap.get(featuredTargetSlug) ?? cardMobilityBySlug[featuredTargetSlug] ?? null : null;
+  const featuredMobilityLoading = topMobilityLoading && featuredTargetSlug !== null && featuredMobilityDisplay === null;
   const recommendedMode = featuredMobilityDisplay?.summary.best_mode ?? bestOption?.decision.best_mode ?? null;
   const featuredTransportRows = buildFeaturedTransportRows(featuredMobilityDisplay);
   const featuredFooterTiles = buildFeaturedFooterTiles(featuredMobilityDisplay, bestOption ?? null);
   const featuredCardFrame = buildFeaturedCardFrame(bestOption, recommendedMode, serverOpenCount);
+  const topMobilitySlugs = new Set(topMobilityItemsDisplay.map((entry) => entry.slug));
 
   // Active filter count (for badge)
   const activeFilterCount = [
@@ -357,22 +347,22 @@ function ExplorerScreen() {
     const isFirstPage = offset === 0;
 
     void fetchCenters(
-      {
-        kind: kindFilter === "all" ? undefined : kindFilter,
-        q: deferredSearch === "" ? undefined : deferredSearch,
+      buildCentersListQuery({
+        kindFilter,
+        deferredSearch,
         limit: PAGE_SIZE,
         offset,
-        open_now: openNowOnly || undefined,
-        has_wifi: wifiOnly || undefined,
-        has_sockets: socketsOnly || undefined,
-        accessible: accessibleOnly || undefined,
-        has_ser: serOnly || undefined,
-        district: districtFilter || undefined,
-        neighborhood: neighborhoodFilter || undefined,
-        sort_by: sortBy,
-        user_lat: origin?.lat,
-        user_lon: origin?.lon,
-      },
+        openNowOnly,
+        wifiOnly,
+        socketsOnly,
+        accessibleOnly,
+        serOnly,
+        districtFilter,
+        neighborhoodFilter,
+        sortBy,
+        userLat: origin?.lat,
+        userLon: origin?.lon,
+      }),
       controller.signal,
     )
       .then((response) => {
@@ -412,43 +402,100 @@ function ExplorerScreen() {
   ]);
 
   useEffect(() => {
-    if (!featuredTargetSlug || featuredOriginLat === null || featuredOriginLon === null) {
+    if (!originActive) {
       return;
     }
+
     const controller = new AbortController();
 
-    void fetchCenterMobility(
-      featuredTargetSlug,
-      {
-        userLat: featuredOriginLat,
-        userLon: featuredOriginLon,
-      },
+    void fetchTopMobilityCenters(
+      buildCentersListQuery({
+        kindFilter,
+        deferredSearch,
+        openNowOnly,
+        wifiOnly,
+        socketsOnly,
+        accessibleOnly,
+        serOnly,
+        districtFilter,
+        neighborhoodFilter,
+        sortBy,
+        userLat: origin?.lat,
+        userLon: origin?.lon,
+      }),
       controller.signal,
     )
       .then((response) => {
         if (!controller.signal.aborted) {
-          setFeaturedMobility(response.item);
-          setFeaturedMobilitySlug(featuredTargetSlug);
+          setTopMobilityItems(response.items);
+          setTopMobilityResolvedKey(topMobilityKey);
         }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setFeaturedMobility(null);
-          setFeaturedMobilitySlug(featuredTargetSlug);
+          setTopMobilityItems([]);
+          setTopMobilityResolvedKey(topMobilityKey);
         }
       });
 
     return () => controller.abort();
-  }, [featuredOriginLat, featuredOriginLon, featuredTargetSlug]);
+  }, [
+    accessibleOnly,
+    deferredSearch,
+    districtFilter,
+    neighborhoodFilter,
+    kindFilter,
+    openNowOnly,
+    originActive,
+    origin?.lat,
+    origin?.lon,
+    serOnly,
+    socketsOnly,
+    sortBy,
+    topMobilityKey,
+    wifiOnly,
+  ]);
 
   function resetListState(): void {
     setOffset(0);
     setItems([]);
     setTotal(0);
     setServerOpenCount(0);
+    setTopMobilityItems([]);
+    setTopMobilityResolvedKey(null);
+    setCardMobilityBySlug({});
+    setCardMobilityLoadingBySlug({});
     setLoading(true);
     setLoadingMore(false);
     setListError(null);
+  }
+
+  function handleLoadCardMobility(slug: string): void {
+    if (!origin || cardMobilityBySlug[slug] || cardMobilityLoadingBySlug[slug]) {
+      return;
+    }
+
+    setCardMobilityLoadingBySlug((current) => ({ ...current, [slug]: true }));
+
+    void fetchCenterMobilitySummary(
+      slug,
+      {
+        userLat: origin.lat,
+        userLon: origin.lon,
+      },
+    )
+      .then((response) => {
+        setCardMobilityBySlug((current) => ({
+          ...current,
+          [slug]: response.item,
+        }));
+      })
+      .finally(() => {
+        setCardMobilityLoadingBySlug((current) => ({
+          ...current,
+          [slug]: false,
+        }));
+      });
   }
 
   function clearAllFilters(): void {
@@ -902,6 +949,10 @@ function ExplorerScreen() {
                       <CenterCard
                         key={center.id}
                         center={center}
+                        mobility={topMobilityMap.get(center.slug) ?? cardMobilityBySlug[center.slug] ?? null}
+                        mobilityLoading={cardMobilityLoadingBySlug[center.slug] ?? false}
+                        canLoadMobility={originActive && !topMobilitySlugs.has(center.slug)}
+                        onLoadMobility={() => handleLoadCardMobility(center.slug)}
                         onSelect={(slug) => navigate(`/centers/${slug}`)}
                       />
                     ))}
@@ -1001,48 +1052,81 @@ function CenterDetailRoute() {
   const { origin } = useUserOrigin();
   const [detail, setDetail] = useState<GetCenterDetailResponse["item"] | null>(null);
   const [mobility, setMobility] = useState<CenterMobility | null>(null);
-  const [resolvedKey, setResolvedKey] = useState<string | null>(null);
-  const [errorState, setErrorState] = useState<{ key: string; message: string } | null>(null);
+  const [detailResolvedSlug, setDetailResolvedSlug] = useState<string | null>(null);
+  const [detailErrorState, setDetailErrorState] = useState<{ slug: string; message: string } | null>(null);
+  const [mobilityResolvedKey, setMobilityResolvedKey] = useState<string | null>(null);
+  const [mobilityErrorState, setMobilityErrorState] = useState<{ key: string; message: string } | null>(null);
   const requestKey = `${slug ?? "missing"}:${origin?.lat ?? "none"}:${origin?.lon ?? "none"}`;
 
   useEffect(() => {
     if (!slug) return;
     const controller = new AbortController();
 
-    Promise.allSettled([
-      fetchCenterDetail(slug, controller.signal),
-      fetchCenterMobility(slug, origin ? { userLat: origin.lat, userLon: origin.lon } : undefined, controller.signal),
-    ])
-      .then(([detailResult, mobilityResult]) => {
-        if (detailResult.status !== "fulfilled") throw detailResult.reason;
-        setDetail(detailResult.value.item);
-        setMobility(
-          mobilityResult.status === "fulfilled"
-            ? mobilityResult.value.item
-            : buildFallbackMobilityFromDetail(detailResult.value.item),
-        );
-        setResolvedKey(requestKey);
-        setErrorState(null);
+    void fetchCenterDetail(slug, controller.signal)
+      .then((detailResponse) => {
+        if (!controller.signal.aborted) {
+          setDetail(detailResponse.item);
+          setDetailResolvedSlug(slug);
+          setDetailErrorState(null);
+        }
       })
       .catch((nextError: Error) => {
         if (!controller.signal.aborted) {
-          setErrorState({ key: requestKey, message: `No se pudo cargar el centro (${nextError.message}).` });
+          setDetail(null);
+          setDetailResolvedSlug(slug);
+          setDetailErrorState({ slug, message: `No se pudo cargar el centro (${nextError.message}).` });
+        }
+      });
+
+    return () => controller.abort();
+  }, [slug]);
+
+  useEffect(() => {
+    if (!slug) return;
+    const controller = new AbortController();
+
+    void fetchCenterMobility(
+      slug,
+      origin ? { userLat: origin.lat, userLon: origin.lon } : undefined,
+      controller.signal,
+    )
+      .then((response) => {
+        if (!controller.signal.aborted) {
+          setMobility(response.item);
+          setMobilityResolvedKey(requestKey);
+          setMobilityErrorState(null);
+        }
+      })
+      .catch((nextError: Error) => {
+        if (!controller.signal.aborted) {
+          setMobility(null);
+          setMobilityResolvedKey(requestKey);
+          setMobilityErrorState({ key: requestKey, message: `No se pudo actualizar la movilidad (${nextError.message}).` });
         }
       });
 
     return () => controller.abort();
   }, [origin, requestKey, slug]);
 
-  const loading = !errorState && resolvedKey !== requestKey;
-  const error = errorState?.key === requestKey ? errorState.message : null;
+  const detailMatches = detailResolvedSlug === slug;
+  const mobilityMatches = mobilityResolvedKey === requestKey;
+  const hasCurrentDetailError = detailErrorState !== null && detailErrorState.slug === slug;
+  const hasCurrentMobilityError =
+    mobilityErrorState !== null && mobilityErrorState.key === requestKey;
+  const loading = slug !== undefined && !detailMatches && !hasCurrentDetailError;
+  const mobilityLoading = !!slug && !mobilityMatches && !hasCurrentMobilityError;
+  const detailError = hasCurrentDetailError ? detailErrorState.message : null;
+  const mobilityError = hasCurrentMobilityError ? mobilityErrorState.message : null;
 
   return (
     <CenterDetailScreen
-      item={detail}
-      mobility={mobility}
+      item={detailMatches ? detail : null}
+      mobility={mobilityMatches ? mobility : null}
       origin={origin}
       loading={loading}
-      error={error}
+      mobilityLoading={mobilityLoading}
+      mobilityError={mobilityError}
+      error={detailError}
     />
   );
 }

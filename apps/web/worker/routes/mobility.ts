@@ -1,4 +1,7 @@
-import type { GetCenterMobilityResponse } from "@alabiblio/contracts/mobility";
+import type {
+  GetCenterMobilityResponse,
+  GetCenterMobilitySummaryResponse,
+} from "@alabiblio/contracts/mobility";
 import {
   buildCenterMobility,
 } from "@alabiblio/domain/mobility";
@@ -118,31 +121,81 @@ function buildScheduleSummaryForDecision(
   });
 }
 
+function parseUserLocationFromRequest(request: Request): { lat: number; lon: number } | null {
+  const url = new URL(request.url);
+  const userLat = parseCoordinateParam(url.searchParams.get("user_lat"), {
+    min: -90,
+    max: 90,
+  });
+  const userLon = parseCoordinateParam(url.searchParams.get("user_lon"), {
+    min: -180,
+    max: 180,
+  });
+
+  return userLat !== undefined && userLon !== undefined
+    ? {
+        lat: userLat,
+        lon: userLon,
+      }
+    : null;
+}
+
+async function buildCenterMobilityRuntime(
+  slug: string,
+  env: WorkerEnv,
+  userLocation: { lat: number; lon: number } | null,
+): Promise<GetCenterMobilityResponse["item"] | null> {
+  const centerRecord = await getCenterBySlug(env.DB, slug);
+
+  if (!centerRecord) {
+    return null;
+  }
+
+  const [ser, nodeRows] = await Promise.all([
+    getCenterSerCoverageByCenterId(env.DB, centerRecord.center.id),
+    listTransportNodesByCenterId(env.DB, centerRecord.center.id),
+  ]);
+  const destination = groupDestinationTransportNodes(nodeRows);
+  const originContext = await loadOriginTransportContext(env, userLocation);
+
+  return buildCenterMobility({
+    center: centerRecord.center,
+    schedule: buildScheduleSummaryForDecision(
+      centerRecord.schedule,
+      centerRecord.source_last_updated,
+    ),
+    userLocation,
+    ser,
+    origin: userLocation
+      ? {
+          kind: null,
+          label: "Origen activo",
+        }
+      : null,
+    originEmtStops: originContext.originEmtStops,
+    destinationEmtStops: destination.destinationEmtStops,
+    originBicimadStations: originContext.originBicimadStations,
+    destinationBicimadStations: destination.destinationBicimadStations,
+    originMetroStations: originContext.originMetroStations,
+    destinationMetroStations: destination.destinationMetroStations,
+    destinationParkings: destination.destinationParkings,
+    realtimeByStopId: originContext.realtimeByStopId,
+    emtRealtimeStatus: originContext.emtRealtimeStatus,
+    emtRealtimeFetchedAt: originContext.emtRealtimeFetchedAt,
+    fetchedAt: new Date().toISOString(),
+  });
+}
+
 export async function handleGetCenterMobility(
   slug: string,
   env: WorkerEnv,
   ctx: ExecutionContext,
   request: Request,
 ): Promise<Response> {
-  const url = new URL(request.url);
   let userLocation: { lat: number; lon: number } | null = null;
 
   try {
-    const userLat = parseCoordinateParam(url.searchParams.get("user_lat"), {
-      min: -90,
-      max: 90,
-    });
-    const userLon = parseCoordinateParam(url.searchParams.get("user_lon"), {
-      min: -180,
-      max: 180,
-    });
-    userLocation =
-      userLat !== undefined && userLon !== undefined
-        ? {
-            lat: userLat,
-            lon: userLon,
-          }
-        : null;
+    userLocation = parseUserLocationFromRequest(request);
   } catch (error) {
     return Response.json(
       {
@@ -163,9 +216,9 @@ export async function handleGetCenterMobility(
       ctx,
       buildOriginBucket(userLocation?.lat, userLocation?.lon),
       async (dataVersion) => {
-        const centerRecord = await getCenterBySlug(env.DB, slug);
+        const item = await buildCenterMobilityRuntime(slug, env, userLocation);
 
-        if (!centerRecord) {
+        if (!item) {
           return Response.json(
             {
               error: "Center not found",
@@ -177,40 +230,8 @@ export async function handleGetCenterMobility(
           );
         }
 
-        const [ser, nodeRows] = await Promise.all([
-          getCenterSerCoverageByCenterId(env.DB, centerRecord.center.id),
-          listTransportNodesByCenterId(env.DB, centerRecord.center.id),
-        ]);
-        const destination = groupDestinationTransportNodes(nodeRows);
-        const originContext = await loadOriginTransportContext(env, userLocation);
-
         const payload: GetCenterMobilityResponse = {
-          item: buildCenterMobility({
-            center: centerRecord.center,
-            schedule: buildScheduleSummaryForDecision(
-              centerRecord.schedule,
-              centerRecord.source_last_updated,
-            ),
-            userLocation,
-            ser,
-            origin: userLocation
-              ? {
-                  kind: null,
-                  label: "Origen activo",
-                }
-              : null,
-            originEmtStops: originContext.originEmtStops,
-            destinationEmtStops: destination.destinationEmtStops,
-            originBicimadStations: originContext.originBicimadStations,
-            destinationBicimadStations: destination.destinationBicimadStations,
-            originMetroStations: originContext.originMetroStations,
-            destinationMetroStations: destination.destinationMetroStations,
-            destinationParkings: destination.destinationParkings,
-            realtimeByStopId: originContext.realtimeByStopId,
-            emtRealtimeStatus: originContext.emtRealtimeStatus,
-            emtRealtimeFetchedAt: originContext.emtRealtimeFetchedAt,
-            fetchedAt: new Date().toISOString(),
-          }),
+          item,
         };
 
         return Response.json(payload, {
@@ -221,5 +242,64 @@ export async function handleGetCenterMobility(
   }
   catch (error) {
     return buildInternalErrorResponse("center_mobility_failed", error);
+  }
+}
+
+export async function handleGetCenterMobilitySummary(
+  slug: string,
+  env: WorkerEnv,
+  ctx: ExecutionContext,
+  request: Request,
+): Promise<Response> {
+  let userLocation: { lat: number; lon: number } | null = null;
+
+  try {
+    userLocation = parseUserLocationFromRequest(request);
+  } catch (error) {
+    return Response.json(
+      {
+        error: "Invalid query parameters",
+        detail: error instanceof Error ? error.message : "unknown_error",
+      },
+      {
+        status: 400,
+        headers: buildNoStoreHeaders(),
+      },
+    );
+  }
+
+  try {
+    return await respondWithPublicCache(
+      request,
+      env,
+      ctx,
+      buildOriginBucket(userLocation?.lat, userLocation?.lon),
+      async (dataVersion) => {
+        const item = await buildCenterMobilityRuntime(slug, env, userLocation);
+
+        if (!item) {
+          return Response.json(
+            {
+              error: "Center not found",
+            },
+            {
+              status: 404,
+              headers: buildNoStoreHeaders(),
+            },
+          );
+        }
+
+        const payload: GetCenterMobilitySummaryResponse = {
+          slug,
+          item,
+        };
+
+        return Response.json(payload, {
+          headers: buildPublicReadHeaders(dataVersion),
+        });
+      },
+    );
+  } catch (error) {
+    return buildInternalErrorResponse("center_mobility_summary_failed", error);
   }
 }

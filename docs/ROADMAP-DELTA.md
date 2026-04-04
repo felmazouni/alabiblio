@@ -33,6 +33,8 @@ Fecha: 2026-04-04
 | Feature | Prioridad | Estado | Dependencia | Criterio de cierre |
 | ------- | --------- | ------ | ----------- | ------------------ |
 | `/api/centers` | P0 | OK | visible-first + contratos V1 | devuelve solo resumen de listado y highlights sin payload de detalle ni escaneo completo del dataset |
+| `/api/centers/top-mobility` | P0 | OK | cache corta + origen activo | devuelve solo top 3 enriquecido con realtime y board completo |
+| `/api/centers/:slug/mobility-summary` | P0 | OK | cache por slug + origen | hidrata una sola card bajo demanda sin cargar el detalle completo |
 | `/api/centers/:slug` | P1 | OK | contratos V1 | devuelve detalle base + anchors estaticos sin realtime obligatorio |
 | `/api/centers/:slug/mobility` | P1 | OK | contratos V1 + cache | devuelve origen, realtime, ranking y degradacion controlada |
 | Geocode | P1 | PARCIAL | politica de cache | fallback e invalidacion definidos |
@@ -42,7 +44,7 @@ Fecha: 2026-04-04
 | Feature | Prioridad | Estado | Dependencia | Criterio de cierre |
 | ------- | --------- | ------ | ----------- | ------------------ |
 | Modelo canonico de movilidad | P0 | OK | `TRANSPORT-ARCHITECTURE-V1.md` | cada campo pertenece a `STATIC_CENTER`, `ORIGIN_DEPENDENT` o `REALTIME` en runtime real |
-| Explorador transporte | P0 | OK | visible-first + cache | full computation solo en principal y ventana visible con scan acotado por request |
+| Explorador transporte | P0 | OK | visible-first + cache | home carga listado base barato, top 3 enriquecido y transporte individual bajo demanda |
 | Cache de movilidad | P0 | PARCIAL | `TRANSPORT-CACHE-POLICY.md` | TTL, invalidacion y bucketizacion aplicados tambien en fallback stale por fuente |
 | Matching EMT | P1 | PARCIAL | criterio V1 cerrado | linea util y degradacion cumplen especificacion V1 con hit rate aceptable |
 | Degradacion por modo | P0 | OK | contratos V1 | no existe fallback generico si quedan modulos utiles |

@@ -218,3 +218,18 @@ export interface EmtRealtimePayload {
 export interface GetCenterMobilityResponse {
   item: CenterMobilityRuntimeV1;
 }
+
+export interface CenterTopMobilityItem {
+  slug: string;
+  rank: number;
+  item: CenterMobilityRuntimeV1;
+}
+
+export interface GetTopMobilityCentersResponse {
+  items: CenterTopMobilityItem[];
+}
+
+export interface GetCenterMobilitySummaryResponse {
+  slug: string;
+  item: CenterMobilityRuntimeV1;
+}

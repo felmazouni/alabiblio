@@ -2,11 +2,12 @@ import type { WorkerEnv } from "./lib/db";
 import {
   handleGetCenterDetail,
   handleGetCenterSchedule,
+  handleGetTopMobilityCenters,
   handleListCenters,
 } from "./routes/centers";
 import { handleApiNotFound, handleHealth } from "./routes/health";
 import { handleGeocodeSearch } from "./routes/geocode";
-import { handleGetCenterMobility } from "./routes/mobility";
+import { handleGetCenterMobility, handleGetCenterMobilitySummary } from "./routes/mobility";
 import { handleGetOriginPresets } from "./routes/originPresets";
 
 export default {
@@ -24,6 +25,10 @@ export default {
 
       if (request.method === "GET" && url.pathname === "/api/centers") {
         return handleListCenters(request, env, ctx);
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/centers/top-mobility") {
+        return handleGetTopMobilityCenters(request, env, ctx);
       }
 
       if (request.method === "GET" && url.pathname === "/api/geocode") {
@@ -55,6 +60,16 @@ export default {
           }
 
           return handleGetCenterMobility(slug, env, ctx, request);
+        }
+
+        if (nestedPath.endsWith("/mobility-summary")) {
+          const slug = nestedPath.replace(/\/mobility-summary$/, "");
+
+          if (slug === "") {
+            return handleApiNotFound(request);
+          }
+
+          return handleGetCenterMobilitySummary(slug, env, ctx, request);
         }
 
         const slug = nestedPath;

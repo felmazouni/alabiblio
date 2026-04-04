@@ -3,7 +3,11 @@ import type {
   ListCentersQuery,
   ListCentersResponse,
 } from "@alabiblio/contracts/centers";
-import type { GetCenterMobilityResponse as GetCenterMobilityResponsePayload } from "@alabiblio/contracts/mobility";
+import type {
+  GetCenterMobilityResponse as GetCenterMobilityResponsePayload,
+  GetCenterMobilitySummaryResponse,
+  GetTopMobilityCentersResponse,
+} from "@alabiblio/contracts/mobility";
 import type {
   GeocodeSearchResponse,
   GetOriginPresetsResponse,
@@ -17,7 +21,11 @@ async function readSanitizedJson<T>(response: Response): Promise<T> {
 
 function buildListCentersUrl(query: ListCentersQuery): string {
   const url = new URL("/api/centers", window.location.origin);
+  applyListCentersQuery(url, query);
+  return url.pathname + url.search;
+}
 
+function applyListCentersQuery(url: URL, query: ListCentersQuery): void {
   if (query.kind) {
     url.searchParams.set("kind", query.kind);
   }
@@ -77,8 +85,6 @@ function buildListCentersUrl(query: ListCentersQuery): string {
   if (query.offset !== undefined) {
     url.searchParams.set("offset", String(query.offset));
   }
-
-  return url.pathname + url.search;
 }
 
 export async function fetchCenters(
@@ -92,6 +98,22 @@ export async function fetchCenters(
   }
 
   return readSanitizedJson<ListCentersResponse>(response);
+}
+
+export async function fetchTopMobilityCenters(
+  query: ListCentersQuery,
+  signal?: AbortSignal,
+): Promise<GetTopMobilityCentersResponse> {
+  const url = new URL("/api/centers/top-mobility", window.location.origin);
+  applyListCentersQuery(url, query);
+
+  const response = await fetch(url.pathname + url.search, { signal });
+
+  if (!response.ok) {
+    throw new Error(`top_mobility_${response.status}`);
+  }
+
+  return readSanitizedJson<GetTopMobilityCentersResponse>(response);
 }
 
 export async function fetchCenterDetail(
@@ -138,6 +160,35 @@ export async function fetchCenterMobility(
   }
 
   return readSanitizedJson<GetCenterMobilityResponsePayload>(response);
+}
+
+export async function fetchCenterMobilitySummary(
+  slug: string,
+  options?: {
+    userLat?: number;
+    userLon?: number;
+  },
+  signal?: AbortSignal,
+): Promise<GetCenterMobilitySummaryResponse> {
+  const url = new URL(
+    `/api/centers/${encodeURIComponent(slug)}/mobility-summary`,
+    window.location.origin,
+  );
+
+  if (options?.userLat !== undefined && options.userLon !== undefined) {
+    url.searchParams.set("user_lat", String(options.userLat));
+    url.searchParams.set("user_lon", String(options.userLon));
+  }
+
+  const response = await fetch(url.pathname + url.search, {
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`center_mobility_summary_${response.status}`);
+  }
+
+  return readSanitizedJson<GetCenterMobilitySummaryResponse>(response);
 }
 
 export async function fetchGeocodeOptions(

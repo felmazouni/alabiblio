@@ -7,6 +7,7 @@ import type {
   ListCentersResponse,
   ScheduleAudience,
 } from "@alabiblio/contracts/centers";
+import type { GetTopMobilityCentersResponse } from "@alabiblio/contracts/mobility";
 import {
   toCenterDecisionCardItem,
   toCenterDetailDecisionItem,
@@ -42,7 +43,10 @@ const LIST_SCAN_CHUNK = 48;
 const LIST_SCAN_LIMIT = 144;
 const LIST_VISIBLE_PADDING = 12;
 const LIST_CACHE_TTL_SECONDS = 30;
+const TOP_MOBILITY_CACHE_TTL_SECONDS = 15;
 const DETAIL_CACHE_TTL_SECONDS = 60;
+const TOP_MOBILITY_COUNT = 3;
+const TOP_MOBILITY_CANDIDATES = 6;
 const SCHEDULE_AUDIENCE_ORDER: ScheduleAudience[] = [
   "sala",
   "centro",
@@ -414,6 +418,52 @@ async function loadListWindowRecords(
   };
 }
 
+async function enrichDecisionRecords(
+  env: WorkerEnv,
+  records: Array<ReturnType<typeof buildBaseListRecord>>,
+  userLocation: { lat: number; lon: number } | null,
+) {
+  if (!userLocation || records.length === 0) {
+    return records;
+  }
+
+  const candidateIds = records.map((record) => record.center.id);
+  const [transportNodeMap, originContext] = await Promise.all([
+    loadTransportNodesByCenterIds(env.DB, candidateIds),
+    loadOriginTransportContext(env, userLocation),
+  ]);
+
+  return records.map((record) => {
+    const destination = groupDestinationTransportNodes(
+      transportNodeMap.get(record.center.id) ?? [],
+    );
+    const mobility = buildCenterMobility({
+      center: record.center,
+      schedule: record.schedule,
+      userLocation,
+      originEmtStops: originContext.originEmtStops,
+      destinationEmtStops: destination.destinationEmtStops,
+      originBicimadStations: originContext.originBicimadStations,
+      destinationBicimadStations: destination.destinationBicimadStations,
+      originMetroStations: originContext.originMetroStations,
+      destinationMetroStations: destination.destinationMetroStations,
+      destinationParkings: destination.destinationParkings,
+      realtimeByStopId: originContext.realtimeByStopId,
+      emtRealtimeStatus: originContext.emtRealtimeStatus,
+      emtRealtimeFetchedAt: originContext.emtRealtimeFetchedAt,
+      fetchedAt: new Date().toISOString(),
+    });
+    const decision = buildDecisionSummary({
+      center: record.center,
+      schedule: record.schedule,
+      userLocation,
+      mobility,
+    });
+
+    return { ...record, mobility, decision };
+  });
+}
+
 export async function handleListCenters(
   request: Request,
   env: WorkerEnv,
@@ -456,53 +506,7 @@ export async function handleListCenters(
           loadListWindowRecords(env, query, userLocation),
         ]);
         const openCountInResults = listWindow.records.filter((r) => r.schedule.is_open_now).length;
-        let sortedRecords = listWindow.records;
-
-        if (userLocation && listWindow.records.length > 0) {
-          const candidateRecords = listWindow.records.slice(
-            0,
-            Math.max(query.offset + query.limit + LIST_VISIBLE_PADDING, DEFAULT_LIMIT),
-          );
-          const candidateIds = candidateRecords.map((record) => record.center.id);
-          const [transportNodeMap, originContext] = await Promise.all([
-            loadTransportNodesByCenterIds(env.DB, candidateIds),
-            loadOriginTransportContext(env, userLocation),
-          ]);
-          const enrichedCandidates = candidateRecords.map((record) => {
-            const destination = groupDestinationTransportNodes(
-              transportNodeMap.get(record.center.id) ?? [],
-            );
-            const mobility = buildCenterMobility({
-              center: record.center,
-              schedule: record.schedule,
-              userLocation,
-              originEmtStops: originContext.originEmtStops,
-              destinationEmtStops: destination.destinationEmtStops,
-              originBicimadStations: originContext.originBicimadStations,
-              destinationBicimadStations: destination.destinationBicimadStations,
-              originMetroStations: originContext.originMetroStations,
-              destinationMetroStations: destination.destinationMetroStations,
-              destinationParkings: destination.destinationParkings,
-              realtimeByStopId: originContext.realtimeByStopId,
-              emtRealtimeStatus: originContext.emtRealtimeStatus,
-              emtRealtimeFetchedAt: originContext.emtRealtimeFetchedAt,
-              fetchedAt: new Date().toISOString(),
-            });
-            const decision = buildDecisionSummary({
-              center: record.center,
-              schedule: record.schedule,
-              userLocation,
-              mobility,
-            });
-
-            return { ...record, mobility, decision };
-          });
-          const candidateIdSet = new Set(candidateIds);
-          sortedRecords = [
-            ...sortDecisionRecords(enrichedCandidates, listWindow.sortMode),
-            ...listWindow.records.filter((record) => !candidateIdSet.has(record.center.id)),
-          ];
-        }
+        const sortedRecords = listWindow.records;
 
         const pagedRecords = sortedRecords.slice(query.offset, query.offset + query.limit);
         const pageCenterIds = pagedRecords.map((item) => item.center.id);
@@ -551,6 +555,90 @@ export async function handleListCenters(
   }
   catch (error) {
     return buildInternalErrorResponse("list_centers_failed", error);
+  }
+}
+
+export async function handleGetTopMobilityCenters(
+  request: Request,
+  env: WorkerEnv,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  const url = new URL(request.url);
+  let query: ReturnType<typeof parseListCentersQuery>;
+
+  try {
+    query = parseListCentersQuery(url);
+  } catch (error) {
+    return Response.json(
+      {
+        error: "Invalid query parameters",
+        detail: error instanceof Error ? error.message : "unknown_error",
+      },
+      {
+        status: 400,
+        headers: buildNoStoreHeaders(),
+      },
+    );
+  }
+
+  const userLocation =
+    query.user_lat !== undefined && query.user_lon !== undefined
+      ? { lat: query.user_lat, lon: query.user_lon }
+      : null;
+
+  if (!userLocation) {
+    const emptyPayload: GetTopMobilityCentersResponse = { items: [] };
+    return Response.json(emptyPayload, {
+      headers: buildNoStoreHeaders(),
+    });
+  }
+
+  try {
+    return await respondWithPublicCache(
+      request,
+      env,
+      ctx,
+      {
+        ttlSeconds: TOP_MOBILITY_CACHE_TTL_SECONDS,
+        originBucket: buildOriginBucket(query.user_lat, query.user_lon),
+      },
+      async (dataVersion) => {
+        const listWindow = await loadListWindowRecords(
+          env,
+          {
+            ...query,
+            limit: TOP_MOBILITY_CANDIDATES,
+            offset: 0,
+          },
+          userLocation,
+        );
+
+        const enrichedCandidates = await enrichDecisionRecords(
+          env,
+          listWindow.records.slice(0, TOP_MOBILITY_CANDIDATES),
+          userLocation,
+        );
+
+        const rankedCandidates = sortDecisionRecords(
+          enrichedCandidates,
+          listWindow.sortMode,
+        ).slice(0, TOP_MOBILITY_COUNT);
+
+        const payload: GetTopMobilityCentersResponse = {
+          items: rankedCandidates.map((record, index) => ({
+            slug: record.center.slug,
+            rank: index + 1,
+            item: record.mobility,
+          })),
+        };
+
+        return Response.json(payload, {
+          headers: buildPublicReadHeaders(dataVersion, TOP_MOBILITY_CACHE_TTL_SECONDS),
+        });
+      },
+    );
+  } catch (error) {
+    return buildInternalErrorResponse("top_mobility_failed", error);
   }
 }
 

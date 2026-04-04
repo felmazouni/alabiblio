@@ -32,6 +32,8 @@ type CenterDetailScreenProps = {
   mobility: CenterMobility | null;
   origin: UserOrigin | null;
   loading: boolean;
+  mobilityLoading: boolean;
+  mobilityError: string | null;
   error: string | null;
 };
 
@@ -61,6 +63,8 @@ export function CenterDetailScreen({
   mobility,
   origin,
   loading,
+  mobilityLoading,
+  mobilityError,
   error,
 }: CenterDetailScreenProps) {
   const navigate = useNavigate();
@@ -81,7 +85,7 @@ export function CenterDetailScreen({
     );
   }
 
-  if (!item || !mobility) {
+  if (!item) {
     return (
       <section className="detail-screen">
         <EmptyStateCard title="Centro no disponible" body="No hay payload consistente para este centro." />
@@ -92,8 +96,8 @@ export function CenterDetailScreen({
   const mapsUrl = formatMapsUrl(item);
   const scheduleRows = buildCompactSchedule(item.schedule.regular_rules);
   const reason = buildHumanReason(mobility);
-  const transportRows = buildFeaturedTransportRows(mobility);
-  const footerTiles = buildFeaturedFooterTiles(mobility, {
+  const transportRows = mobility ? buildFeaturedTransportRows(mobility) : [];
+  const footerTiles = mobility ? buildFeaturedFooterTiles(mobility, {
     ser: item.ser,
     decision: {
       best_mode: mobility.summary.best_mode,
@@ -105,7 +109,7 @@ export function CenterDetailScreen({
       rationale: mobility.summary.rationale,
       summary_label: null,
     },
-  });
+  }) : [];
 
   return (
     <section className="detail-screen">
@@ -135,9 +139,11 @@ export function CenterDetailScreen({
           <div className="detail-screen__kpi">
             <Navigation size={14} />
             <span>
-              {mobility.summary.best_time_minutes !== null && mobility.summary.best_mode
+              {mobility && mobility.summary.best_time_minutes !== null && mobility.summary.best_mode
                 ? `${mobility.summary.best_time_minutes} min - ${modeLabel(mobility.summary.best_mode)}`
-                : "Sin origen suficiente"}
+                : mobilityLoading
+                  ? "Calculando movilidad"
+                  : "Sin origen suficiente"}
             </span>
           </div>
           {origin ? <div className="detail-screen__kpi"><MapPin size={14} /><span>{origin.label}</span></div> : null}
@@ -156,41 +162,58 @@ export function CenterDetailScreen({
       <section className="detail-screen__section">
         <div className="detail-screen__section-copy">
           <span className="detail-screen__section-label">Como llegar</span>
-          <h3>{mobility.summary.rationale[0] ?? "Decision de movilidad"}</h3>
-          <p>{reason}</p>
+          <h3>{mobility?.summary.rationale[0] ?? "Decision de movilidad"}</h3>
+          <p>{mobility ? reason : "Cargamos la movilidad de forma independiente para no bloquear el detalle."}</p>
         </div>
-        <div className="transport-v1-list transport-v1-list--board">
-          {transportRows.map((row) => (
-            <div key={row.mode} className={`transport-v1-row transport-v1-row--board${row.recommended ? " transport-v1-row--recommended" : ""}`}>
-              <span className="transport-v1-row__label">
-                {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
-                {row.label}
-              </span>
-              <div className="transport-v1-row__copy">
-                <span className="transport-v1-row__body">
-                  {buildDetailModeSummary(row.mode, mobility)}
+        {!mobility && mobilityLoading ? (
+          <div className="transport-v1-list transport-v1-list--board">
+            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Calculando coche, EMT, BiciMAD y metro...</div>
+            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Cargando anchors y tiempos del origen activo...</div>
+          </div>
+        ) : mobility ? (
+          <div className="transport-v1-list transport-v1-list--board">
+            {transportRows.map((row) => (
+              <div key={row.mode} className={`transport-v1-row transport-v1-row--board${row.recommended ? " transport-v1-row--recommended" : ""}`}>
+                <span className="transport-v1-row__label">
+                  {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
+                  {row.label}
                 </span>
-                {buildModuleNote(row.mode, mobility) ? <span className="transport-v1-row__note">{buildModuleNote(row.mode, mobility)}</span> : null}
-              </div>
-              {row.eta ? <span className="transport-v1-row__eta">{row.eta}</span> : null}
-            </div>
-          ))}
-          <div className="transport-v1-footer-grid">
-            {footerTiles.map((tile) => (
-              <div key={tile.mode} className={`transport-v1-footer-tile transport-v1-footer-tile--${tile.mode}`}>
-                <span className="transport-v1-footer-tile__label">
-                  {tile.mode === "car" ? <Car size={13} /> : <Navigation size={13} />}
-                  {tile.label}
-                </span>
-                <strong className="transport-v1-footer-tile__body">{tile.body}</strong>
+                <div className="transport-v1-row__copy">
+                  <span className="transport-v1-row__body">
+                    {buildDetailModeSummary(row.mode, mobility)}
+                  </span>
+                  {buildModuleNote(row.mode, mobility) ? <span className="transport-v1-row__note">{buildModuleNote(row.mode, mobility)}</span> : null}
+                </div>
+                {row.eta ? <span className="transport-v1-row__eta">{row.eta}</span> : null}
               </div>
             ))}
+            <div className="transport-v1-footer-grid">
+              {footerTiles.map((tile) => (
+                <div key={tile.mode} className={`transport-v1-footer-tile transport-v1-footer-tile--${tile.mode}`}>
+                  <span className="transport-v1-footer-tile__label">
+                    {tile.mode === "car" ? <Car size={13} /> : <Navigation size={13} />}
+                    {tile.label}
+                  </span>
+                  <strong className="transport-v1-footer-tile__body">{tile.body}</strong>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="transport-v1-list transport-v1-list--board">
+            <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">
+              {mobilityError ?? "No se pudo cargar la movilidad de este centro."}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="detail-screen__section">
-        <CenterMobilityMap center={item} mobility={mobility} ser={item.ser} origin={origin} />
+        {mobility ? (
+          <CenterMobilityMap center={item} mobility={mobility} ser={item.ser} origin={origin} />
+        ) : (
+          <div className="detail-screen__fallback">Calculando mapa de movilidad y anchors utiles...</div>
+        )}
       </section>
 
       <section className="detail-screen__section">
