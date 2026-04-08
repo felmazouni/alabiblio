@@ -65,7 +65,8 @@ function createTopCenter(
       best_time_minutes: 9,
       distance_m: 3898.4,
       confidence: "medium",
-      rationale: ["Centro abierto ahora", "Coche con contexto SER"],
+      confidence_source: "heuristic",
+      rationale: ["Centro abierto ahora", "Coche heuristico con contexto SER"],
       summary_label: "Coche 9 min",
     },
     ser: {
@@ -109,18 +110,21 @@ function createMobility(
       best_mode: "car",
       best_time_minutes: 9,
       confidence: "medium",
-      rationale: ["Centro abierto ahora", "Coche con contexto SER"],
+      confidence_source: "heuristic",
+      rationale: ["Centro abierto ahora", "Coche heuristico con contexto SER"],
     },
     highlights: {
       primary: {
         mode: "car",
         label: "Coche 9 min - 3.9 km - SER Centro",
         confidence: "medium",
+        confidence_source: "heuristic",
       },
       secondary: {
         mode: "metro",
         label: "Metro 17 min - estacion cercana",
         confidence: "medium",
+        confidence_source: "frequency",
       },
     },
     modules: {
@@ -130,6 +134,7 @@ function createMobility(
         ser_enabled: true,
         ser_zone_name: "Centro",
         distance_m: 3898.4,
+        confidence_source: "heuristic",
       },
       bus: {
         state: "partial",
@@ -142,6 +147,7 @@ function createMobility(
         estimated_total_min: 28,
         realtime_status: "unconfigured",
         fetched_at: "2026-04-08T15:32:09.631Z",
+        confidence_source: "estimated",
       },
       bike: {
         state: "partial",
@@ -152,6 +158,7 @@ function createMobility(
         docks_available: null,
         realtime_status: "unavailable",
         fetched_at: null,
+        confidence_source: "heuristic",
       },
       metro: {
         state: "ok",
@@ -160,6 +167,7 @@ function createMobility(
         destination_station: null,
         line_labels: ["L1", "L10"],
         realtime_status: "unconfigured",
+        confidence_source: "frequency",
       },
     },
     degraded_modes: ["bus", "bike"],
@@ -193,12 +201,12 @@ test("TopMobilityCard mantiene la capa enriquecida con scope y decision reales",
   });
 
   assert.equal(presentation.scopeSignal, "ORIGEN");
-  assert.equal(presentation.frame.eyebrow, "Mejor opcion ahora");
-  assert.equal(presentation.frame.sectionTitle, "Llegar ahora");
+  assert.equal(presentation.frame.eyebrow, "Referencia de llegada");
+  assert.equal(presentation.frame.sectionTitle, "Llegada orientativa");
   assert.match(presentation.frame.sectionSummary, /9 min en coche/i);
   assert.equal(presentation.transportRows.length, 3);
   assert.ok(
     presentation.footerTiles.some((tile) => tile.label === "COCHE" && /3\.9 km/i.test(tile.body)),
   );
-  assert.match(presentation.reason, /contexto SER/i);
+  assert.match(presentation.reason, /heuristica/i);
 });

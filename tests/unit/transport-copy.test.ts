@@ -5,6 +5,7 @@ import type { CenterMobility } from "../../packages/contracts/src/mobility";
 import {
   buildBusCopy,
   buildBaseExplorationHighlights,
+  buildCarCopy,
   buildFeaturedTransportRows,
   buildHumanReason,
   buildModuleNote,
@@ -44,11 +45,12 @@ function createMobility(overrides?: Partial<CenterMobility>): CenterMobility {
       best_mode: "bus",
       best_time_minutes: 14,
       confidence: "high",
-      rationale: ["EMT con llegada proxima"],
+      confidence_source: "realtime",
+      rationale: ["EMT con llegada realtime"],
     },
     highlights: {
-      primary: { mode: "bus", label: "Bus 5 - 4 min", confidence: "high" },
-      secondary: { mode: "bike", label: "Bici 12 min - x15", confidence: "medium" },
+      primary: { mode: "bus", label: "Bus 5 - 4 min", confidence: "high", confidence_source: "realtime" },
+      secondary: { mode: "bike", label: "Bici 12 min - x15", confidence: "medium", confidence_source: "realtime" },
     },
     modules: {
       car: {
@@ -57,6 +59,7 @@ function createMobility(overrides?: Partial<CenterMobility>): CenterMobility {
         ser_enabled: true,
         ser_zone_name: "Verde",
         distance_m: 1800,
+        confidence_source: "heuristic",
       },
       bus: {
         state: "ok",
@@ -83,6 +86,7 @@ function createMobility(overrides?: Partial<CenterMobility>): CenterMobility {
         estimated_total_min: 12,
         realtime_status: "available",
         fetched_at: "2026-04-05T10:00:00.000Z",
+        confidence_source: "realtime",
       },
       bike: {
         state: "ok",
@@ -109,6 +113,7 @@ function createMobility(overrides?: Partial<CenterMobility>): CenterMobility {
         docks_available: 16,
         realtime_status: "available",
         fetched_at: "2026-04-05T10:00:00.000Z",
+        confidence_source: "realtime",
       },
       metro: {
         state: "ok",
@@ -131,6 +136,7 @@ function createMobility(overrides?: Partial<CenterMobility>): CenterMobility {
         },
         line_labels: ["L1", "L10"],
         realtime_status: "unavailable",
+        confidence_source: "frequency",
       },
     },
     degraded_modes: [],
@@ -175,17 +181,18 @@ test("buildHumanReason reduce verbosidad y mantiene honestidad semantica", () =>
   assert.equal(buildHumanReason(null), "Actualizando la mejor llegada.");
 
   const bus = createMobility();
-  assert.equal(buildHumanReason(bus), "EMT ofrece la mejor llegada util.");
+  assert.equal(buildHumanReason(bus), "EMT ofrece la mejor llegada con realtime.");
 
   const carWithSer = createMobility({
     summary: {
       best_mode: "car",
       best_time_minutes: 9,
       confidence: "high",
-      rationale: ["Coche con contexto SER"],
+      confidence_source: "heuristic",
+      rationale: ["Coche heuristico con contexto SER"],
     },
   });
-  assert.equal(buildHumanReason(carWithSer), "Coche es la llegada mas rapida con contexto SER.");
+  assert.equal(buildHumanReason(carWithSer), "Coche queda como referencia heuristica mas rapida con contexto SER.");
 });
 
 test("buildBaseExplorationHighlights usa solo senales honestas del scope base", () => {
@@ -232,6 +239,16 @@ test("buildBusCopy usa una sintaxis compacta y no tecnica", () => {
   assert.equal(
     buildBusCopy(createMobility()),
     "L5 \u00b7 Sube en Agustin de Foxa \u00b7 Baja en Sol Sevilla \u00b7 Espera 4 min \u00b7 Viaje 8 min",
+  );
+});
+
+test("buildCarCopy y buildModuleNote marcan heuristica y frecuencia de forma explicita", () => {
+  const mobility = createMobility();
+
+  assert.match(buildCarCopy(mobility), /ETA heuristica 9 min/i);
+  assert.equal(
+    buildModuleNote("metro", mobility),
+    "Tiempo orientativo por frecuencia y estaciones cercanas.",
   );
 });
 

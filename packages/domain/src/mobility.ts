@@ -5,6 +5,7 @@ import type {
   CenterMobility,
   CenterMobilitySummaryV1,
   EmtRealtimeArrival,
+  MobilityConfidenceSource,
   MetroModuleV1,
   MobilityConfidence,
   MobilityHighlightV1,
@@ -28,13 +29,34 @@ import type {
 } from "@alabiblio/contracts/centers";
 import { haversineDistanceMeters } from "@alabiblio/geo/distance";
 
-const WALKING_METERS_PER_MINUTE = 83;
-const EMT_METERS_PER_MINUTE = 290;
-const BICI_METERS_PER_MINUTE = 220;
-const CAR_METERS_PER_MINUTE = 420;
-const MAX_ORIGIN_STOP_DISTANCE_M = 700;
-const MAX_DESTINATION_STOP_DISTANCE_M = 500;
-const MAX_BIKE_ACCESS_DISTANCE_M = 500;
+const MOBILITY_SPEEDS_M_PER_MINUTE = {
+  walk: 83,
+  emt: 290,
+  bike: 220,
+  car: 420,
+} as const;
+
+const MOBILITY_ACCESS_LIMITS_M = {
+  emt_origin_stop_max: 700,
+  emt_destination_stop_max: 500,
+  bike_station_access_max: 500,
+} as const;
+
+const MOBILITY_CONFIDENCE_SOURCE_SCORE_PENALTY = {
+  realtime: 0,
+  estimated: 60,
+  frequency: 120,
+  heuristic: 180,
+  fallback: 240,
+} as const satisfies Record<MobilityConfidenceSource, number>;
+
+const MOBILITY_CONFIDENCE_SOURCE_ETA_PENALTY_MINUTES = {
+  realtime: 0,
+  estimated: 2,
+  frequency: 5,
+  heuristic: 8,
+  fallback: 12,
+} as const satisfies Record<MobilityConfidenceSource, number>;
 
 export interface DecisionEmtStop {
   id: string;
@@ -107,6 +129,20 @@ function roundDistance(value: number): number {
 
 function confidenceRank(confidence: MobilityConfidence): number {
   return confidence === "high" ? 0 : confidence === "medium" ? 1 : 2;
+}
+
+function confidenceSourceRank(source: MobilityConfidenceSource): number {
+  switch (source) {
+    case "realtime": return 0;
+    case "estimated": return 1;
+    case "frequency": return 2;
+    case "heuristic": return 3;
+    case "fallback": return 4;
+  }
+}
+
+function confidenceSourcePenaltyMinutes(source: MobilityConfidenceSource): number {
+  return MOBILITY_CONFIDENCE_SOURCE_ETA_PENALTY_MINUTES[source];
 }
 
 function moduleStateRank(state: MobilityModuleState): number {
@@ -198,12 +234,12 @@ export function buildStaticTransportAnchors(input: {
 
 function buildWalkingMinutes(input: TripCentricMobilityInput): number | null {
   if (!input.userLocation || input.center.lat === null || input.center.lon === null) return null;
-  return roundMinutes(haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon) / WALKING_METERS_PER_MINUTE);
+  return roundMinutes(haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon) / MOBILITY_SPEEDS_M_PER_MINUTE.walk);
 }
 
 function buildCarEtaMinutes(input: TripCentricMobilityInput): number | null {
   if (!input.userLocation || input.center.lat === null || input.center.lon === null) return null;
-  return roundMinutes(haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon) / CAR_METERS_PER_MINUTE);
+  return roundMinutes(haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon) / MOBILITY_SPEEDS_M_PER_MINUTE.car);
 }
 
 function buildDirectDistanceMeters(input: TripCentricMobilityInput): number | null {
@@ -211,8 +247,48 @@ function buildDirectDistanceMeters(input: TripCentricMobilityInput): number | nu
   return roundDistance(haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon));
 }
 
-function scoreOption(totalMinutes: number, confidence: MobilityConfidence, accessPenalty: number, realtimeBonus: number): number {
-  return Number((1000 - totalMinutes * 12 - accessPenalty * 0.25 - confidenceRank(confidence) * 90 + realtimeBonus).toFixed(2));
+function scoreOption(
+  totalMinutes: number,
+  confidence: MobilityConfidence,
+  confidenceSource: MobilityConfidenceSource,
+  accessPenalty: number,
+  realtimeBonus: number,
+): number {
+  return Number(
+    (
+      1000
+      - totalMinutes * 12
+      - accessPenalty * 0.25
+      - confidenceRank(confidence) * 90
+      - MOBILITY_CONFIDENCE_SOURCE_SCORE_PENALTY[confidenceSource]
+      + realtimeBonus
+    ).toFixed(2),
+  );
+}
+
+function compareRankedCandidates<T extends {
+  eta: number;
+  confidence: MobilityConfidence;
+  confidence_source: MobilityConfidenceSource;
+  state: MobilityModuleState;
+}>(
+  left: T,
+  right: T,
+): number {
+  const stateDiff = moduleStateRank(left.state) - moduleStateRank(right.state);
+  if (stateDiff !== 0) return stateDiff;
+
+  const effectiveEtaDiff =
+    (left.eta + confidenceSourcePenaltyMinutes(left.confidence_source))
+    - (right.eta + confidenceSourcePenaltyMinutes(right.confidence_source));
+  if (effectiveEtaDiff !== 0) return effectiveEtaDiff;
+
+  const sourceDiff =
+    confidenceSourceRank(left.confidence_source)
+    - confidenceSourceRank(right.confidence_source);
+  if (sourceDiff !== 0) return sourceDiff;
+
+  return confidenceRank(left.confidence) - confidenceRank(right.confidence);
 }
 
 function getTopRealtimeArrival(stopId: string, line: string, realtimeByStopId: Map<string, EmtRealtimeArrival[]>): EmtRealtimeArrival | null {
@@ -228,22 +304,30 @@ function buildBusOptions(input: TripCentricMobilityInput): MobilityOption[] {
   const directDistance = haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon);
   const candidates: MobilityOption[] = [];
   for (const originStop of input.originEmtStops.slice(0, 6)) {
-    if (originStop.distance_m > MAX_ORIGIN_STOP_DISTANCE_M) continue;
+    if (originStop.distance_m > MOBILITY_ACCESS_LIMITS_M.emt_origin_stop_max) continue;
     for (const destinationStop of input.destinationEmtStops.slice(0, 4)) {
-      if (destinationStop.distance_m > MAX_DESTINATION_STOP_DISTANCE_M) continue;
+      if (destinationStop.distance_m > MOBILITY_ACCESS_LIMITS_M.emt_destination_stop_max) continue;
       const sharedLines = originStop.lines.filter((line) => destinationStop.lines.includes(line));
       for (const line of sharedLines.slice(0, 2)) {
         const topArrival = getTopRealtimeArrival(originStop.id, line, input.realtimeByStopId);
-        const accessOrigin = roundMinutes(originStop.distance_m / WALKING_METERS_PER_MINUTE);
-        const accessDestination = roundMinutes(destinationStop.distance_m / WALKING_METERS_PER_MINUTE);
+        const accessOrigin = roundMinutes(originStop.distance_m / MOBILITY_SPEEDS_M_PER_MINUTE.walk);
+        const accessDestination = roundMinutes(destinationStop.distance_m / MOBILITY_SPEEDS_M_PER_MINUTE.walk);
         const waitMinutes = topArrival?.minutes ?? 8;
-        const inVehicleMinutes = roundMinutes(directDistance / EMT_METERS_PER_MINUTE) + 4;
+        const inVehicleMinutes = roundMinutes(directDistance / MOBILITY_SPEEDS_M_PER_MINUTE.emt) + 4;
         const totalMinutes = accessOrigin + waitMinutes + inVehicleMinutes + accessDestination;
         const confidence: MobilityConfidence = topArrival ? (originStop.distance_m <= 350 && destinationStop.distance_m <= 350 ? "high" : "medium") : "low";
+        const confidenceSource: MobilityConfidenceSource = topArrival ? "realtime" : "estimated";
         candidates.push({
           type: "bus",
-          score: scoreOption(totalMinutes, confidence, originStop.distance_m + destinationStop.distance_m, topArrival ? 80 : 0),
+          score: scoreOption(
+            totalMinutes,
+            confidence,
+            confidenceSource,
+            originStop.distance_m + destinationStop.distance_m,
+            topArrival ? 80 : 0,
+          ),
           confidence,
+          confidence_source: confidenceSource,
           origin: buildAnchor(originStop),
           destination: buildAnchor(destinationStop),
           realtime: {
@@ -271,20 +355,28 @@ function buildBikeOptions(input: TripCentricMobilityInput): MobilityOption[] {
   if (directDistance < 1200 || directDistance > 8000) return [];
   const candidates: MobilityOption[] = [];
   for (const originStation of input.originBicimadStations.slice(0, 4)) {
-    if (originStation.distance_m > MAX_BIKE_ACCESS_DISTANCE_M) continue;
+    if (originStation.distance_m > MOBILITY_ACCESS_LIMITS_M.bike_station_access_max) continue;
     for (const destinationStation of input.destinationBicimadStations.slice(0, 4)) {
-      if (destinationStation.distance_m > MAX_BIKE_ACCESS_DISTANCE_M) continue;
-      const accessOrigin = roundMinutes(originStation.distance_m / WALKING_METERS_PER_MINUTE);
-      const accessDestination = roundMinutes(destinationStation.distance_m / WALKING_METERS_PER_MINUTE);
-      const inVehicleMinutes = roundMinutes(directDistance / BICI_METERS_PER_MINUTE);
+      if (destinationStation.distance_m > MOBILITY_ACCESS_LIMITS_M.bike_station_access_max) continue;
+      const accessOrigin = roundMinutes(originStation.distance_m / MOBILITY_SPEEDS_M_PER_MINUTE.walk);
+      const accessDestination = roundMinutes(destinationStation.distance_m / MOBILITY_SPEEDS_M_PER_MINUTE.walk);
+      const inVehicleMinutes = roundMinutes(directDistance / MOBILITY_SPEEDS_M_PER_MINUTE.bike);
       const totalMinutes = accessOrigin + accessDestination + inVehicleMinutes;
       const hasRealtime = originStation.bikes_available !== undefined && originStation.bikes_available !== null && destinationStation.docks_available !== undefined && destinationStation.docks_available !== null;
       const viableRealtime = (originStation.bikes_available ?? 0) > 0 && (destinationStation.docks_available ?? 0) > 0;
       const confidence: MobilityConfidence = hasRealtime ? (viableRealtime ? "medium" : "low") : "low";
+      const confidenceSource: MobilityConfidenceSource = hasRealtime ? "realtime" : "heuristic";
       candidates.push({
         type: "bike",
-        score: scoreOption(totalMinutes, confidence, originStation.distance_m + destinationStation.distance_m, viableRealtime ? 40 : -120),
+        score: scoreOption(
+          totalMinutes,
+          confidence,
+          confidenceSource,
+          originStation.distance_m + destinationStation.distance_m,
+          viableRealtime ? 40 : -120,
+        ),
         confidence,
+        confidence_source: confidenceSource,
         origin: buildAnchor(originStation),
         destination: buildAnchor(destinationStation),
         realtime: hasRealtime ? { status: "available", bikes_available: originStation.bikes_available ?? undefined, docks_available: destinationStation.docks_available ?? undefined } : { status: "unavailable" },
@@ -303,15 +395,23 @@ function buildMetroOptions(input: TripCentricMobilityInput): MobilityOption[] {
   const candidates: MobilityOption[] = [];
   for (const originStation of input.originMetroStations.slice(0, 2)) {
     for (const destinationStation of input.destinationMetroStations.slice(0, 2)) {
-      const accessOrigin = roundMinutes(originStation.distance_m / WALKING_METERS_PER_MINUTE);
-      const accessDestination = roundMinutes(destinationStation.distance_m / WALKING_METERS_PER_MINUTE);
+      const accessOrigin = roundMinutes(originStation.distance_m / MOBILITY_SPEEDS_M_PER_MINUTE.walk);
+      const accessDestination = roundMinutes(destinationStation.distance_m / MOBILITY_SPEEDS_M_PER_MINUTE.walk);
       const totalMinutes = accessOrigin + accessDestination + 12;
       const sharedLines = originStation.lines.filter((line) => destinationStation.lines.includes(line));
       const confidence: MobilityConfidence = sharedLines.length > 0 ? "medium" : "low";
+      const confidenceSource: MobilityConfidenceSource = sharedLines.length > 0 ? "frequency" : "heuristic";
       candidates.push({
         type: "metro",
-        score: scoreOption(totalMinutes, confidence, originStation.distance_m + destinationStation.distance_m, sharedLines.length > 0 ? 20 : 0),
+        score: scoreOption(
+          totalMinutes,
+          confidence,
+          confidenceSource,
+          originStation.distance_m + destinationStation.distance_m,
+          sharedLines.length > 0 ? 20 : 0,
+        ),
         confidence,
+        confidence_source: confidenceSource,
         origin: buildAnchor(originStation),
         destination: buildAnchor(destinationStation),
         route_label: sharedLines[0] ?? destinationStation.lines[0] ?? "Metro",
@@ -363,7 +463,14 @@ function buildRealtimeLayer(input: TripCentricMobilityInput, busOption: Mobility
 
 function buildCarModule(originLayer: OriginDependentLayerV1, ser: Pick<CenterSerInfo, "enabled" | "zone_name"> | null | undefined): CarModuleV1 {
   if (originLayer.estimated_car_eta_min === null) {
-    return { state: "unavailable", eta_min: null, ser_enabled: ser?.enabled ?? false, ser_zone_name: ser?.zone_name ?? null, distance_m: null };
+    return {
+      state: "unavailable",
+      eta_min: null,
+      ser_enabled: ser?.enabled ?? false,
+      ser_zone_name: ser?.zone_name ?? null,
+      distance_m: null,
+      confidence_source: "fallback",
+    };
   }
   return {
     state: ser ? "ok" : "partial",
@@ -371,6 +478,7 @@ function buildCarModule(originLayer: OriginDependentLayerV1, ser: Pick<CenterSer
     ser_enabled: ser?.enabled ?? false,
     ser_zone_name: ser?.zone_name ?? null,
     distance_m: null,
+    confidence_source: "heuristic",
   };
 }
 
@@ -378,7 +486,19 @@ function buildBusModule(input: TripCentricMobilityInput, bestBus: MobilityOption
   const originStop = toStopAnchor(bestBus ? { id: bestBus.origin.id ?? "origin-stop", name: bestBus.origin.name, distance_m: bestBus.origin.distance_m, lat: bestBus.origin.lat ?? 0, lon: bestBus.origin.lon ?? 0, lines: bestBus.route_label ? [bestBus.route_label] : [] } : input.originEmtStops[0] ?? null);
   const destinationStop = toStopAnchor(bestBus ? { id: bestBus.destination.id ?? "destination-stop", name: bestBus.destination.name, distance_m: bestBus.destination.distance_m, lat: bestBus.destination.lat ?? 0, lon: bestBus.destination.lon ?? 0, lines: bestBus.route_label ? [bestBus.route_label] : [] } : input.destinationEmtStops[0] ?? null);
   if (!originStop && !destinationStop) {
-    return { state: "unavailable", selected_line: null, selected_destination: null, origin_stop: null, destination_stop: null, next_arrival_min: null, estimated_travel_min: null, estimated_total_min: null, realtime_status: input.emtRealtimeStatus ?? "unconfigured", fetched_at: input.emtRealtimeFetchedAt ?? null };
+    return {
+      state: "unavailable",
+      selected_line: null,
+      selected_destination: null,
+      origin_stop: null,
+      destination_stop: null,
+      next_arrival_min: null,
+      estimated_travel_min: null,
+      estimated_total_min: null,
+      realtime_status: input.emtRealtimeStatus ?? "unconfigured",
+      fetched_at: input.emtRealtimeFetchedAt ?? null,
+      confidence_source: "fallback",
+    };
   }
   if (!bestBus) {
     const fallbackOriginRaw = input.originEmtStops.find((stop) => getBestRealtimeArrivalByStop(stop.id, input.realtimeByStopId)) ?? input.originEmtStops[0] ?? null;
@@ -395,6 +515,7 @@ function buildBusModule(input: TripCentricMobilityInput, bestBus: MobilityOption
       estimated_total_min: null,
       realtime_status: fallbackArrival ? "available" : input.emtRealtimeStatus ?? "unconfigured",
       fetched_at: input.emtRealtimeFetchedAt ?? null,
+      confidence_source: fallbackArrival ? "realtime" : "fallback",
     };
   }
   const arrival = bestBus.realtime?.arrivals?.[0];
@@ -409,6 +530,7 @@ function buildBusModule(input: TripCentricMobilityInput, bestBus: MobilityOption
     estimated_total_min: bestBus.estimated_total_minutes,
     realtime_status: bestBus.realtime?.status ?? input.emtRealtimeStatus ?? "unconfigured",
     fetched_at: input.emtRealtimeFetchedAt ?? null,
+    confidence_source: arrival ? "realtime" : bestBus.confidence_source,
   };
 }
 
@@ -416,7 +538,17 @@ function buildBikeModule(input: TripCentricMobilityInput, bestBike: MobilityOpti
   const origin = bestBike ? input.originBicimadStations.find((v) => v.id === bestBike.origin.id) ?? null : input.originBicimadStations[0] ?? null;
   const destination = bestBike ? input.destinationBicimadStations.find((v) => v.id === bestBike.destination.id) ?? null : input.destinationBicimadStations[0] ?? null;
   if (!origin && !destination) {
-    return { state: "unavailable", eta_min: null, origin_station: null, destination_station: null, bikes_available: null, docks_available: null, realtime_status: "empty", fetched_at: null };
+    return {
+      state: "unavailable",
+      eta_min: null,
+      origin_station: null,
+      destination_station: null,
+      bikes_available: null,
+      docks_available: null,
+      realtime_status: "empty",
+      fetched_at: null,
+      confidence_source: "fallback",
+    };
   }
   const hasRealtime = origin !== null && destination !== null && origin.bikes_available !== undefined && origin.bikes_available !== null && destination.docks_available !== undefined && destination.docks_available !== null;
   return {
@@ -428,6 +560,7 @@ function buildBikeModule(input: TripCentricMobilityInput, bestBike: MobilityOpti
     docks_available: destination?.docks_available ?? null,
     realtime_status: hasRealtime ? "available" : origin || destination ? "unavailable" : "empty",
     fetched_at: null,
+    confidence_source: bestBike?.confidence_source ?? (hasRealtime ? "realtime" : origin || destination ? "heuristic" : "fallback"),
   };
 }
 
@@ -443,7 +576,15 @@ function buildMetroModule(input: TripCentricMobilityInput, bestMetro: MobilityOp
     ),
   ).slice(0, 3);
   if (!originStation && !destinationStation) {
-    return { state: "unavailable", eta_min: null, origin_station: null, destination_station: null, line_labels: [], realtime_status: "unconfigured" };
+    return {
+      state: "unavailable",
+      eta_min: null,
+      origin_station: null,
+      destination_station: null,
+      line_labels: [],
+      realtime_status: "unconfigured",
+      confidence_source: "fallback",
+    };
   }
   return {
     state: bestMetro ? "ok" : "partial",
@@ -452,11 +593,17 @@ function buildMetroModule(input: TripCentricMobilityInput, bestMetro: MobilityOp
     destination_station: toStationAnchor(destinationStation),
     line_labels: lineLabels,
     realtime_status: "unconfigured",
+    confidence_source: bestMetro?.confidence_source ?? (lineLabels.length > 0 ? "frequency" : "heuristic"),
   };
 }
 
-function buildHighlight(mode: MobilityHighlightV1["mode"], label: string, confidence: MobilityConfidence): MobilityHighlightV1 {
-  return { mode, label, confidence };
+function buildHighlight(
+  mode: MobilityHighlightV1["mode"],
+  label: string,
+  confidence: MobilityConfidence,
+  confidenceSource: MobilityConfidenceSource = "fallback",
+): MobilityHighlightV1 {
+  return { mode, label, confidence, confidence_source: confidenceSource };
 }
 
 function buildMobilityHighlightsLegacy(input: { car: CarModuleV1; bus: BusModuleV1; bike: BikeModuleV1; metro: MetroModuleV1 }) {
@@ -488,7 +635,7 @@ function buildMobilityHighlights(input: { car: CarModuleV1; bus: BusModuleV1; bi
       .join(" - ");
     candidates.push({
       rank: moduleStateRank(input.car.state) * 100 + input.car.eta_min,
-      item: buildHighlight("car", carLabel, input.car.state === "ok" ? "medium" : "low"),
+      item: buildHighlight("car", carLabel, input.car.state === "ok" ? "medium" : "low", input.car.confidence_source),
     });
   }
 
@@ -504,7 +651,7 @@ function buildMobilityHighlights(input: { car: CarModuleV1; bus: BusModuleV1; bi
       : "Bus - parada cercana";
     candidates.push({
       rank: moduleStateRank(input.bus.state) * 100 + (input.bus.estimated_total_min ?? input.bus.next_arrival_min ?? 99),
-      item: buildHighlight("bus", busLabel, input.bus.state === "ok" ? "high" : input.bus.state === "partial" ? "medium" : "low"),
+      item: buildHighlight("bus", busLabel, input.bus.state === "ok" ? "high" : input.bus.state === "partial" ? "medium" : "low", input.bus.confidence_source),
     });
   }
 
@@ -514,7 +661,7 @@ function buildMobilityHighlights(input: { car: CarModuleV1; bus: BusModuleV1; bi
       : `Bici - ${input.bike.bikes_available ?? "-"} bicis cerca`;
     candidates.push({
       rank: moduleStateRank(input.bike.state) * 100 + (input.bike.eta_min ?? 99),
-      item: buildHighlight("bike", bikeLabel, input.bike.state === "ok" ? "medium" : "low"),
+      item: buildHighlight("bike", bikeLabel, input.bike.state === "ok" ? "medium" : "low", input.bike.confidence_source),
     });
   }
 
@@ -524,7 +671,7 @@ function buildMobilityHighlights(input: { car: CarModuleV1; bus: BusModuleV1; bi
       : `Metro - ${input.metro.origin_station?.name ?? "sin estacion clara"}`;
     candidates.push({
       rank: moduleStateRank(input.metro.state) * 100 + (input.metro.eta_min ?? 99),
-      item: buildHighlight("metro", metroLabel, input.metro.state === "ok" ? "medium" : "low"),
+      item: buildHighlight("metro", metroLabel, input.metro.state === "ok" ? "medium" : "low", input.metro.confidence_source),
     });
   }
 
@@ -533,28 +680,29 @@ function buildMobilityHighlights(input: { car: CarModuleV1; bus: BusModuleV1; bi
 }
 
 function buildSummary(input: { schedule: Pick<CenterScheduleSummary, "is_open_now">; walkingMinutes: number | null; car: CarModuleV1; bus: BusModuleV1; bike: BikeModuleV1; metro: MetroModuleV1 }): CenterMobilitySummaryV1 {
-  const candidates: Array<{ mode: CenterMobilitySummaryV1["best_mode"]; eta: number; confidence: MobilityConfidence; state: MobilityModuleState; rationale: string }> = [];
-  if (input.car.eta_min !== null) candidates.push({ mode: "car", eta: input.car.eta_min, confidence: input.car.state === "ok" ? "medium" : "low", state: input.car.state, rationale: input.car.ser_enabled ? "Coche con contexto SER" : "Coche estimado por distancia" });
+  const candidates: Array<{ mode: CenterMobilitySummaryV1["best_mode"]; eta: number; confidence: MobilityConfidence; confidence_source: MobilityConfidenceSource; state: MobilityModuleState; rationale: string }> = [];
+  if (input.car.eta_min !== null) candidates.push({ mode: "car", eta: input.car.eta_min, confidence: input.car.state === "ok" ? "medium" : "low", confidence_source: input.car.confidence_source, state: input.car.state, rationale: input.car.ser_enabled ? "Coche heuristico con contexto SER" : "Coche heuristico por distancia" });
   if ((input.bus.state === "ok" || input.bus.state === "partial") && input.bus.origin_stop) candidates.push({
     mode: "bus",
     eta: input.bus.estimated_total_min ?? input.bus.next_arrival_min ?? 99,
     confidence: input.bus.state === "ok" ? "high" : "medium",
+    confidence_source: input.bus.confidence_source,
     state: input.bus.state,
     rationale:
       input.bus.next_arrival_min !== null
-        ? "EMT con llegada proxima"
+        ? "EMT con llegada realtime"
         : input.bus.estimated_total_min !== null
-          ? "EMT con llegada estimada"
-          : "EMT con parada util",
+          ? "EMT con ETA estimada"
+          : "EMT por frecuencia de linea",
   });
-  if (input.bike.origin_station) candidates.push({ mode: "bike", eta: input.bike.eta_min ?? 99, confidence: input.bike.state === "ok" ? "medium" : "low", state: input.bike.state, rationale: input.bike.bikes_available !== null && input.bike.docks_available !== null ? "BiciMAD con stock y anclaje" : "BiciMAD con anchors utiles" });
-  if (input.metro.origin_station) candidates.push({ mode: "metro", eta: input.metro.eta_min ?? 99, confidence: input.metro.state === "ok" ? "medium" : "low", state: input.metro.state, rationale: "Metro aproximado por anchors" });
-  const best = candidates.sort((a, b) => moduleStateRank(a.state) - moduleStateRank(b.state) || a.eta - b.eta)[0];
+  if (input.bike.origin_station) candidates.push({ mode: "bike", eta: input.bike.eta_min ?? 99, confidence: input.bike.state === "ok" ? "medium" : "low", confidence_source: input.bike.confidence_source, state: input.bike.state, rationale: input.bike.bikes_available !== null && input.bike.docks_available !== null ? "BiciMAD con stock realtime" : "BiciMAD heuristico por anchors" });
+  if (input.metro.origin_station) candidates.push({ mode: "metro", eta: input.metro.eta_min ?? 99, confidence: input.metro.state === "ok" ? "medium" : "low", confidence_source: input.metro.confidence_source, state: input.metro.state, rationale: "Metro orientativo por frecuencia" });
+  const best = candidates.sort(compareRankedCandidates)[0];
   if (!best) {
-    if (input.walkingMinutes !== null) return { best_mode: "walk", best_time_minutes: input.walkingMinutes, confidence: "high", rationale: [input.schedule.is_open_now ? "Centro abierto ahora" : "Revisa horario", "Fallback andando"] };
-    return { best_mode: null, best_time_minutes: null, confidence: "low", rationale: [input.schedule.is_open_now ? "Centro abierto ahora" : "Sin origen suficiente"] };
+    if (input.walkingMinutes !== null) return { best_mode: "walk", best_time_minutes: input.walkingMinutes, confidence: "high", confidence_source: "fallback", rationale: [input.schedule.is_open_now ? "Centro abierto ahora" : "Revisa horario", "Fallback andando"] };
+    return { best_mode: null, best_time_minutes: null, confidence: "low", confidence_source: "fallback", rationale: [input.schedule.is_open_now ? "Centro abierto ahora" : "Sin origen suficiente"] };
   }
-  return { best_mode: best.mode, best_time_minutes: best.eta, confidence: best.confidence, rationale: [input.schedule.is_open_now ? "Centro abierto ahora" : "Revisa horario", best.rationale] };
+  return { best_mode: best.mode, best_time_minutes: best.eta, confidence: best.confidence, confidence_source: best.confidence_source, rationale: [input.schedule.is_open_now ? "Centro abierto ahora" : "Revisa horario", best.rationale] };
 }
 
 function buildDegradedModes(input: { car: CarModuleV1; bus: BusModuleV1; bike: BikeModuleV1; metro: MetroModuleV1 }): Array<"car" | "bus" | "bike" | "metro"> {
@@ -601,10 +749,10 @@ function toSummaryLabel(mode: "walk" | "car" | "bus" | "bike" | "metro", minutes
 
 export function buildDecisionSummary(input: { center: { lat: number | null; lon: number | null }; schedule: Pick<CenterScheduleSummary, "is_open_now" | "schedule_confidence_label">; userLocation: UserLocationInput | null; mobility: CenterMobility }): CenterDecisionSummary {
   if (!input.userLocation || input.center.lat === null || input.center.lon === null) {
-    return { best_mode: null, best_time_minutes: null, distance_m: null, confidence: "low", rationale: input.schedule.is_open_now ? ["Centro abierto ahora"] : [], summary_label: null };
+    return { best_mode: null, best_time_minutes: null, distance_m: null, confidence: "low", confidence_source: "fallback", rationale: input.schedule.is_open_now ? ["Centro abierto ahora"] : [], summary_label: null };
   }
   const distanceM = haversineDistanceMeters(input.userLocation.lat, input.userLocation.lon, input.center.lat, input.center.lon);
-  const walkingMinutes = input.mobility.origin_dependent.walking_eta_min ?? roundMinutes(distanceM / WALKING_METERS_PER_MINUTE);
+  const walkingMinutes = input.mobility.origin_dependent.walking_eta_min ?? roundMinutes(distanceM / MOBILITY_SPEEDS_M_PER_MINUTE.walk);
   const bestMode = input.mobility.summary.best_mode ?? "walk";
   const bestTimeMinutes = input.mobility.summary.best_time_minutes ?? walkingMinutes;
   return {
@@ -612,6 +760,7 @@ export function buildDecisionSummary(input: { center: { lat: number | null; lon:
     best_time_minutes: bestTimeMinutes,
     distance_m: roundDistance(distanceM),
     confidence: input.mobility.summary.confidence,
+    confidence_source: input.mobility.summary.confidence_source,
     rationale: input.mobility.summary.rationale,
     summary_label: toSummaryLabel(bestMode, bestTimeMinutes),
   };
@@ -633,6 +782,9 @@ export function sortCenterListItems<T extends { decision: CenterDecisionSummary;
       const leftOpen = left.is_open_now ? 0 : 1;
       const rightOpen = right.is_open_now ? 0 : 1;
       if (leftOpen !== rightOpen) return leftOpen - rightOpen;
+    }
+    if (sortBy === "recommended" && confidenceSourceRank(left.decision.confidence_source) !== confidenceSourceRank(right.decision.confidence_source)) {
+      return confidenceSourceRank(left.decision.confidence_source) - confidenceSourceRank(right.decision.confidence_source);
     }
     if (sortBy === "recommended" && confidenceRank(left.decision.confidence) !== confidenceRank(right.decision.confidence)) {
       return confidenceRank(left.decision.confidence) - confidenceRank(right.decision.confidence);

@@ -42,6 +42,7 @@ type TopMobilityResponse = {
     center: {
       decision: {
         best_mode: string | null;
+        confidence_source: "realtime" | "estimated" | "frequency" | "heuristic" | "fallback";
       };
     };
   }>;
@@ -95,6 +96,7 @@ type CenterMobilityResponse = {
     summary: {
       best_mode: "walk" | "car" | "bus" | "bike" | "metro" | null;
       confidence: "high" | "medium" | "low";
+      confidence_source: "realtime" | "estimated" | "frequency" | "heuristic" | "fallback";
     };
     modules: {
       bus: {
@@ -106,6 +108,7 @@ type CenterMobilityResponse = {
       primary: {
         mode: "walk" | "car" | "bus" | "bike" | "metro";
         label: string;
+        confidence_source: "realtime" | "estimated" | "frequency" | "heuristic" | "fallback";
       } | null;
     };
   };
@@ -230,6 +233,7 @@ async function main() {
   assert.equal(top.payload.meta.scope, "origin_enriched", "Top mobility must expose enriched scope");
   assert.ok(top.payload.items.length > 0, "Top mobility must return ranked items");
   assert.ok(top.payload.items[0]?.center.decision.best_mode, "Top mobility must include decision");
+  assert.ok(top.payload.items[0]?.center.decision.confidence_source, "Top mobility must expose confidence source");
   assertOperationalHeaders("/api/centers/top-mobility", top.headers, "origin_enriched");
   assert.equal(top.headers.get("x-data-scope"), top.payload.meta.scope);
   assert.equal(top.headers.get("x-data-state"), top.payload.meta.data_state);
@@ -255,6 +259,7 @@ async function main() {
   );
   assert.equal(mobility.payload.meta.scope, "origin_enriched", "Mobility endpoint must expose enriched scope");
   assert.ok(mobility.payload.item.summary.confidence, "Mobility summary must expose confidence");
+  assert.ok(mobility.payload.item.summary.confidence_source, "Mobility summary must expose confidence source");
   assert.ok(
     typeof mobility.payload.item.modules.bus.state === "string",
     "Mobility payload must include V1 bus module",
@@ -265,7 +270,8 @@ async function main() {
   );
   assert.ok(
     mobility.payload.item.highlights.primary === null ||
-      typeof mobility.payload.item.highlights.primary.label === "string",
+      (typeof mobility.payload.item.highlights.primary.label === "string"
+        && typeof mobility.payload.item.highlights.primary.confidence_source === "string"),
     "Mobility payload must include V1 highlights",
   );
   assertOperationalHeaders(`/api/centers/${slug}/mobility`, mobility.headers, "origin_enriched");

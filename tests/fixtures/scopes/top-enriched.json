@@ -37,9 +37,10 @@
           "best_time_minutes": 9,
           "distance_m": 3898.4,
           "confidence": "medium",
+          "confidence_source": "heuristic",
           "rationale": [
             "Centro abierto ahora",
-            "Coche con contexto SER"
+            "Coche heuristico con contexto SER"
           ],
           "summary_label": "Coche 9 min"
         },
@@ -61,9 +62,10 @@
           "best_mode": "car",
           "best_time_minutes": 9,
           "confidence": "medium",
+          "confidence_source": "heuristic",
           "rationale": [
             "Centro abierto ahora",
-            "Coche con contexto SER"
+            "Coche heuristico con contexto SER"
           ]
         },
         "module_states": {

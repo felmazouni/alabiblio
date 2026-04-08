@@ -44,6 +44,7 @@ test("usa andando como fallback principal cuando no hay transporte", () => {
 
   assert.equal(decision.best_mode, "car");
   assert.ok((decision.best_time_minutes ?? 0) > 0);
+  assert.equal(decision.confidence_source, "heuristic");
   assert.match(decision.summary_label ?? "", /Coche/);
 });
 
@@ -101,7 +102,62 @@ test("prioriza ETA de transporte real cuando existe", () => {
   });
 
   assert.equal(decision.best_mode, "bus");
+  assert.equal(decision.confidence_source, "realtime");
   assert.match(decision.summary_label ?? "", /Bus/);
+});
+
+test("penaliza una heuristica rapida cuando EMT tiene realtime cercano", () => {
+  const mobility = buildCenterMobility({
+    center: { lat: 40.4777, lon: -3.6587 },
+    schedule: openSchedule,
+    userLocation: { lat: 40.451, lon: -3.688 },
+    originEmtStops: [
+      {
+        id: "507",
+        name: "Almanzora-Bacares",
+        distance_m: 120,
+        lat: 40.451,
+        lon: -3.688,
+        lines: ["7"],
+      },
+    ],
+    destinationEmtStops: [
+      {
+        id: "600",
+        name: "Manoteras",
+        distance_m: 120,
+        lat: 40.4777,
+        lon: -3.6587,
+        lines: ["7"],
+      },
+    ],
+    originBicimadStations: [],
+    destinationBicimadStations: [],
+    realtimeByStopId: new Map([
+      [
+        "507",
+        [
+          {
+            stop_id: "507",
+            stop_name: "Almanzora-Bacares",
+            line: "7",
+            destination: "Manoteras",
+            minutes: 4,
+          },
+        ],
+      ],
+    ]),
+  });
+
+  const decision = buildDecisionSummary({
+    center: { lat: 40.4777, lon: -3.6587 },
+    schedule: openSchedule,
+    userLocation: { lat: 40.451, lon: -3.688 },
+    mobility,
+  });
+
+  assert.equal(decision.best_mode, "bus");
+  assert.equal(decision.confidence_source, "realtime");
 });
 
 test("rebaja bici a confidence baja sin disponibilidad realtime", () => {
@@ -140,6 +196,7 @@ test("rebaja bici a confidence baja sin disponibilidad realtime", () => {
 
   assert.equal(mobility.modules.bike.state, "partial");
   assert.equal(mobility.modules.bike.realtime_status, "unavailable");
+  assert.equal(mobility.modules.bike.confidence_source, "heuristic");
 });
 
 test("ordena por llegada y luego por distancia como fallback", () => {
@@ -187,6 +244,7 @@ test("ordena por llegada y luego por distancia como fallback", () => {
         best_time_minutes: 12,
         distance_m: 600,
         confidence: "high",
+        confidence_source: "fallback",
         rationale: [],
         summary_label: "12 min andando",
       }),
@@ -195,6 +253,7 @@ test("ordena por llegada y luego por distancia como fallback", () => {
         best_time_minutes: 10,
         distance_m: 900,
         confidence: "high",
+        confidence_source: "realtime",
         rationale: [],
         summary_label: "Bus · 10 min",
       }),

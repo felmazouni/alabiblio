@@ -44,12 +44,12 @@
 	- [x] Introducir fixtures de payload para listado, top y detalle
 	- [x] Anadir pruebas unitarias e integracion para la capa `centersQuery` y serializacion
 
-- [ ] *Lote 5 - Honestidad de movilidad y dominio*
-	- [ ] Declarar de forma explicita `realtime`, `estimado`, `frecuencia` y `heuristica` en contratos de movilidad
-	- [ ] Sustituir constantes heuristicas opacas por configuracion nombrada y documentada
-	- [ ] Revisar scoring de coche, EMT, BiciMAD y metro para evitar precision falsa
-	- [ ] Alinear copy UI con el nivel real de confianza del dominio
-	- [ ] Anadir golden tests de decisiones de movilidad y ordenacion
+- [x] *Lote 5 - Honestidad de movilidad y dominio*
+	- [x] Declarar de forma explicita `realtime`, `estimado`, `frecuencia` y `heuristica` en contratos de movilidad
+	- [x] Sustituir constantes heuristicas opacas por configuracion nombrada y documentada
+	- [x] Revisar scoring de coche, EMT, BiciMAD y metro para evitar precision falsa
+	- [x] Alinear copy UI con el nivel real de confianza del dominio
+	- [x] Anadir golden tests de decisiones de movilidad y ordenacion
 
 - [ ] *Lote 6 - Encoding y texto end-to-end*
 	- [ ] Unificar normalizacion de texto entre ingesta, worker y cliente

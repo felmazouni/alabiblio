@@ -94,6 +94,7 @@ export function sortDecisionRecords<
       best_time_minutes: number | null;
       distance_m: number | null;
       confidence: "high" | "medium" | "low";
+      confidence_source: "realtime" | "estimated" | "frequency" | "heuristic" | "fallback";
       rationale: string[];
       summary_label: string | null;
     };

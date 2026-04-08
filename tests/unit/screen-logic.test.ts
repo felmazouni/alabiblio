@@ -12,6 +12,7 @@ test("buildFeaturedCardFrame no llama mejor opcion ahora a un centro cerrado", (
         best_time_minutes: 12,
         distance_m: 2100,
         confidence: "medium",
+        confidence_source: "frequency",
         rationale: [],
         summary_label: "Bici 12 min",
       },

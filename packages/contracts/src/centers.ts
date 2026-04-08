@@ -1,6 +1,7 @@
 import type { CenterFeature } from "./features";
 import type {
   MobilityConfidence,
+  MobilityConfidenceSource,
   MobilityMode,
   StaticTransportAnchorsV1,
 } from "./mobility";
@@ -147,6 +148,7 @@ export interface CenterDecisionSummary {
   best_time_minutes: number | null;
   distance_m: number | null;
   confidence: MobilityConfidence;
+  confidence_source: MobilityConfidenceSource;
   rationale: string[];
   summary_label: string | null;
 }

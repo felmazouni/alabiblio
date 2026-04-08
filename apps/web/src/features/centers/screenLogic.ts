@@ -34,6 +34,9 @@ export function buildFeaturedCardFrame(
     center && center.decision.best_time_minutes !== null && recommendedMode
       ? `${center.decision.best_time_minutes} min en ${modeLabel(recommendedMode)}`
       : "Sin origen suficiente";
+  const isStrongRecommendation = center
+    ? center.decision.confidence_source === "realtime" || center.decision.confidence_source === "estimated"
+    : false;
 
   if (!center) {
     return {
@@ -45,8 +48,8 @@ export function buildFeaturedCardFrame(
 
   if (center.is_open_now) {
     return {
-      eyebrow: "Mejor opcion ahora",
-      sectionTitle: "Llegar ahora",
+      eyebrow: isStrongRecommendation ? "Mejor opcion ahora" : "Referencia de llegada",
+      sectionTitle: isStrongRecommendation ? "Llegar ahora" : "Llegada orientativa",
       sectionSummary: timingSummary,
     };
   }
@@ -63,8 +66,8 @@ export function buildFeaturedCardFrame(
   }
 
   return {
-    eyebrow: "Mejor opcion cercana",
-    sectionTitle: "Planifica el trayecto",
+    eyebrow: isStrongRecommendation ? "Mejor opcion cercana" : "Referencia cercana",
+    sectionTitle: isStrongRecommendation ? "Planifica el trayecto" : "Plan orientativo",
     sectionSummary: timingSummary,
   };
 }

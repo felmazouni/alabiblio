@@ -30,6 +30,7 @@ import {
   buildFeaturedTransportRows,
   buildHumanReason,
   buildModuleNote,
+  confidenceSourceLabel,
   modeLabel,
 } from "../transportCopy";
 import { getDetailMobilityScopeLabel } from "../scopePresentation";
@@ -138,14 +139,15 @@ export function CenterDetailScreen({
   const hasOriginEnrichedMobility = mobilityScope === "origin_enriched" && mobility !== null;
   const footerTiles = hasOriginEnrichedMobility ? buildFeaturedFooterTiles(mobility, {
     ser: item.ser,
-    decision: {
-      best_mode: mobility.summary.best_mode,
-      best_time_minutes: mobility.summary.best_time_minutes,
-      distance_m: null,
-      confidence: mobility.summary.confidence,
-      rationale: mobility.summary.rationale,
-      summary_label: null,
-    },
+      decision: {
+        best_mode: mobility.summary.best_mode,
+        best_time_minutes: mobility.summary.best_time_minutes,
+        distance_m: null,
+        confidence: mobility.summary.confidence,
+        confidence_source: mobility.summary.confidence_source,
+        rationale: mobility.summary.rationale,
+        summary_label: null,
+      },
   }) : [];
 
   return (
@@ -180,7 +182,7 @@ export function CenterDetailScreen({
             <Navigation size={14} />
             <span>
               {hasOriginEnrichedMobility && mobility.summary.best_time_minutes !== null && mobility.summary.best_mode
-                ? `${mobility.summary.best_time_minutes} min - ${modeLabel(mobility.summary.best_mode)}`
+                ? `${mobility.summary.best_time_minutes} min - ${modeLabel(mobility.summary.best_mode)} (${confidenceSourceLabel(mobility.summary.confidence_source)})`
                 : mobilityLoading
                   ? "Resolviendo llegada desde tu origen"
                   : "Detalle base sin llegada contextual"}
@@ -206,7 +208,7 @@ export function CenterDetailScreen({
           </span>
           <h3>
             {hasOriginEnrichedMobility && mobility.summary.best_mode
-              ? `Llegada resuelta: ${modeLabel(mobility.summary.best_mode)}`
+              ? `${mobility.summary.confidence_source === "realtime" ? "Llegada resuelta" : mobility.summary.confidence_source === "estimated" ? "Llegada estimada" : "Llegada orientativa"}: ${modeLabel(mobility.summary.best_mode)}`
               : "Movilidad"}
           </h3>
           <p>

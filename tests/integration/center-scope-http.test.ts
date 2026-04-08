@@ -130,6 +130,8 @@ test("GET /api/centers/top-mobility mantiene scope origin_enriched y expone deci
     assert.equal(payload.items.length, 1);
     assert.ok(payload.items[0]?.center.decision);
     assert.ok(payload.items[0]?.item.summary.best_mode);
+    assert.ok(payload.items[0]?.center.decision.confidence_source);
+    assert.ok(payload.items[0]?.item.summary.confidence_source);
 
     assert.deepEqual(
       normalizeTopMobilityPayload(payload),
@@ -175,6 +177,7 @@ test("GET /api/centers/:slug/mobility mantiene scope origin_enriched y expone la
     assert.equal(payload.item.origin.available, true);
     assert.equal(payload.item.summary.best_mode, "car");
     assert.equal(payload.item.origin_dependent.estimated_car_eta_min, 9);
+    assert.ok(payload.item.summary.confidence_source);
   } finally {
     harness.cleanup();
   }

@@ -5,6 +5,7 @@ import type {
   CenterMobility,
   CenterTopMobilityCardV1,
   MetroModuleV1,
+  MobilityConfidenceSource,
   MobilityHighlightV1,
   MobilityMode,
 } from "@alabiblio/contracts/mobility";
@@ -93,6 +94,36 @@ function formatEta(etaMin: number | null | undefined): string | null {
   return `${etaMin} min`;
 }
 
+export function confidenceSourceLabel(source: MobilityConfidenceSource): string {
+  switch (source) {
+    case "realtime":
+      return "realtime";
+    case "estimated":
+      return "estimado";
+    case "frequency":
+      return "frecuencia";
+    case "heuristic":
+      return "heuristico";
+    case "fallback":
+      return "fallback";
+  }
+}
+
+function sourceNote(source: MobilityConfidenceSource): string | null {
+  switch (source) {
+    case "realtime":
+      return "Dato realtime";
+    case "estimated":
+      return "ETA estimada";
+    case "frequency":
+      return "Tiempo orientativo por frecuencia";
+    case "heuristic":
+      return "Tiempo heuristico";
+    case "fallback":
+      return "Referencia fallback";
+  }
+}
+
 export function modeLabel(mode: CenterMobility["summary"]["best_mode"]): string {
   switch (mode) {
     case "car":
@@ -124,26 +155,27 @@ export function buildHumanReason(mobility: CenterMobility | null): string {
       entry !== "Fallback andando",
   );
   const lead = specific[0] ?? null;
+  const source = mobility.summary.confidence_source;
 
   switch (mobility.summary.best_mode) {
     case "car":
-      return lead === "Coche con contexto SER"
-        ? "Coche es la llegada mas rapida con contexto SER."
-        : "Coche es la llegada mas rapida.";
+      return lead === "Coche heuristico con contexto SER"
+        ? "Coche queda como referencia heuristica mas rapida con contexto SER."
+        : "Coche queda como referencia heuristica mas rapida.";
     case "bus":
-      return lead === "EMT con llegada proxima"
-        ? "EMT ofrece la mejor llegada util."
-        : "EMT sigue siendo la mejor opcion disponible.";
+      if (source === "realtime") return "EMT ofrece la mejor llegada con realtime.";
+      if (source === "estimated") return "EMT queda como mejor llegada estimada.";
+      return "EMT queda como referencia parcial, no como llegada exacta.";
     case "bike":
-      return lead === "BiciMAD con stock y anclaje"
-        ? "BiciMAD compensa por tiempo y disponibilidad."
-        : "BiciMAD compensa mejor en este trayecto.";
+      return lead === "BiciMAD con stock realtime"
+        ? "BiciMAD compensa con stock realtime."
+        : "BiciMAD solo queda como estimacion por anchors.";
     case "metro":
-      return "Metro equilibra acceso y tiempo total.";
+      return "Metro queda como aproximacion por frecuencia y estaciones cercanas.";
     case "walk":
-      return "Ir andando es la opcion mas directa.";
+      return "Ir andando queda como fallback mas directo.";
     default:
-      return "Mostramos la mejor opcion disponible.";
+      return "Mostramos la mejor referencia disponible.";
   }
 }
 
@@ -153,7 +185,10 @@ export function buildCarCopy(mobility: CenterMobility | null): string {
   const car = mobility.modules.car;
   if (car.eta_min === null) return "Sin estimacion fiable en coche.";
 
-  const parts = [`${car.eta_min} min`, formatDistanceCompact(car.distance_m)];
+  const parts = [
+    car.confidence_source === "heuristic" ? `ETA heuristica ${car.eta_min} min` : `${car.eta_min} min`,
+    formatDistanceCompact(car.distance_m),
+  ];
   const serCopy = buildSerCopy(car.ser_enabled, car.ser_zone_name);
   if (serCopy) parts.push(serCopy);
   return joinParts(parts);
@@ -292,7 +327,8 @@ export function buildModuleNote(
 ): string | null {
   if (!mobility) return "Actualizando datos.";
 
-  const state = mobility.modules[mode].state;
+  const module = mobility.modules[mode];
+  const state = module.state;
   if (state === "degraded_upstream") {
     if (mode === "bus") return "EMT no respondio a tiempo; mostramos estimacion.";
     if (mode === "bike") return "BiciMAD no devuelve disponibilidad en tiempo real.";
@@ -307,6 +343,9 @@ export function buildModuleNote(
   }
 
   if (state === "partial") {
+    if (module.confidence_source === "estimated") return "Mostramos una ETA estimada, no un realtime.";
+    if (module.confidence_source === "frequency") return "Mostramos un tiempo orientativo por frecuencia.";
+    if (module.confidence_source === "heuristic") return "Mostramos una referencia heuristica, no una llegada exacta.";
     if (mode === "bus") return "Mostramos la mejor alternativa EMT disponible.";
     if (mode === "bike") return "Mostramos estaciones utiles con disponibilidad parcial.";
     if (mode === "metro") return "Mostramos estaciones y lineas con tiempo aproximado.";
@@ -319,6 +358,10 @@ export function buildModuleNote(
     if (mode === "metro") return "No hay una alternativa de metro suficiente.";
     return "No hay datos suficientes para este modo.";
   }
+
+  if (module.confidence_source === "frequency") return "Tiempo orientativo por frecuencia y estaciones cercanas.";
+  if (module.confidence_source === "heuristic") return "Tiempo heuristico basado en distancia y anchors.";
+  if (module.confidence_source === "estimated") return "ETA estimada con anchors y recorrido aproximado.";
 
   return null;
 }
@@ -355,7 +398,7 @@ export function humanizeHighlightLabel(label: string): string {
 
 function buildHighlightRowFromSummary(highlight: MobilityHighlightV1): SecondaryCardHighlightRow {
   const label = modeTag(highlight.mode);
-  const body = humanizeHighlightLabel(highlight.label);
+  const body = joinParts([humanizeHighlightLabel(highlight.label), sourceNote(highlight.confidence_source)]);
   return { label, body };
 }
 
@@ -409,6 +452,7 @@ function buildBusBoardContent(bus: BusModuleV1): Pick<TransportBoardRow, "headli
               : "Llegada estimada",
         ),
         buildBoardDetail("route", bus.estimated_travel_min !== null ? `Viaje ${bus.estimated_travel_min} min` : null),
+        buildBoardDetail("note", sourceNote(bus.confidence_source)),
       ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
     };
   }
@@ -419,6 +463,7 @@ function buildBusBoardContent(bus: BusModuleV1): Pick<TransportBoardRow, "headli
       details: [
         buildBoardDetail("origin", `Parada a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"}`),
         buildBoardDetail("time", bus.estimated_total_min !== null ? `Llegada estimada ${bus.estimated_total_min} min` : "Llegada estimada"),
+        buildBoardDetail("note", sourceNote(bus.confidence_source)),
       ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
     };
   }
@@ -429,13 +474,14 @@ function buildBusBoardContent(bus: BusModuleV1): Pick<TransportBoardRow, "headli
       details: [
         buildBoardDetail("origin", `Parada a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"}`),
         buildBoardDetail("note", "Sin linea directa clara"),
+        buildBoardDetail("note", sourceNote(bus.confidence_source)),
       ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
     };
   }
 
   return {
     headline: "Sin linea clara",
-    details: [buildBoardDetail("note", "No vemos una opcion EMT clara")].filter((value): value is NonNullable<typeof value> => Boolean(value)),
+    details: [buildBoardDetail("note", "No vemos una opcion EMT clara"), buildBoardDetail("note", sourceNote(bus.confidence_source))].filter((value): value is NonNullable<typeof value> => Boolean(value)),
   };
 }
 
@@ -451,6 +497,7 @@ function buildBikeBoardContent(bike: BikeModuleV1): Pick<TransportBoardRow, "hea
     details: [
       buildBoardDetail("origin", `Origen: ${origin}`),
       buildBoardDetail("destination", `Destino: ${destination}`),
+      buildBoardDetail("note", sourceNote(bike.confidence_source)),
     ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
   };
 }
@@ -479,6 +526,7 @@ function buildMetroBoardContent(metro: MetroModuleV1): Pick<TransportBoardRow, "
           ? `Destino a ${formatWalkMinutesFromMeters(metro.destination_station.distance_m)}`
           : null,
       ),
+      buildBoardDetail("note", sourceNote(metro.confidence_source)),
     ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
   };
 }
@@ -545,7 +593,11 @@ export function buildFeaturedFooterTiles(
       label: "COCHE",
       body:
         car && car.eta_min !== null
-          ? joinParts([`${car.eta_min} min`, formatDistanceCompact(car.distance_m ?? distance), serCopy])
+          ? joinParts([
+            car.confidence_source === "heuristic" ? `ETA heuristica ${car.eta_min} min` : `${car.eta_min} min`,
+            formatDistanceCompact(car.distance_m ?? distance),
+            serCopy,
+          ])
           : serCopy ?? "Sin estimacion fiable en coche",
     },
     {
@@ -553,7 +605,7 @@ export function buildFeaturedFooterTiles(
       label: walkingMinutes !== null ? "A PIE" : "DISTANCIA",
       body:
         walkingMinutes !== null
-          ? joinParts([`${walkingMinutes} min`, formatDistanceCompact(distance)])
+          ? joinParts([`${walkingMinutes} min`, formatDistanceCompact(distance), "fallback"])
           : formatDistanceCompact(distance) ?? "Sin distancia estimada",
     },
   ];

@@ -100,10 +100,11 @@ const mobility: CenterMobility = {
     best_mode: "bus",
     best_time_minutes: 14,
     confidence: "medium",
-    rationale: ["Centro abierto ahora", "EMT con llegada proxima"],
+    confidence_source: "realtime",
+    rationale: ["Centro abierto ahora", "EMT con llegada realtime"],
   },
   highlights: {
-    primary: { mode: "bus", label: "Bus 14 min", confidence: "medium" },
+    primary: { mode: "bus", label: "Bus 14 min", confidence: "medium", confidence_source: "realtime" },
     secondary: null,
   },
   modules: {
@@ -113,6 +114,7 @@ const mobility: CenterMobility = {
       ser_enabled: true,
       ser_zone_name: "Centro",
       distance_m: 1800,
+      confidence_source: "heuristic",
     },
     bus: {
       state: "ok",
@@ -125,6 +127,7 @@ const mobility: CenterMobility = {
       estimated_total_min: 14,
       realtime_status: "available",
       fetched_at: "2026-04-08T10:00:00.000Z",
+      confidence_source: "realtime",
     },
     bike: {
       state: "unavailable",
@@ -135,6 +138,7 @@ const mobility: CenterMobility = {
       docks_available: null,
       realtime_status: "unavailable",
       fetched_at: null,
+      confidence_source: "fallback",
     },
     metro: {
       state: "partial",
@@ -143,6 +147,7 @@ const mobility: CenterMobility = {
       destination_station: null,
       line_labels: [],
       realtime_status: "unavailable",
+      confidence_source: "frequency",
     },
   },
   degraded_modes: ["bike"],
@@ -180,7 +185,8 @@ test("GET /api/centers/top-mobility serializa scope enriquecido sin leaking de s
       best_time_minutes: 14,
       distance_m: 1800,
       confidence: "medium",
-      rationale: ["Centro abierto ahora", "EMT con llegada proxima"],
+      confidence_source: "realtime",
+      rationale: ["Centro abierto ahora", "EMT con llegada realtime"],
       summary_label: "Bus 14 min",
     },
   });
@@ -211,7 +217,8 @@ test("el mismo centro cambia de scope sin mezclar semantica entre listado y top"
       best_time_minutes: 14,
       distance_m: 1800,
       confidence: "medium",
-      rationale: ["Centro abierto ahora", "EMT con llegada proxima"],
+      confidence_source: "realtime",
+      rationale: ["Centro abierto ahora", "EMT con llegada realtime"],
       summary_label: "Bus 14 min",
     },
   });

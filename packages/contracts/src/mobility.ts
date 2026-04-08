@@ -3,6 +3,12 @@ import type { CenterResponseMetaV1 } from "./scopes";
 export type MobilityMode = "car" | "bus" | "bike" | "metro";
 
 export type MobilityConfidence = "high" | "medium" | "low";
+export type MobilityConfidenceSource =
+  | "realtime"
+  | "estimated"
+  | "frequency"
+  | "heuristic"
+  | "fallback";
 
 export type TransportNodeKind =
   | "emt_stop"
@@ -42,6 +48,7 @@ export interface MobilityOption {
   type: Exclude<MobilityMode, "car">;
   score: number;
   confidence: MobilityConfidence;
+  confidence_source: MobilityConfidenceSource;
   origin: MobilityAnchor;
   destination: MobilityAnchor;
   realtime?: {
@@ -61,6 +68,7 @@ export interface MobilityHighlightV1 {
   mode: MobilityMode | "walk";
   label: string;
   confidence: MobilityConfidence;
+  confidence_source: MobilityConfidenceSource;
 }
 
 export interface MobilityHighlightsV1 {
@@ -147,6 +155,7 @@ export interface CarModuleV1 {
   ser_enabled: boolean;
   ser_zone_name: string | null;
   distance_m: number | null;
+  confidence_source: MobilityConfidenceSource;
 }
 
 export interface BusModuleV1 {
@@ -160,6 +169,7 @@ export interface BusModuleV1 {
   estimated_total_min: number | null;
   realtime_status: MobilityRealtimeStatus;
   fetched_at: string | null;
+  confidence_source: MobilityConfidenceSource;
 }
 
 export interface BikeModuleV1 {
@@ -171,6 +181,7 @@ export interface BikeModuleV1 {
   docks_available: number | null;
   realtime_status: MobilityRealtimeStatus;
   fetched_at: string | null;
+  confidence_source: MobilityConfidenceSource;
 }
 
 export interface MetroModuleV1 {
@@ -180,12 +191,14 @@ export interface MetroModuleV1 {
   destination_station: StaticTransportStationAnchorV1 | null;
   line_labels: string[];
   realtime_status: MobilityRealtimeStatus;
+  confidence_source: MobilityConfidenceSource;
 }
 
 export interface CenterMobilitySummaryV1 {
   best_mode: MobilityMode | "walk" | null;
   best_time_minutes: number | null;
   confidence: MobilityConfidence;
+  confidence_source: MobilityConfidenceSource;
   rationale: string[];
 }
 
@@ -244,6 +257,7 @@ export interface CenterTopMobilityCardV1 {
     best_time_minutes: number | null;
     distance_m: number | null;
     confidence: MobilityConfidence;
+    confidence_source: MobilityConfidenceSource;
     rationale: string[];
     summary_label: string | null;
   };
