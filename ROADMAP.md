@@ -23,12 +23,12 @@
 	- [x] Comparar el mismo centro entre listado, top y detalle con el mismo origen
 	- [x] Dejar fixtures/golden minimos que congelen la semantica nueva
 
-- [ ] *Lote 2 - Observabilidad y depuracion operativa*
-	- [ ] Introducir `request_id` en todas las respuestas `/api/*`
-	- [ ] Anadir logs estructurados con `route`, `request_id`, `cache_status`, `upstream_status`, `duration_ms` y `data_version`
-	- [ ] Exponer headers de depuracion para distinguir `HIT`, `MISS`, `BYPASS`, `fallback` y `realtime`
-	- [ ] Registrar errores de upstream con causa tipada y sin texto ambiguo
-	- [ ] Anadir smoke checks con timeout y validacion de headers operativos
+- [x] *Lote 2 - Observabilidad y depuracion operativa*
+	- [x] Introducir `request_id` en todas las respuestas `/api/*`
+	- [x] Anadir logs estructurados con `route`, `request_id`, `cache_status`, `upstream_status`, `duration_ms` y `data_version`
+	- [x] Exponer headers de depuracion para distinguir `HIT`, `MISS`, `BYPASS`, `fallback` y `realtime`
+	- [x] Registrar errores de upstream con causa tipada y sin texto ambiguo
+	- [x] Anadir smoke checks con timeout y validacion de headers operativos
 
 - [ ] *Lote 3 - Frontend shell y reduccion de regresiones en `App.tsx`*
 	- [ ] Extraer `TopPicksScreen` a modulo propio
