@@ -30,12 +30,12 @@
 	- [x] Registrar errores de upstream con causa tipada y sin texto ambiguo
 	- [x] Anadir smoke checks con timeout y validacion de headers operativos
 
-- [ ] *Lote 3 - Frontend shell y reduccion de regresiones en `App.tsx`*
-	- [ ] Extraer `TopPicksScreen` a modulo propio
-	- [ ] Extraer `CatalogScreen` a modulo propio
-	- [ ] Extraer `CenterDetailRoute` a modulo propio
-	- [ ] Centralizar estado de origen, filtros y carga remota fuera del entrypoint
-	- [ ] Reducir `apps/web/src/App.tsx` a composicion y routing
+- [x] *Lote 3 - Frontend shell y reduccion de regresiones en `App.tsx`*
+	- [x] Extraer `TopPicksScreen` a modulo propio
+	- [x] Extraer `CatalogScreen` a modulo propio
+	- [x] Extraer `CenterDetailRoute` a modulo propio
+	- [x] Centralizar estado de origen, filtros y carga remota fuera del entrypoint
+	- [x] Reducir `apps/web/src/App.tsx` a composicion y routing
 
 - [ ] *Lote 4 - Backend de centros y query layer*
 	- [ ] Dividir `apps/web/worker/routes/centers.ts` en handlers por endpoint
