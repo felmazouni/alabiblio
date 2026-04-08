@@ -37,12 +37,12 @@
 	- [x] Centralizar estado de origen, filtros y carga remota fuera del entrypoint
 	- [x] Reducir `apps/web/src/App.tsx` a composicion y routing
 
-- [ ] *Lote 4 - Backend de centros y query layer*
-	- [ ] Dividir `apps/web/worker/routes/centers.ts` en handlers por endpoint
-	- [ ] Separar parsing, caching, conteo, ranking y serializacion en modulos dedicados
+- [x] *Lote 4 - Backend de centros y query layer*
+	- [x] Dividir `apps/web/worker/routes/centers.ts` en handlers por endpoint
+	- [x] Separar parsing, caching, conteo, ranking y serializacion en modulos dedicados
 	- [ ] Eliminar escaneos repetidos de horarios para `open_count` y `closed_count`
-	- [ ] Introducir fixtures de payload para listado, top y detalle
-	- [ ] Anadir pruebas unitarias e integracion para la capa `centersQuery` y serializacion
+	- [x] Introducir fixtures de payload para listado, top y detalle
+	- [x] Anadir pruebas unitarias e integracion para la capa `centersQuery` y serializacion
 
 - [ ] *Lote 5 - Honestidad de movilidad y dominio*
 	- [ ] Declarar de forma explicita `realtime`, `estimado`, `frecuencia` y `heuristica` en contratos de movilidad
