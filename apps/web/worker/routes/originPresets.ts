@@ -1,4 +1,6 @@
 import type { GetOriginPresetsResponse, OriginPreset } from "@alabiblio/contracts/origin";
+import type { ApiRequestContext } from "../lib/observability";
+import { buildPublicCacheControl, createApiJsonResponse } from "../lib/observability";
 
 const ORIGIN_PRESETS: OriginPreset[] = [
   { code: "sol", label: "Sol", lat: 40.4169, lon: -3.7035 },
@@ -13,14 +15,16 @@ const ORIGIN_PRESETS: OriginPreset[] = [
   { code: "vallecas", label: "Vallecas", lat: 40.3822, lon: -3.6678 },
 ];
 
-export function handleGetOriginPresets(): Response {
+export function handleGetOriginPresets(requestContext: ApiRequestContext): Response {
   const payload: GetOriginPresetsResponse = {
     items: ORIGIN_PRESETS,
   };
 
-  return Response.json(payload, {
-    headers: {
-      "cache-control": "public, max-age=86400, s-maxage=86400",
-    },
+  return createApiJsonResponse(requestContext, payload, {
+    headers: buildPublicCacheControl(86400),
+    cacheStatus: "BYPASS",
+    dataScope: "not_applicable",
+    upstreamStatus: "none",
+    dataState: "estimated",
   });
 }

@@ -21,37 +21,20 @@ import {
   buildCenterMobilityResponsePayload,
   buildCenterMobilitySummaryResponsePayload,
 } from "../lib/centerPayloads";
+import type { ApiRequestContext } from "../lib/observability";
+import {
+  buildMobilityUpstreamStatus,
+  buildNoStoreHeaders,
+  buildPublicCacheControl,
+  classifyMobilityDataState,
+  createApiErrorResponse,
+  createApiJsonResponse,
+  setOriginBucket,
+  withApiHeaders,
+} from "../lib/observability";
 import { loadOriginTransportContext } from "../lib/originTransport";
 
 const MOBILITY_CACHE_TTL_SECONDS = 15;
-
-function buildPublicReadHeaders(dataVersion: string | null): HeadersInit {
-  return {
-    "cache-control": `public, max-age=${MOBILITY_CACHE_TTL_SECONDS}, s-maxage=${MOBILITY_CACHE_TTL_SECONDS}, stale-while-revalidate=${MOBILITY_CACHE_TTL_SECONDS}`,
-    ...(dataVersion ? { "x-data-version": dataVersion } : {}),
-  };
-}
-
-function buildNoStoreHeaders(): HeadersInit {
-  return {
-    "cache-control": "no-store",
-  };
-}
-
-function buildInternalErrorResponse(scope: string, error: unknown): Response {
-  console.error(`[${scope}]`, error);
-
-  return Response.json(
-    {
-      error: "Internal server error",
-      detail: scope,
-    },
-    {
-      status: 500,
-      headers: buildNoStoreHeaders(),
-    },
-  );
-}
 
 function buildOriginBucket(lat: number | undefined, lon: number | undefined): string | null {
   if (lat === undefined || lon === undefined) {
@@ -69,11 +52,13 @@ async function respondWithPublicCache(
   request: Request,
   env: WorkerEnv,
   ctx: ExecutionContext,
+  requestContext: ApiRequestContext,
   originBucket: string | null,
   buildResponse: (dataVersion: string | null) => Promise<Response>,
 ): Promise<Response> {
   const dataVersion = await getLatestDataVersion(env.DB);
   const cacheUrl = new URL(request.url);
+  setOriginBucket(requestContext, originBucket);
   cacheUrl.searchParams.set("__v", dataVersion ?? "none");
   if (originBucket) {
     cacheUrl.searchParams.set("__origin_bucket", originBucket);
@@ -85,16 +70,17 @@ async function respondWithPublicCache(
   const cached = await cache.match(cacheKey);
 
   if (cached) {
-    return cached;
+    return withApiHeaders(cached, requestContext, { cacheStatus: "HIT" });
   }
 
   const response = await buildResponse(dataVersion);
+  const missResponse = withApiHeaders(response, requestContext, { cacheStatus: "MISS" });
 
-  if (response.ok) {
-    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  if (missResponse.ok) {
+    ctx.waitUntil(cache.put(cacheKey, missResponse.clone()));
   }
 
-  return response;
+  return missResponse;
 }
 
 function parseCoordinateParam(
@@ -195,22 +181,24 @@ export async function handleGetCenterMobility(
   env: WorkerEnv,
   ctx: ExecutionContext,
   request: Request,
+  requestContext: ApiRequestContext,
 ): Promise<Response> {
   let userLocation: { lat: number; lon: number } | null = null;
 
   try {
     userLocation = parseUserLocationFromRequest(request);
   } catch (error) {
-    return Response.json(
-      {
-        error: "Invalid query parameters",
-        detail: error instanceof Error ? error.message : "unknown_error",
-      },
-      {
-        status: 400,
-        headers: buildNoStoreHeaders(),
-      },
-    );
+    return createApiErrorResponse(requestContext, {
+      status: 400,
+      error: "Invalid query parameters",
+      detail: error instanceof Error ? error.message : "unknown_error",
+      errorType: "validation_error",
+      headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "origin_enriched",
+      upstreamStatus: "none",
+      dataState: "estimated",
+    });
   }
 
   try {
@@ -218,32 +206,50 @@ export async function handleGetCenterMobility(
       request,
       env,
       ctx,
+      requestContext,
       buildOriginBucket(userLocation?.lat, userLocation?.lon),
       async (dataVersion) => {
         const item = await buildCenterMobilityRuntime(slug, env, userLocation);
 
         if (!item) {
-          return Response.json(
-            {
-              error: "Center not found",
-            },
-            {
-              status: 404,
-              headers: buildNoStoreHeaders(),
-            },
-          );
+          return createApiErrorResponse(requestContext, {
+            status: 404,
+            error: "Center not found",
+            detail: slug,
+            errorType: "not_found",
+            headers: buildNoStoreHeaders(),
+            cacheStatus: "BYPASS",
+            dataScope: "origin_enriched",
+            upstreamStatus: "none",
+            dataState: "fallback",
+          });
         }
 
         const payload: GetCenterMobilityResponse = buildCenterMobilityResponsePayload(item);
 
-        return Response.json(payload, {
-          headers: buildPublicReadHeaders(dataVersion),
+        return createApiJsonResponse(requestContext, payload, {
+          headers: buildPublicCacheControl(MOBILITY_CACHE_TTL_SECONDS),
+          cacheStatus: "MISS",
+          dataScope: "origin_enriched",
+          upstreamStatus: buildMobilityUpstreamStatus(item),
+          dataState: classifyMobilityDataState(item, dataVersion),
+          dataVersion,
         });
       },
     );
   }
   catch (error) {
-    return buildInternalErrorResponse("center_mobility_failed", error);
+    return createApiErrorResponse(requestContext, {
+      status: 500,
+      error: "Internal server error",
+      detail: error instanceof Error ? error.message : "center_mobility_failed",
+      errorType: "internal_error",
+      headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "origin_enriched",
+      upstreamStatus: "none",
+      dataState: "estimated",
+    });
   }
 }
 
@@ -252,22 +258,24 @@ export async function handleGetCenterMobilitySummary(
   env: WorkerEnv,
   ctx: ExecutionContext,
   request: Request,
+  requestContext: ApiRequestContext,
 ): Promise<Response> {
   let userLocation: { lat: number; lon: number } | null = null;
 
   try {
     userLocation = parseUserLocationFromRequest(request);
   } catch (error) {
-    return Response.json(
-      {
-        error: "Invalid query parameters",
-        detail: error instanceof Error ? error.message : "unknown_error",
-      },
-      {
-        status: 400,
-        headers: buildNoStoreHeaders(),
-      },
-    );
+    return createApiErrorResponse(requestContext, {
+      status: 400,
+      error: "Invalid query parameters",
+      detail: error instanceof Error ? error.message : "unknown_error",
+      errorType: "validation_error",
+      headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "origin_enriched",
+      upstreamStatus: "none",
+      dataState: "estimated",
+    });
   }
 
   try {
@@ -275,20 +283,23 @@ export async function handleGetCenterMobilitySummary(
       request,
       env,
       ctx,
+      requestContext,
       buildOriginBucket(userLocation?.lat, userLocation?.lon),
       async (dataVersion) => {
         const item = await buildCenterMobilityRuntime(slug, env, userLocation);
 
         if (!item) {
-          return Response.json(
-            {
-              error: "Center not found",
-            },
-            {
-              status: 404,
-              headers: buildNoStoreHeaders(),
-            },
-          );
+          return createApiErrorResponse(requestContext, {
+            status: 404,
+            error: "Center not found",
+            detail: slug,
+            errorType: "not_found",
+            headers: buildNoStoreHeaders(),
+            cacheStatus: "BYPASS",
+            dataScope: "origin_enriched",
+            upstreamStatus: "none",
+            dataState: "fallback",
+          });
         }
 
         const payload: GetCenterMobilitySummaryResponse =
@@ -297,12 +308,27 @@ export async function handleGetCenterMobilitySummary(
             item,
           });
 
-        return Response.json(payload, {
-          headers: buildPublicReadHeaders(dataVersion),
+        return createApiJsonResponse(requestContext, payload, {
+          headers: buildPublicCacheControl(MOBILITY_CACHE_TTL_SECONDS),
+          cacheStatus: "MISS",
+          dataScope: "origin_enriched",
+          upstreamStatus: buildMobilityUpstreamStatus(item),
+          dataState: classifyMobilityDataState(item, dataVersion),
+          dataVersion,
         });
       },
     );
   } catch (error) {
-    return buildInternalErrorResponse("center_mobility_summary_failed", error);
+    return createApiErrorResponse(requestContext, {
+      status: 500,
+      error: "Internal server error",
+      detail: error instanceof Error ? error.message : "center_mobility_summary_failed",
+      errorType: "internal_error",
+      headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "origin_enriched",
+      upstreamStatus: "none",
+      dataState: "estimated",
+    });
   }
 }

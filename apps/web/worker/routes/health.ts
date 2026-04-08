@@ -1,4 +1,10 @@
 import type { WorkerEnv } from "../lib/db";
+import type { ApiRequestContext } from "../lib/observability";
+import {
+  buildNoStoreHeaders,
+  createApiErrorResponse,
+  createApiJsonResponse,
+} from "../lib/observability";
 
 const noStoreHeaders = {
   "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -6,28 +12,50 @@ const noStoreHeaders = {
   expires: "0",
 };
 
-export function handleHealth(_request: Request, env: WorkerEnv): Response {
-  return Response.json(
+export function handleHealth(
+  _request: Request,
+  env: WorkerEnv,
+  requestContext: ApiRequestContext,
+): Response {
+  return createApiJsonResponse(
+    requestContext,
     {
       ok: true,
       env: env.APP_ENV,
       timestamp: new Date().toISOString(),
     },
     {
-      headers: noStoreHeaders,
+      headers: {
+        ...buildNoStoreHeaders(),
+        ...noStoreHeaders,
+      },
+      cacheStatus: "BYPASS",
+      dataScope: "not_applicable",
+      upstreamStatus: "none",
+      dataState: "estimated",
     },
   );
 }
 
-export function handleApiNotFound(request: Request): Response {
-  return Response.json(
+export function handleApiNotFound(
+  request: Request,
+  requestContext: ApiRequestContext,
+): Response {
+  return createApiErrorResponse(
+    requestContext,
     {
       error: "Not Found",
-      path: new URL(request.url).pathname,
-    },
-    {
+      detail: new URL(request.url).pathname,
+      errorType: "not_found",
       status: 404,
-      headers: noStoreHeaders,
+      headers: {
+        ...buildNoStoreHeaders(),
+        ...noStoreHeaders,
+      },
+      cacheStatus: "BYPASS",
+      dataScope: "not_applicable",
+      upstreamStatus: "none",
+      dataState: "estimated",
     },
   );
 }

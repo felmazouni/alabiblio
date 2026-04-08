@@ -509,6 +509,7 @@ function installMemoryCache() {
 
 export function createWorkerScopeHarness() {
   const restoreCaches = installMemoryCache();
+  const pendingWaitUntil: Promise<unknown>[] = [];
   const env = {
     APP_ENV: "test",
     ASSETS: {
@@ -517,7 +518,8 @@ export function createWorkerScopeHarness() {
     DB: createFakeDb(),
   };
   const ctx = {
-    waitUntil() {
+    waitUntil(promise: Promise<unknown>) {
+      pendingWaitUntil.push(promise);
       return undefined;
     },
   };
@@ -529,11 +531,13 @@ export function createWorkerScopeHarness() {
       lon: -3.6898,
     },
     async request(pathname: string): Promise<Response> {
-      return worker.fetch(
+      const response = await worker.fetch(
         new Request(`https://example.test${pathname}`),
         env as never,
         ctx as never,
       );
+      await Promise.allSettled(pendingWaitUntil.splice(0));
+      return response;
     },
     async requestJson<T>(pathname: string): Promise<T> {
       const response = await this.request(pathname);

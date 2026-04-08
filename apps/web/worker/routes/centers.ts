@@ -38,6 +38,18 @@ import {
   buildListCentersResponsePayload,
   buildTopMobilityCentersResponsePayload,
 } from "../lib/centerPayloads";
+import type { ApiRequestContext } from "../lib/observability";
+import {
+  buildNoStoreHeaders,
+  buildPublicCacheControl,
+  buildTopMobilityUpstreamStatus,
+  classifyDataStateFromDataVersion,
+  classifyMobilityDataState,
+  createApiErrorResponse,
+  createApiJsonResponse,
+  setOriginBucket,
+  withApiHeaders,
+} from "../lib/observability";
 import { loadOriginTransportContext } from "../lib/originTransport";
 import {
   buildCenterFilters,
@@ -64,41 +76,11 @@ const SCHEDULE_AUDIENCE_ORDER: ScheduleAudience[] = [
   "secretaria",
 ];
 
-function buildPublicReadHeaders(
-  dataVersion: string | null,
-  ttlSeconds: number,
-): HeadersInit {
-  return {
-    "cache-control": `public, max-age=${ttlSeconds}, s-maxage=${ttlSeconds}, stale-while-revalidate=${ttlSeconds * 2}`,
-    ...(dataVersion ? { "x-data-version": dataVersion } : {}),
-  };
-}
-
-function buildNoStoreHeaders(): HeadersInit {
-  return {
-    "cache-control": "no-store",
-  };
-}
-
-function buildInternalErrorResponse(scope: string, error: unknown): Response {
-  console.error(`[${scope}]`, error);
-
-  return Response.json(
-    {
-      error: "Internal server error",
-      detail: scope,
-    },
-    {
-      status: 500,
-      headers: buildNoStoreHeaders(),
-    },
-  );
-}
-
 async function respondWithPublicCache(
   request: Request,
   env: WorkerEnv,
   ctx: ExecutionContext,
+  requestContext: ApiRequestContext,
   options: {
     ttlSeconds: number;
     originBucket?: string | null;
@@ -107,6 +89,9 @@ async function respondWithPublicCache(
 ): Promise<Response> {
   const dataVersion = await getLatestDataVersion(env.DB);
   const cacheUrl = new URL(request.url);
+  if (options.originBucket !== undefined) {
+    setOriginBucket(requestContext, options.originBucket);
+  }
   cacheUrl.searchParams.set("__v", dataVersion ?? "none");
   if (options.originBucket) {
     cacheUrl.searchParams.set("__origin_bucket", options.originBucket);
@@ -118,16 +103,17 @@ async function respondWithPublicCache(
   const cached = await cache.match(cacheKey);
 
   if (cached) {
-    return cached;
+    return withApiHeaders(cached, requestContext, { cacheStatus: "HIT" });
   }
 
   const response = await buildResponse(dataVersion);
+  const missResponse = withApiHeaders(response, requestContext, { cacheStatus: "MISS" });
 
-  if (response.ok) {
-    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  if (missResponse.ok) {
+    ctx.waitUntil(cache.put(cacheKey, missResponse.clone()));
   }
 
-  return response;
+  return missResponse;
 }
 
 function buildScheduleFromRecord(
@@ -355,6 +341,7 @@ export async function handleListCenters(
   request: Request,
   env: WorkerEnv,
   ctx: ExecutionContext,
+  requestContext: ApiRequestContext,
 ): Promise<Response> {
   const url = new URL(request.url);
   let query: ReturnType<typeof parseListCentersQuery>;
@@ -365,23 +352,27 @@ export async function handleListCenters(
       maxLimit: MAX_LIMIT,
     });
   } catch (error) {
-    return Response.json(
-      {
-        error: "Invalid query parameters",
-        detail: error instanceof Error ? error.message : "unknown_error",
-      },
-      {
-        status: 400,
-        headers: buildNoStoreHeaders(),
-      },
-    );
+    return createApiErrorResponse(requestContext, {
+      status: 400,
+      error: "Invalid query parameters",
+      detail: error instanceof Error ? error.message : "unknown_error",
+      errorType: "validation_error",
+      headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "base_exploration",
+      upstreamStatus: "none",
+      dataState: "estimated",
+    });
   }
+
+  setOriginBucket(requestContext, buildOriginBucket(query.user_lat, query.user_lon));
 
   try {
     return await respondWithPublicCache(
       request,
       env,
       ctx,
+      requestContext,
       {
         ttlSeconds: LIST_CACHE_TTL_SECONDS,
       },
@@ -427,14 +418,29 @@ export async function handleListCenters(
             : null,
         });
 
-        return Response.json(payload, {
-          headers: buildPublicReadHeaders(dataVersion, LIST_CACHE_TTL_SECONDS),
+        return createApiJsonResponse(requestContext, payload, {
+          headers: buildPublicCacheControl(LIST_CACHE_TTL_SECONDS),
+          cacheStatus: "MISS",
+          dataScope: "base_exploration",
+          upstreamStatus: "none",
+          dataState: classifyDataStateFromDataVersion(dataVersion, "estimated"),
+          dataVersion,
         });
       },
     );
   }
   catch (error) {
-    return buildInternalErrorResponse("list_centers_failed", error);
+    return createApiErrorResponse(requestContext, {
+      status: 500,
+      error: "Internal server error",
+      detail: error instanceof Error ? error.message : "list_centers_failed",
+      errorType: "internal_error",
+      headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "base_exploration",
+      upstreamStatus: "none",
+      dataState: "estimated",
+    });
   }
 }
 
@@ -442,6 +448,7 @@ export async function handleGetTopMobilityCenters(
   request: Request,
   env: WorkerEnv,
   ctx: ExecutionContext,
+  requestContext: ApiRequestContext,
 ): Promise<Response> {
   const url = new URL(request.url);
   let query: ReturnType<typeof parseListCentersQuery>;
@@ -452,30 +459,36 @@ export async function handleGetTopMobilityCenters(
       maxLimit: MAX_LIMIT,
     });
   } catch (error) {
-    return Response.json(
-      {
-        error: "Invalid query parameters",
-        detail: error instanceof Error ? error.message : "unknown_error",
-      },
-      {
-        status: 400,
-        headers: buildNoStoreHeaders(),
-      },
-    );
+    return createApiErrorResponse(requestContext, {
+      status: 400,
+      error: "Invalid query parameters",
+      detail: error instanceof Error ? error.message : "unknown_error",
+      errorType: "validation_error",
+      headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "origin_enriched",
+      upstreamStatus: "none",
+      dataState: "estimated",
+    });
   }
 
   const userLocation =
     query.user_lat !== undefined && query.user_lon !== undefined
       ? { lat: query.user_lat, lon: query.user_lon }
       : null;
+  setOriginBucket(requestContext, buildOriginBucket(query.user_lat, query.user_lon));
 
   if (!userLocation) {
     const emptyPayload: GetTopMobilityCentersResponse = buildTopMobilityCentersResponsePayload({
       items: [],
       open_count: 0,
     });
-    return Response.json(emptyPayload, {
+    return createApiJsonResponse(requestContext, emptyPayload, {
       headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "origin_enriched",
+      upstreamStatus: "origin:missing",
+      dataState: "fallback",
     });
   }
 
@@ -484,6 +497,7 @@ export async function handleGetTopMobilityCenters(
       request,
       env,
       ctx,
+      requestContext,
       {
         ttlSeconds: TOP_MOBILITY_CACHE_TTL_SECONDS,
         originBucket: buildOriginBucket(query.user_lat, query.user_lon),
@@ -544,13 +558,31 @@ export async function handleGetTopMobilityCenters(
           open_count: totalOpenCenters,
         });
 
-        return Response.json(payload, {
-          headers: buildPublicReadHeaders(dataVersion, TOP_MOBILITY_CACHE_TTL_SECONDS),
+        return createApiJsonResponse(requestContext, payload, {
+          headers: buildPublicCacheControl(TOP_MOBILITY_CACHE_TTL_SECONDS),
+          cacheStatus: "MISS",
+          dataScope: "origin_enriched",
+          upstreamStatus: buildTopMobilityUpstreamStatus(payload.items),
+          dataState:
+            payload.items[0]
+              ? classifyMobilityDataState(payload.items[0].item, dataVersion)
+              : classifyDataStateFromDataVersion(dataVersion, "fallback"),
+          dataVersion,
         });
       },
     );
   } catch (error) {
-    return buildInternalErrorResponse("top_mobility_failed", error);
+    return createApiErrorResponse(requestContext, {
+      status: 500,
+      error: "Internal server error",
+      detail: error instanceof Error ? error.message : "top_mobility_failed",
+      errorType: "internal_error",
+      headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "origin_enriched",
+      upstreamStatus: "none",
+      dataState: "estimated",
+    });
   }
 }
 
@@ -559,12 +591,14 @@ export async function handleGetCenterDetail(
   env: WorkerEnv,
   ctx: ExecutionContext,
   request: Request,
+  requestContext: ApiRequestContext,
 ): Promise<Response> {
   try {
     return await respondWithPublicCache(
       request,
       env,
       ctx,
+      requestContext,
       {
         ttlSeconds: DETAIL_CACHE_TTL_SECONDS,
       },
@@ -572,10 +606,17 @@ export async function handleGetCenterDetail(
         const detail = await getCenterBySlug(env.DB, slug);
 
         if (!detail) {
-          return Response.json(
-            { error: "Center not found" },
-            { status: 404, headers: buildNoStoreHeaders() },
-          );
+          return createApiErrorResponse(requestContext, {
+            status: 404,
+            error: "Center not found",
+            detail: slug,
+            errorType: "not_found",
+            headers: buildNoStoreHeaders(),
+            cacheStatus: "BYPASS",
+            dataScope: "base_exploration",
+            upstreamStatus: "none",
+            dataState: "estimated",
+          });
         }
 
         const [ser, nodeRows, featuresMap] = await Promise.all([
@@ -605,14 +646,29 @@ export async function handleGetCenterDetail(
           }),
         );
 
-        return Response.json(payload, {
-          headers: buildPublicReadHeaders(dataVersion, DETAIL_CACHE_TTL_SECONDS),
+        return createApiJsonResponse(requestContext, payload, {
+          headers: buildPublicCacheControl(DETAIL_CACHE_TTL_SECONDS),
+          cacheStatus: "MISS",
+          dataScope: "base_exploration",
+          upstreamStatus: "none",
+          dataState: classifyDataStateFromDataVersion(dataVersion, "estimated"),
+          dataVersion,
         });
       },
     );
   }
   catch (error) {
-    return buildInternalErrorResponse("center_detail_failed", error);
+    return createApiErrorResponse(requestContext, {
+      status: 500,
+      error: "Internal server error",
+      detail: error instanceof Error ? error.message : "center_detail_failed",
+      errorType: "internal_error",
+      headers: buildNoStoreHeaders(),
+      cacheStatus: "BYPASS",
+      dataScope: "base_exploration",
+      upstreamStatus: "none",
+      dataState: "estimated",
+    });
   }
 }
 
@@ -621,31 +677,45 @@ export async function handleGetCenterSchedule(
   env: WorkerEnv,
   ctx: ExecutionContext,
   request: Request,
+  requestContext: ApiRequestContext,
 ): Promise<Response> {
   return respondWithPublicCache(
     request,
     env,
     ctx,
-      {
-        ttlSeconds: DETAIL_CACHE_TTL_SECONDS,
-      },
-      async (dataVersion) => {
-        const detail = await getCenterBySlug(env.DB, slug);
+    requestContext,
+    {
+      ttlSeconds: DETAIL_CACHE_TTL_SECONDS,
+    },
+    async (dataVersion) => {
+      const detail = await getCenterBySlug(env.DB, slug);
 
-        if (!detail) {
-          return Response.json(
-            { error: "Center not found" },
-            { status: 404, headers: buildNoStoreHeaders() },
-          );
-        }
-
-        const payload: GetCenterScheduleResponse = {
-          item: buildScheduleFromRecord(detail.schedule, detail.source_last_updated),
-        };
-
-        return Response.json(payload, {
-          headers: buildPublicReadHeaders(dataVersion, DETAIL_CACHE_TTL_SECONDS),
+      if (!detail) {
+        return createApiErrorResponse(requestContext, {
+          status: 404,
+          error: "Center not found",
+          detail: slug,
+          errorType: "not_found",
+          headers: buildNoStoreHeaders(),
+          cacheStatus: "BYPASS",
+          dataScope: "base_exploration",
+          upstreamStatus: "none",
+          dataState: "estimated",
         });
-      },
+      }
+
+      const payload: GetCenterScheduleResponse = {
+        item: buildScheduleFromRecord(detail.schedule, detail.source_last_updated),
+      };
+
+      return createApiJsonResponse(requestContext, payload, {
+        headers: buildPublicCacheControl(DETAIL_CACHE_TTL_SECONDS),
+        cacheStatus: "MISS",
+        dataScope: "base_exploration",
+        upstreamStatus: "none",
+        dataState: classifyDataStateFromDataVersion(dataVersion, "estimated"),
+        dataVersion,
+      });
+    },
   );
 }

@@ -20,12 +20,22 @@ export type CenterScopedEndpoint =
   | "center_mobility"
   | "center_mobility_summary";
 
+export type ApiCacheStatusV1 = "HIT" | "MISS" | "BYPASS";
+
+export type ApiDataStateV1 =
+  | "realtime"
+  | "estimated"
+  | "fallback"
+  | "stale";
+
 export interface CenterResponseMetaV1<
   TScope extends CenterComputationScope = CenterComputationScope,
   TEndpoint extends CenterScopedEndpoint = CenterScopedEndpoint,
 > {
   scope: TScope;
   endpoint: TEndpoint;
+  data_state?: ApiDataStateV1;
+  upstream_status?: string;
 }
 
 export const CENTER_SCOPE_DESCRIPTORS_V1: Record<

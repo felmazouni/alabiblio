@@ -1,7 +1,9 @@
 {
   "meta": {
     "scope": "base_exploration",
-    "endpoint": "list_centers"
+    "endpoint": "list_centers",
+    "data_state": "estimated",
+    "upstream_status": "none"
   },
   "total": 2,
   "open_count": 1,
