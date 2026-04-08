@@ -1,8 +1,9 @@
-import type { CenterDecisionCardItem } from "@alabiblio/contracts/centers";
+import type { CenterListBaseItemV1 } from "@alabiblio/contracts/centers";
 import type {
   BikeModuleV1,
   BusModuleV1,
   CenterMobility,
+  CenterTopMobilityCardV1,
   MetroModuleV1,
   MobilityHighlightV1,
   MobilityMode,
@@ -32,6 +33,13 @@ export type TransportFooterTile = {
   body: string;
 };
 
+function joinParts(parts: Array<string | null | undefined>, separator = " 路 "): string {
+  return parts
+    .map((part) => cleanText(part))
+    .filter((part): part is string => part.length > 0)
+    .join(separator);
+}
+
 function buildBoardDetail(
   kind: "route" | "origin" | "destination" | "time" | "availability" | "note",
   text: string | null | undefined,
@@ -42,7 +50,7 @@ function buildBoardDetail(
 
 function cleanText(value: string | null | undefined): string {
   return repairMojibake(value ?? "")
-    .replace(/[窌]/g, "-")
+    .replace(/[路鈥/g, "-")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -103,7 +111,7 @@ export function modeLabel(mode: CenterMobility["summary"]["best_mode"]): string 
 }
 
 export function buildHumanReason(mobility: CenterMobility | null): string {
-  if (!mobility) return "Estamos actualizando la mejor alternativa de llegada.";
+  if (!mobility) return "Actualizando la mejor llegada.";
 
   const meaningful = mobility.summary.rationale
     .map((entry) => cleanText(entry))
@@ -120,115 +128,109 @@ export function buildHumanReason(mobility: CenterMobility | null): string {
   switch (mobility.summary.best_mode) {
     case "car":
       return lead === "Coche con contexto SER"
-        ? "La opcion mas rapida ahora es coche por tiempo total y contexto SER."
-        : "La opcion mas rapida ahora es coche por tiempo total.";
+        ? "Coche es la llegada mas rapida con contexto SER."
+        : "Coche es la llegada mas rapida.";
     case "bus":
       return lead === "EMT con llegada proxima"
-        ? "EMT queda arriba por espera corta y trayecto util."
-        : "EMT sigue siendo util con la mejor llegada estimada disponible.";
+        ? "EMT ofrece la mejor llegada util."
+        : "EMT sigue siendo la mejor opcion disponible.";
     case "bike":
       return lead === "BiciMAD con stock y anclaje"
-        ? "BiciMAD queda arriba por tiempo total y stock util."
-        : "BiciMAD queda arriba por tiempo total.";
+        ? "BiciMAD compensa por tiempo y disponibilidad."
+        : "BiciMAD compensa mejor en este trayecto.";
     case "metro":
-      return "Metro compensa mejor el acceso y el tiempo total.";
+      return "Metro equilibra acceso y tiempo total.";
     case "walk":
-      return "Ir andando sigue siendo la opcion mas directa desde tu origen.";
+      return "Ir andando es la opcion mas directa.";
     default:
-      return "Mostramos la mejor alternativa util con los datos disponibles.";
+      return "Mostramos la mejor opcion disponible.";
   }
 }
 
 export function buildCarCopy(mobility: CenterMobility | null): string {
-  if (!mobility) return "Calculando trayecto en coche.";
+  if (!mobility) return "Calculando coche.";
 
   const car = mobility.modules.car;
-  if (car.eta_min === null) return "No hay una estimacion fiable en coche para este origen.";
+  if (car.eta_min === null) return "Sin estimacion fiable en coche.";
 
-  const parts = [`${car.eta_min} min`];
-  if (car.distance_m !== null) {
-    parts.push(formatDistanceCompact(car.distance_m) ?? "");
-  }
+  const parts = [`${car.eta_min} min`, formatDistanceCompact(car.distance_m)];
   const serCopy = buildSerCopy(car.ser_enabled, car.ser_zone_name);
   if (serCopy) parts.push(serCopy);
-  return parts.filter(Boolean).join(" - ");
+  return joinParts(parts);
 }
 
 function buildBusDegradation(bus: BusModuleV1): string {
   if (bus.selected_line && bus.origin_stop) {
-    const parts = [
-      `Linea ${bus.selected_line}`,
-      `subida en ${trimLabel(bus.origin_stop.name, 22)}`,
-    ];
+    const parts = [`L${bus.selected_line}`, `Sube en ${trimLabel(bus.origin_stop.name, 22)}`];
 
     if (bus.destination_stop) {
-      parts.push(`bajada en ${trimLabel(bus.destination_stop.name, 22)}`);
+      parts.push(`Baja en ${trimLabel(bus.destination_stop.name, 22)}`);
     }
 
     if (bus.estimated_total_min !== null) {
-      parts.push(`llegada estimada ${bus.estimated_total_min} min`);
+      parts.push(`Llegada estimada ${bus.estimated_total_min} min`);
     }
 
     if (bus.estimated_travel_min !== null) {
-      parts.push(`viaje ${bus.estimated_travel_min} min`);
+      parts.push(`Viaje ${bus.estimated_travel_min} min`);
     }
 
-    return parts.join(" - ");
+    return joinParts(parts);
   }
 
   if (bus.origin_stop && bus.realtime_status !== "available") {
-    return `Parada ${trimLabel(bus.origin_stop.name, 22)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - llegada estimada`;
+    return joinParts([
+      trimLabel(bus.origin_stop.name, 22),
+      bus.estimated_total_min !== null ? `Llegada estimada ${bus.estimated_total_min} min` : "Llegada estimada",
+    ]);
   }
 
   if (bus.origin_stop) {
-    return `Parada ${trimLabel(bus.origin_stop.name, 22)} a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"} - sin linea directa util desde tu origen`;
+    return joinParts([trimLabel(bus.origin_stop.name, 22), "Sin linea directa clara"]);
   }
 
   if (bus.destination_stop) {
-    return "No vemos una parada de salida clara cerca de tu origen.";
+    return "No vemos una parada clara de salida.";
   }
 
-  return "No encontramos una opcion EMT clara para este trayecto.";
+  return "No vemos una opcion EMT clara.";
 }
 
 export function buildBusCopy(mobility: CenterMobility | null): string {
-  if (!mobility) return "Calculando opcion EMT.";
+  if (!mobility) return "Calculando EMT.";
 
   const bus = mobility.modules.bus;
   if (bus.selected_line && bus.origin_stop) {
-    const parts = [
-      `Linea ${bus.selected_line}`,
-      `subida en ${trimLabel(bus.origin_stop.name, 22)}`,
-    ];
+    const parts = [`L${bus.selected_line}`, `Sube en ${trimLabel(bus.origin_stop.name, 22)}`];
 
     if (bus.destination_stop) {
-      parts.push(`bajada en ${trimLabel(bus.destination_stop.name, 22)}`);
+      parts.push(`Baja en ${trimLabel(bus.destination_stop.name, 22)}`);
     }
 
     if (bus.next_arrival_min !== null) {
-      parts.push(`espera ${bus.next_arrival_min} min`);
+      parts.push(`Espera ${bus.next_arrival_min} min`);
     } else if (bus.estimated_total_min !== null) {
-      parts.push(`llegada estimada ${bus.estimated_total_min} min`);
+      parts.push(`Llegada estimada ${bus.estimated_total_min} min`);
     } else {
-      parts.push("llegada estimada");
+      parts.push("Llegada estimada");
     }
 
     if (bus.estimated_travel_min !== null) {
-      parts.push(`viaje ${bus.estimated_travel_min} min`);
+      parts.push(`Viaje ${bus.estimated_travel_min} min`);
     }
 
-    return parts.join(" - ");
+    return joinParts(parts);
   }
 
   return buildBusDegradation(bus);
 }
 
 export function buildBikeCopy(mobility: CenterMobility | null): string {
-  if (!mobility) return "Calculando opcion BiciMAD.";
+  if (!mobility) return "Calculando BiciMAD.";
 
   const bike = mobility.modules.bike;
   if (!bike.origin_station && !bike.destination_station) {
-    return "No vemos una combinacion BiciMAD clara para este trayecto.";
+    return "No vemos una combinacion BiciMAD clara.";
   }
 
   const parts: string[] = [];
@@ -237,54 +239,51 @@ export function buildBikeCopy(mobility: CenterMobility | null): string {
   if (bike.origin_station) {
     const distance = formatDistanceCompact(bike.origin_station.distance_m) ?? "poca distancia";
     const bikes = bike.bikes_available !== null ? ` con ${bike.bikes_available} bicis` : "";
-    parts.push(`origen: ${stationRef(bike.origin_station.station_number, bike.origin_station.name)} a ${distance}${bikes}`);
+    parts.push(`Origen: ${stationRef(bike.origin_station.station_number, bike.origin_station.name)} a ${distance}${bikes}`);
   } else {
-    parts.push("origen sin estacion util");
+    parts.push("Origen sin estacion clara");
   }
 
   if (bike.destination_station) {
     const distance = formatDistanceCompact(bike.destination_station.distance_m) ?? "poca distancia";
     const docks = bike.docks_available !== null ? ` con ${bike.docks_available} anclajes` : "";
-    parts.push(`destino: ${stationRef(bike.destination_station.station_number, bike.destination_station.name)} a ${distance}${docks}`);
+    parts.push(`Destino: ${stationRef(bike.destination_station.station_number, bike.destination_station.name)} a ${distance}${docks}`);
   } else {
-    parts.push("destino sin estacion util");
+    parts.push("Destino sin estacion clara");
   }
 
-  return parts.join(" - ");
+  return joinParts(parts);
 }
 
 export function buildMetroCopy(mobility: CenterMobility | null): string {
-  if (!mobility) return "Calculando opcion de metro.";
+  if (!mobility) return "Calculando metro.";
 
   const metro = mobility.modules.metro;
   if (!metro.origin_station && !metro.destination_station) {
-    return "No vemos una combinacion de metro clara para este trayecto.";
+    return "No vemos una combinacion de metro clara.";
   }
 
   const parts: string[] = [];
-  if (metro.eta_min !== null) parts.push(`${metro.eta_min} min`);
-
   if (metro.origin_station) {
     const lines = metro.line_labels.slice(0, 3).join(", ") || metro.origin_station.lines.slice(0, 2).join(", ");
     const walk = formatWalkMinutesFromMeters(metro.origin_station.distance_m);
     parts.push(
-      `${trimLabel(metro.origin_station.name, 20)}${lines ? ` (${lines})` : ""}${walk ? ` a ${walk} andando` : ""}`,
+      `${trimLabel(metro.origin_station.name, 20)}${lines ? ` 路 ${lines}` : ""}${walk ? ` 路 Origen a ${walk}` : ""}`,
     );
   } else {
-    parts.push("origen sin estacion util");
+    parts.push("Origen sin estacion clara");
   }
 
   if (metro.destination_station) {
-    const lines = metro.destination_station.lines.slice(0, 2).join(", ");
     const walk = formatWalkMinutesFromMeters(metro.destination_station.distance_m);
     parts.push(
-      `salida ${trimLabel(metro.destination_station.name, 20)}${lines ? ` (${lines})` : ""}${walk ? ` a ${walk}` : ""}`,
+      `Destino: ${trimLabel(metro.destination_station.name, 20)}${walk ? ` 路 Destino a ${walk}` : ""}`,
     );
   } else {
-    parts.push("destino sin estacion clara");
+    parts.push("Destino sin estacion clara");
   }
 
-  return parts.join(" - ");
+  return joinParts(parts);
 }
 
 export function buildModuleNote(
@@ -295,29 +294,29 @@ export function buildModuleNote(
 
   const state = mobility.modules[mode].state;
   if (state === "degraded_upstream") {
-    if (mode === "bus") return "Mostramos llegada estimada mientras EMT no responde a tiempo.";
-    if (mode === "bike") return "BiciMAD no esta devolviendo disponibilidad en tiempo real.";
-    return "Mostramos una estimacion util con datos parciales.";
+    if (mode === "bus") return "EMT no respondio a tiempo; mostramos estimacion.";
+    if (mode === "bike") return "BiciMAD no devuelve disponibilidad en tiempo real.";
+    return "Mostramos una estimacion con datos parciales.";
   }
 
   if (state === "degraded_missing_anchor") {
-    if (mode === "bus") return "Usamos la mejor parada cercana aunque no haya linea directa clara.";
-    if (mode === "bike") return "Falta una estacion util para cerrar el trayecto completo.";
-    if (mode === "metro") return "Falta una estacion clara para completar el trayecto.";
-    return "Faltan datos para cerrar esta estimacion.";
+    if (mode === "bus") return "Usamos la mejor parada cercana.";
+    if (mode === "bike") return "Falta una estacion para cerrar el trayecto.";
+    if (mode === "metro") return "Falta una estacion para completar el trayecto.";
+    return "Faltan anchors para cerrar la estimacion.";
   }
 
   if (state === "partial") {
-    if (mode === "bus") return "Mostramos la mejor alternativa EMT con llegada estimada.";
-    if (mode === "bike") return "Mostramos estaciones utiles aunque falte parte del tiempo real.";
-    if (mode === "metro") return "Mostramos estaciones y lineas aunque el tiempo sea aproximado.";
-    return "Mostramos una estimacion util con datos parciales.";
+    if (mode === "bus") return "Mostramos la mejor alternativa EMT disponible.";
+    if (mode === "bike") return "Mostramos estaciones utiles con disponibilidad parcial.";
+    if (mode === "metro") return "Mostramos estaciones y lineas con tiempo aproximado.";
+    return "Mostramos una estimacion parcial.";
   }
 
   if (state === "unavailable") {
-    if (mode === "bus") return "No hay una alternativa EMT suficiente con el origen actual.";
-    if (mode === "bike") return "No hay una combinacion BiciMAD suficiente con el origen actual.";
-    if (mode === "metro") return "No hay una alternativa de metro suficiente con el origen actual.";
+    if (mode === "bus") return "No hay una alternativa EMT suficiente.";
+    if (mode === "bike") return "No hay una combinacion BiciMAD suficiente.";
+    if (mode === "metro") return "No hay una alternativa de metro suficiente.";
     return "No hay datos suficientes para este modo.";
   }
 
@@ -345,12 +344,12 @@ export function humanizeHighlightLabel(label: string): string {
   const normalized = cleanText(label);
 
   return normalized
-    .replace(/Bus\s+([A-Z0-9]+)\s*[-]\s*(\d+)\s*min/i, "Bus $1 - llega en $2 min")
-    .replace(/Bus\s+([A-Z0-9]+)\s*[路-]\s*(\d+)\s*min/i, "Bus $1 - llega en $2 min")
-    .replace(/Bus\s*[路-]\s*sin linea util/i, "Sin linea directa util desde tu origen")
-    .replace(/Bici\s+(\d+)\s*min\s*[路-]\s*x(\d+)/i, "Bici $1 min - $2 bicis cerca")
-    .replace(/Metro\s+(\d+)\s*min$/i, "Metro $1 min - estacion cercana")
-    .replace(/Coche\s+(\d+)\s*min\s*[路-]\s*SER\s*(.+)$/i, "Coche $1 min - SER $2")
+    .replace(/Bus\s+([A-Z0-9]+)\s*[-]\s*(\d+)\s*min/i, "Bus $1 路 llega en $2 min")
+    .replace(/Bus\s+([A-Z0-9]+)\s*[路-]\s*(\d+)\s*min/i, "Bus $1 路 llega en $2 min")
+    .replace(/Bus\s*[路-]\s*sin linea util/i, "Sin linea directa clara")
+    .replace(/Bici\s+(\d+)\s*min\s*[路-]\s*x(\d+)/i, "Bici $1 min 路 $2 bicis cerca")
+    .replace(/Metro\s+(\d+)\s*min$/i, "Metro $1 min 路 estacion cercana")
+    .replace(/Coche\s+(\d+)\s*min\s*[路-]\s*SER\s*(.+)$/i, "Coche $1 min 路 SER $2")
     .trim();
 }
 
@@ -360,40 +359,31 @@ function buildHighlightRowFromSummary(highlight: MobilityHighlightV1): Secondary
   return { label, body };
 }
 
-export function buildSecondaryCardHighlights(center: CenterDecisionCardItem): SecondaryCardHighlightRow[] {
-  const rows = [
-    center.mobility_highlights.primary,
-    center.mobility_highlights.secondary,
-  ]
-    .filter((value): value is MobilityHighlightV1 => value !== null)
-    .map((highlight) => buildHighlightRowFromSummary(highlight));
+export function buildBaseExplorationHighlights(center: CenterListBaseItemV1): SecondaryCardHighlightRow[] {
+  const rows: SecondaryCardHighlightRow[] = [];
 
-  const usedLabels = new Set(rows.map((row) => row.label));
-
-  if (
-    rows.length < 3 &&
-    !usedLabels.has("COCHE") &&
-    center.decision.best_mode === "car" &&
-    center.decision.best_time_minutes !== null
-  ) {
-    const serCopy = buildSerCopy(center.ser?.enabled ?? false, center.ser?.zone_name ?? null);
+  if (center.ser?.enabled) {
     rows.push({
-      label: "COCHE",
-      body: [`${center.decision.best_time_minutes} min`, serCopy].filter(Boolean).join(" - "),
-    });
-    usedLabels.add("COCHE");
-  }
-
-  if (rows.length < 3 && !usedLabels.has("A PIE") && center.decision.distance_m !== null) {
-    const walkMinutes = formatWalkMinutesFromMeters(center.decision.distance_m);
-    const distance = formatDistanceCompact(center.decision.distance_m);
-    rows.push({
-      label: "A PIE",
-      body: [walkMinutes, distance].filter(Boolean).join(" - "),
+      label: "SER",
+      body: center.ser.zone_name ? `Zona ${center.ser.zone_name}` : "Zona SER activa",
     });
   }
 
-  return rows.slice(0, 3);
+  if (center.capacity_value !== null) {
+    rows.push({
+      label: "AFORO",
+      body: `${center.capacity_value} plazas`,
+    });
+  }
+
+  if (center.schedule_confidence_label === "low") {
+    rows.push({
+      label: "HORARIO",
+      body: "Horario con confirmacion baja",
+    });
+  }
+
+  return rows.slice(0, 2);
 }
 
 function buildBusBoardContent(bus: BusModuleV1): Pick<TransportBoardRow, "headline" | "details"> {
@@ -438,13 +428,13 @@ function buildBusBoardContent(bus: BusModuleV1): Pick<TransportBoardRow, "headli
       headline: trimLabel(bus.origin_stop.name, 20),
       details: [
         buildBoardDetail("origin", `Parada a ${formatDistanceCompact(bus.origin_stop.distance_m) ?? "poca distancia"}`),
-        buildBoardDetail("note", "Sin linea directa util"),
+        buildBoardDetail("note", "Sin linea directa clara"),
       ].filter((value): value is NonNullable<typeof value> => Boolean(value)),
     };
   }
 
   return {
-    headline: "Sin linea util",
+    headline: "Sin linea clara",
     details: [buildBoardDetail("note", "No vemos una opcion EMT clara")].filter((value): value is NonNullable<typeof value> => Boolean(value)),
   };
 }
@@ -457,7 +447,7 @@ function buildBikeBoardContent(bike: BikeModuleV1): Pick<TransportBoardRow, "hea
     ? `${stationRef(bike.destination_station.station_number, bike.destination_station.name)}${bike.docks_available !== null ? ` - ${bike.docks_available} anclajes` : ""}`
     : "destino sin estacion";
   return {
-    headline: bike.eta_min !== null ? `Trayecto BiciMAD ${bike.eta_min} min` : "Trayecto BiciMAD",
+    headline: "Red BiciMAD",
     details: [
       buildBoardDetail("origin", `Origen: ${origin}`),
       buildBoardDetail("destination", `Destino: ${destination}`),
@@ -541,7 +531,7 @@ export function buildFeaturedTransportRows(
 
 export function buildFeaturedFooterTiles(
   mobility: CenterMobility | null,
-  center: Pick<CenterDecisionCardItem, "ser" | "decision"> | null,
+  center: Pick<CenterTopMobilityCardV1, "ser" | "decision"> | null,
 ): TransportFooterTile[] {
   const car = mobility?.modules.car ?? null;
   const walkingMinutes = mobility?.origin_dependent.walking_eta_min ?? null;
@@ -555,15 +545,15 @@ export function buildFeaturedFooterTiles(
       label: "COCHE",
       body:
         car && car.eta_min !== null
-          ? [`${car.eta_min} min`, formatDistanceCompact(car.distance_m ?? distance), serCopy].filter(Boolean).join(" - ")
-          : serCopy ?? "Trayecto en coche sin estimacion fiable",
+          ? joinParts([`${car.eta_min} min`, formatDistanceCompact(car.distance_m ?? distance), serCopy])
+          : serCopy ?? "Sin estimacion fiable en coche",
     },
     {
       mode: "walk",
       label: walkingMinutes !== null ? "A PIE" : "DISTANCIA",
       body:
         walkingMinutes !== null
-          ? [`${walkingMinutes} min`, formatDistanceCompact(distance)].filter(Boolean).join(" - ")
+          ? joinParts([`${walkingMinutes} min`, formatDistanceCompact(distance)])
           : formatDistanceCompact(distance) ?? "Sin distancia estimada",
     },
   ];

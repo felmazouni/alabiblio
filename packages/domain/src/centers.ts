@@ -1,17 +1,17 @@
 import type {
   CenterDetailDecisionItem,
   CenterKind,
+  CenterListBaseItemV1,
   CenterRecord,
   CenterSerInfo,
   CenterSourceSummary,
-  CenterDecisionCardItem,
   CenterDecisionSummary,
   CenterSchedulePayload,
   CenterServicesV1,
 } from "@alabiblio/contracts/centers";
 import type { CenterFeature } from "@alabiblio/contracts/features";
 import type {
-  MobilityHighlightsV1,
+  CenterTopMobilityCardV1,
   StaticTransportAnchorsV1,
 } from "@alabiblio/contracts/mobility";
 
@@ -90,14 +90,12 @@ export function buildCenterServices(center: Pick<
   };
 }
 
-export function toCenterDecisionCardItem(input: {
+export function toCenterListBaseItem(input: {
   center: CenterRecord;
   schedule: CenterSchedulePayload;
   ser: { enabled: boolean; zone_name: string | null } | null;
-  decision: CenterDecisionSummary;
-  mobilityHighlights: MobilityHighlightsV1;
-}): CenterDecisionCardItem {
-  const { center, schedule, ser, decision, mobilityHighlights } = input;
+}): CenterListBaseItemV1 {
+  const { center, schedule, ser } = input;
 
   return {
     id: center.id,
@@ -120,8 +118,32 @@ export function toCenterDecisionCardItem(input: {
     ),
     opens_today: schedule.opens_today,
     closes_today: schedule.closes_today,
+  };
+}
+
+export function toCenterTopMobilityCardItem(input: {
+  center: CenterRecord;
+  schedule: CenterSchedulePayload;
+  ser: { enabled: boolean; zone_name: string | null } | null;
+  decision: CenterDecisionSummary;
+}): CenterTopMobilityCardV1 {
+  const { center, schedule, ser, decision } = input;
+
+  return {
+    id: center.id,
+    slug: center.slug,
+    kind: center.kind,
+    kind_label: getCenterKindLabel(center.kind),
+    name: center.name,
+    district: center.district,
+    neighborhood: center.neighborhood,
+    address_line: center.address_line,
+    is_open_now: schedule.is_open_now,
+    opens_today: schedule.opens_today,
+    closes_today: schedule.closes_today,
+    today_human_schedule: schedule.today_human_schedule,
     decision,
-    mobility_highlights: mobilityHighlights,
+    ser,
   };
 }
 

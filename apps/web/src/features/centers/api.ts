@@ -13,6 +13,16 @@ import type {
   GetOriginPresetsResponse,
 } from "@alabiblio/contracts/origin";
 import { sanitizeApiPayload } from "../../lib/displayText";
+import {
+  requireBaseCatalogResponse,
+  requireBaseCenterDetailResponse,
+  requireOriginCenterMobilityResponse,
+  requireOriginTopMobilityResponse,
+} from "./scopedResponses";
+
+const FETCH_RETRY_ATTEMPTS = 2;
+const FETCH_RETRY_DELAY_MS = 250;
+const FETCH_TIMEOUT_MS = 6000;
 
 async function readSanitizedJson<T>(response: Response): Promise<T> {
   const payload = await response.json() as T;
@@ -23,30 +33,82 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+function createTimeoutController(parentSignal?: AbortSignal): {
+  signal: AbortSignal;
+  wasTimedOut: () => boolean;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  let timedOut = false;
+
+  const timeoutId = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort(new DOMException("Request timed out", "AbortError"));
+  }, FETCH_TIMEOUT_MS);
+
+  const abortFromParent = () => controller.abort(parentSignal?.reason);
+
+  if (parentSignal) {
+    if (parentSignal.aborted) {
+      abortFromParent();
+    } else {
+      parentSignal.addEventListener("abort", abortFromParent, { once: true });
+    }
+  }
+
+  return {
+    signal: controller.signal,
+    wasTimedOut: () => timedOut,
+    cleanup: () => {
+      window.clearTimeout(timeoutId);
+      parentSignal?.removeEventListener("abort", abortFromParent);
+    },
+  };
+}
+
 async function fetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit & { signal?: AbortSignal } = {},
 ): Promise<Response> {
-  const attempts = 2;
   let lastError: unknown = null;
 
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
+  for (let attempt = 0; attempt < FETCH_RETRY_ATTEMPTS; attempt += 1) {
+    const timeoutController = createTimeoutController(init.signal);
+
     try {
-      const response = await fetch(input, init);
-      if (response.status >= 500 && response.status < 600 && attempt < attempts - 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
+      const response = await fetch(input, {
+        ...init,
+        signal: timeoutController.signal,
+      });
+      if (
+        response.status >= 500 &&
+        response.status < 600 &&
+        attempt < FETCH_RETRY_ATTEMPTS - 1
+      ) {
+        await new Promise((resolve) => window.setTimeout(resolve, FETCH_RETRY_DELAY_MS));
         continue;
       }
       return response;
     } catch (error) {
+      if (timeoutController.wasTimedOut()) {
+        lastError = new Error("request_timeout");
+        if (attempt >= FETCH_RETRY_ATTEMPTS - 1) {
+          throw lastError;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, FETCH_RETRY_DELAY_MS));
+        continue;
+      }
+
       if (isAbortError(error) || init.signal?.aborted) {
         throw error;
       }
       lastError = error;
-      if (!(error instanceof TypeError) || attempt >= attempts - 1) {
+      if (!(error instanceof TypeError) || attempt >= FETCH_RETRY_ATTEMPTS - 1) {
         throw error;
       }
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      await new Promise((resolve) => window.setTimeout(resolve, FETCH_RETRY_DELAY_MS));
+    } finally {
+      timeoutController.cleanup();
     }
   }
 
@@ -131,7 +193,7 @@ export async function fetchCenters(
     throw new Error(`centers_list_${response.status}`);
   }
 
-  return readSanitizedJson<ListCentersResponse>(response);
+  return requireBaseCatalogResponse(await readSanitizedJson<ListCentersResponse>(response));
 }
 
 export async function fetchTopMobilityCenters(
@@ -147,7 +209,9 @@ export async function fetchTopMobilityCenters(
     throw new Error(`top_mobility_${response.status}`);
   }
 
-  return readSanitizedJson<GetTopMobilityCentersResponse>(response);
+  return requireOriginTopMobilityResponse(
+    await readSanitizedJson<GetTopMobilityCentersResponse>(response),
+  );
 }
 
 export async function fetchCenterDetail(
@@ -164,7 +228,9 @@ export async function fetchCenterDetail(
     throw new Error(`center_detail_${response.status}`);
   }
 
-  return readSanitizedJson<GetCenterDetailResponse>(response);
+  return requireBaseCenterDetailResponse(
+    await readSanitizedJson<GetCenterDetailResponse>(response),
+  );
 }
 
 export async function fetchCenterMobility(
@@ -193,7 +259,9 @@ export async function fetchCenterMobility(
     throw new Error(`center_mobility_${response.status}`);
   }
 
-  return readSanitizedJson<GetCenterMobilityResponsePayload>(response);
+  return requireOriginCenterMobilityResponse(
+    await readSanitizedJson<GetCenterMobilityResponsePayload>(response),
+  );
 }
 
 export async function fetchCenterMobilitySummary(

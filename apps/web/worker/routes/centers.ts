@@ -1,16 +1,14 @@
 import type {
-  CenterDecisionSummary,
-  CenterSortBy,
   GetCenterDetailResponse,
   GetCenterScheduleResponse,
-  ListCentersQuery,
   ListCentersResponse,
   ScheduleAudience,
 } from "@alabiblio/contracts/centers";
 import type { GetTopMobilityCentersResponse } from "@alabiblio/contracts/mobility";
 import {
-  toCenterDecisionCardItem,
+  toCenterListBaseItem,
   toCenterDetailDecisionItem,
+  toCenterTopMobilityCardItem,
 } from "@alabiblio/domain/centers";
 import {
   buildStaticTransportAnchors,
@@ -35,7 +33,18 @@ import {
 import {
   groupDestinationTransportNodes,
 } from "../lib/mobility";
+import {
+  buildCenterDetailResponsePayload,
+  buildListCentersResponsePayload,
+  buildTopMobilityCentersResponsePayload,
+} from "../lib/centerPayloads";
 import { loadOriginTransportContext } from "../lib/originTransport";
+import {
+  buildCenterFilters,
+  buildOriginBucket,
+  parseListCentersQuery,
+  toBaseExplorationQuery,
+} from "../lib/centersQuery";
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 48;
@@ -86,18 +95,6 @@ function buildInternalErrorResponse(scope: string, error: unknown): Response {
   );
 }
 
-function buildOriginBucket(lat: number | undefined, lon: number | undefined): string | null {
-  if (lat === undefined || lon === undefined) {
-    return null;
-  }
-
-  const resolution = 0.002;
-  const latBucket = (Math.round(lat / resolution) * resolution).toFixed(3);
-  const lonBucket = (Math.round(lon / resolution) * resolution).toFixed(3);
-
-  return `${latBucket},${lonBucket}`;
-}
-
 async function respondWithPublicCache(
   request: Request,
   env: WorkerEnv,
@@ -133,147 +130,6 @@ async function respondWithPublicCache(
   return response;
 }
 
-function parseIntegerParam(
-  value: string | null,
-  fallback: number,
-  { min, max }: { min: number; max: number },
-): number {
-  if (value === null) {
-    return fallback;
-  }
-
-  if (!/^\d+$/.test(value)) {
-    throw new Error("invalid_integer");
-  }
-
-  const parsed = Number(value);
-
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error("invalid_integer_range");
-  }
-
-  return parsed;
-}
-
-function parseBooleanParam(value: string | null): boolean | undefined {
-  if (value === null) {
-    return undefined;
-  }
-
-  if (value === "true" || value === "1") {
-    return true;
-  }
-
-  if (value === "false" || value === "0") {
-    return false;
-  }
-
-  throw new Error("invalid_boolean");
-}
-
-function parseCoordinateParam(
-  value: string | null,
-  { min, max }: { min: number; max: number },
-): number | undefined {
-  if (value === null) {
-    return undefined;
-  }
-
-  const parsed = Number(value);
-
-  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
-    throw new Error("invalid_coordinate");
-  }
-
-  return parsed;
-}
-
-function parseSortByParam(value: string | null): CenterSortBy | undefined {
-  if (value === null || value === "") {
-    return undefined;
-  }
-
-  if (
-    value === "recommended" ||
-    value === "distance" ||
-    value === "arrival" ||
-    value === "open_now"
-  ) {
-    return value;
-  }
-
-  throw new Error("invalid_sort_by");
-}
-
-function parseListCentersQuery(
-  url: URL,
-): Required<Pick<ListCentersQuery, "limit" | "offset">> &
-  Pick<
-    ListCentersQuery,
-    | "kind"
-    | "q"
-    | "open_now"
-    | "has_wifi"
-    | "has_sockets"
-    | "accessible"
-    | "open_air"
-    | "has_ser"
-    | "district"
-    | "neighborhood"
-    | "sort_by"
-    | "user_lat"
-    | "user_lon"
-  > {
-  const kind = url.searchParams.get("kind");
-  const q = url.searchParams.get("q")?.trim() ?? "";
-  const limit = parseIntegerParam(url.searchParams.get("limit"), DEFAULT_LIMIT, {
-    min: 1,
-    max: MAX_LIMIT,
-  });
-  const offset = parseIntegerParam(url.searchParams.get("offset"), 0, {
-    min: 0,
-    max: 5000,
-  });
-
-  if (kind !== null && kind !== "study_room" && kind !== "library") {
-    throw new Error("invalid_kind");
-  }
-
-  const userLat = parseCoordinateParam(url.searchParams.get("user_lat"), {
-    min: -90,
-    max: 90,
-  });
-  const userLon = parseCoordinateParam(url.searchParams.get("user_lon"), {
-    min: -180,
-    max: 180,
-  });
-
-  if ((userLat === undefined) !== (userLon === undefined)) {
-    throw new Error("invalid_partial_user_location");
-  }
-
-  const district = url.searchParams.get("district")?.trim() ?? "";
-  const neighborhood = url.searchParams.get("neighborhood")?.trim() ?? "";
-
-  return {
-    kind: kind ?? undefined,
-    q: q === "" ? undefined : q,
-    limit,
-    offset,
-    open_now: parseBooleanParam(url.searchParams.get("open_now")),
-    has_wifi: parseBooleanParam(url.searchParams.get("has_wifi")),
-    has_sockets: parseBooleanParam(url.searchParams.get("has_sockets")),
-    accessible: parseBooleanParam(url.searchParams.get("accessible")),
-    open_air: parseBooleanParam(url.searchParams.get("open_air")),
-    has_ser: parseBooleanParam(url.searchParams.get("has_ser")),
-    district: district === "" ? undefined : district,
-    neighborhood: neighborhood === "" ? undefined : neighborhood,
-    sort_by: parseSortByParam(url.searchParams.get("sort_by")),
-    user_lat: userLat,
-    user_lon: userLon,
-  };
-}
-
 function buildScheduleFromRecord(
   scheduleRecord: Parameters<typeof buildSchedulePayload>[0],
   sourceLastUpdated: string | null,
@@ -285,20 +141,20 @@ function buildScheduleFromRecord(
   });
 }
 
-function buildListSortMode(
-  requestedSort: CenterSortBy | undefined,
-  hasUserLocation: boolean,
-): CenterSortBy {
-  return requestedSort ?? (hasUserLocation ? "recommended" : "open_now");
-}
-
 function sortDecisionRecords<
   T extends {
     center: { id: string; name: string };
     schedule: { is_open_now: boolean | null; schedule_confidence_label: "high" | "medium" | "low" };
-    decision: CenterDecisionSummary;
+    decision: {
+      best_mode: "walk" | "car" | "bus" | "bike" | "metro" | null;
+      best_time_minutes: number | null;
+      distance_m: number | null;
+      confidence: "high" | "medium" | "low";
+      rationale: string[];
+      summary_label: string | null;
+    };
   },
->(records: T[], sortBy: CenterSortBy): T[] {
+>(records: T[], sortBy: "recommended" | "distance" | "arrival" | "open_now"): T[] {
   const sortedItems = sortCenterListItems(
     records.map((record) => ({
       id: record.center.id,
@@ -316,22 +172,6 @@ function sortDecisionRecords<
       (sortedIdOrder.get(left.center.id) ?? Number.MAX_SAFE_INTEGER) -
       (sortedIdOrder.get(right.center.id) ?? Number.MAX_SAFE_INTEGER),
   );
-}
-
-function buildCenterFilters(
-  query: ReturnType<typeof parseListCentersQuery>,
-) {
-  return {
-    kind: query.kind,
-    q: query.q,
-    has_wifi: query.has_wifi,
-    has_sockets: query.has_sockets,
-    accessible: query.accessible,
-    open_air: query.open_air,
-    has_ser: query.has_ser,
-    district: query.district,
-    neighborhood: query.neighborhood,
-  };
 }
 
 function buildBaseListRecord(
@@ -371,7 +211,6 @@ async function loadListWindowRecords(
   query: ReturnType<typeof parseListCentersQuery>,
   userLocation: { lat: number; lon: number } | null,
 ) {
-  const sortMode = buildListSortMode(query.sort_by, userLocation !== null);
   const filters = buildCenterFilters(query);
   const targetCount = Math.max(query.offset + query.limit + LIST_VISIBLE_PADDING, DEFAULT_LIMIT);
   const records: Array<ReturnType<typeof buildBaseListRecord>> = [];
@@ -413,9 +252,8 @@ async function loadListWindowRecords(
   }
 
   return {
-    records: sortDecisionRecords(records, sortMode),
+    records: sortDecisionRecords(records, "open_now"),
     exhausted,
-    sortMode,
   };
 }
 
@@ -475,9 +313,10 @@ async function enrichDecisionRecords(
   }
 
   const candidateIds = records.map((record) => record.center.id);
-  const [transportNodeMap, originContext] = await Promise.all([
+  const [transportNodeMap, originContext, serMap] = await Promise.all([
     loadTransportNodesByCenterIds(env.DB, candidateIds),
     loadOriginTransportContext(env, userLocation),
+    loadSerCoverageByCenterIds(env.DB, candidateIds),
   ]);
 
   return records.map((record) => {
@@ -488,6 +327,7 @@ async function enrichDecisionRecords(
       center: record.center,
       schedule: record.schedule,
       userLocation,
+      ser: serMap.get(record.center.id) ?? null,
       originEmtStops: originContext.originEmtStops,
       destinationEmtStops: destination.destinationEmtStops,
       originBicimadStations: originContext.originBicimadStations,
@@ -520,7 +360,10 @@ export async function handleListCenters(
   let query: ReturnType<typeof parseListCentersQuery>;
 
   try {
-    query = parseListCentersQuery(url);
+    query = parseListCentersQuery(url, {
+      limit: DEFAULT_LIMIT,
+      maxLimit: MAX_LIMIT,
+    });
   } catch (error) {
     return Response.json(
       {
@@ -541,26 +384,22 @@ export async function handleListCenters(
       ctx,
       {
         ttlSeconds: LIST_CACHE_TTL_SECONDS,
-        originBucket: buildOriginBucket(query.user_lat, query.user_lon),
       },
       async (dataVersion) => {
-        const userLocation =
-          query.user_lat !== undefined && query.user_lon !== undefined
-            ? { lat: query.user_lat, lon: query.user_lon }
-            : null;
+        const baseQuery = toBaseExplorationQuery(query);
         const [totalMatchingCenters, scheduleStateSummary, listWindow] = await Promise.all([
-          countCenters(env.DB, buildCenterFilters(query)),
-          countScheduleStateSummaryForQuery(env, query),
-          loadListWindowRecords(env, query, userLocation),
+          countCenters(env.DB, buildCenterFilters(baseQuery)),
+          countScheduleStateSummaryForQuery(env, baseQuery),
+          loadListWindowRecords(env, baseQuery, null),
         ]);
         const totalOpenCenters = scheduleStateSummary.open_count;
         const sortedRecords = listWindow.records;
 
-        const pagedRecords = sortedRecords.slice(query.offset, query.offset + query.limit);
+        const pagedRecords = sortedRecords.slice(baseQuery.offset, baseQuery.offset + baseQuery.limit);
         const pageCenterIds = pagedRecords.map((item) => item.center.id);
         const serMap = await loadSerCoverageByCenterIds(env.DB, pageCenterIds);
         const items = pagedRecords.map((item) =>
-          toCenterDecisionCardItem({
+          toCenterListBaseItem({
             center: item.center,
             schedule: item.schedule,
             ser: serMap.has(item.center.id)
@@ -569,31 +408,24 @@ export async function handleListCenters(
                   zone_name: serMap.get(item.center.id)?.zone_name ?? null,
                 }
               : null,
-            decision: item.decision,
-            mobilityHighlights: item.mobility.highlights,
           }),
         );
-        const payload: ListCentersResponse = {
+        const scopedTotal =
+          baseQuery.open_now === undefined
+            ? totalMatchingCenters
+            : baseQuery.open_now
+              ? scheduleStateSummary.open_count
+              : scheduleStateSummary.closed_count;
+        const payload: ListCentersResponse = buildListCentersResponsePayload({
           items,
-          total:
-            query.open_now === undefined
-              ? totalMatchingCenters
-              : query.open_now
-                ? scheduleStateSummary.open_count
-                : scheduleStateSummary.closed_count,
+          total: scopedTotal,
           open_count: totalOpenCenters,
-          limit: query.limit,
-          offset: query.offset,
-          next_offset:
-            query.offset + query.limit <
-            (query.open_now === undefined
-              ? totalMatchingCenters
-              : query.open_now
-                ? scheduleStateSummary.open_count
-                : scheduleStateSummary.closed_count)
-              ? query.offset + query.limit
-              : null,
-        };
+          limit: baseQuery.limit,
+          offset: baseQuery.offset,
+          next_offset: baseQuery.offset + baseQuery.limit < scopedTotal
+            ? baseQuery.offset + baseQuery.limit
+            : null,
+        });
 
         return Response.json(payload, {
           headers: buildPublicReadHeaders(dataVersion, LIST_CACHE_TTL_SECONDS),
@@ -615,7 +447,10 @@ export async function handleGetTopMobilityCenters(
   let query: ReturnType<typeof parseListCentersQuery>;
 
   try {
-    query = parseListCentersQuery(url);
+    query = parseListCentersQuery(url, {
+      limit: DEFAULT_LIMIT,
+      maxLimit: MAX_LIMIT,
+    });
   } catch (error) {
     return Response.json(
       {
@@ -635,7 +470,10 @@ export async function handleGetTopMobilityCenters(
       : null;
 
   if (!userLocation) {
-    const emptyPayload: GetTopMobilityCentersResponse = { items: [], open_count: 0 };
+    const emptyPayload: GetTopMobilityCentersResponse = buildTopMobilityCentersResponsePayload({
+      items: [],
+      open_count: 0,
+    });
     return Response.json(emptyPayload, {
       headers: buildNoStoreHeaders(),
     });
@@ -679,18 +517,18 @@ export async function handleGetTopMobilityCenters(
 
         const rankedCandidates = sortDecisionRecords(
           enrichedCandidates,
-          listWindow.sortMode,
+          query.sort_by ?? "recommended",
         ).slice(0, TOP_MOBILITY_COUNT);
         const serMap = await loadSerCoverageByCenterIds(
           env.DB,
           rankedCandidates.map((record) => record.center.id),
         );
 
-        const payload: GetTopMobilityCentersResponse = {
+        const payload: GetTopMobilityCentersResponse = buildTopMobilityCentersResponsePayload({
           items: rankedCandidates.map((record, index) => ({
             slug: record.center.slug,
             rank: index + 1,
-            center: toCenterDecisionCardItem({
+            center: toCenterTopMobilityCardItem({
               center: record.center,
               schedule: record.schedule,
               ser: serMap.has(record.center.id)
@@ -700,12 +538,11 @@ export async function handleGetTopMobilityCenters(
                   }
                 : null,
               decision: record.decision,
-              mobilityHighlights: record.mobility.highlights,
             }),
             item: record.mobility,
           })),
           open_count: totalOpenCenters,
-        };
+        });
 
         return Response.json(payload, {
           headers: buildPublicReadHeaders(dataVersion, TOP_MOBILITY_CACHE_TTL_SECONDS),
@@ -751,8 +588,8 @@ export async function handleGetCenterDetail(
           detail.source_last_updated,
         );
         const destination = groupDestinationTransportNodes(nodeRows);
-        const payload: GetCenterDetailResponse = {
-          item: toCenterDetailDecisionItem({
+        const payload: GetCenterDetailResponse = buildCenterDetailResponsePayload(
+          toCenterDetailDecisionItem({
             center: detail.center,
             schedule,
             sources: detail.sources,
@@ -766,7 +603,7 @@ export async function handleGetCenterDetail(
             }),
             features: featuresMap.get(detail.center.id) ?? [],
           }),
-        };
+        );
 
         return Response.json(payload, {
           headers: buildPublicReadHeaders(dataVersion, DETAIL_CACHE_TTL_SECONDS),

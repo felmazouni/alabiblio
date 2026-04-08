@@ -1,22 +1,98 @@
 # API CONTRACTS V1
 
-Fecha: 2026-04-04
+Fecha: 2026-04-08
 
 ## Objetivo
 
 Definir la frontera exacta entre listado, detalle y movilidad, evitando payloads ambiguos o solapados.
 
+## 0. Semantic scopes V1
+
+Estado:
+
+- definido formalmente en Lote 1A
+- enforcement runtime pendiente de Lote 1B
+
+### `base_exploration`
+
+Uso:
+
+- explorar catalogo
+- filtrar
+- ordenar por estado operativo base
+- abrir detalle base
+
+Campos semanticamente permitidos:
+
+- identidad del centro
+- horario resumido
+- servicios
+- detalle base
+- `open_now`
+
+Campos semanticamente prohibidos:
+
+- `recommended`
+- `arrival`
+- `distance`
+
+Regla:
+
+- este scope no puede vender decision contextual ni ranking dependiente del origen
+
+### `origin_enriched`
+
+Uso:
+
+- ranking contextual
+- top por movilidad
+- comparacion real entre modos
+- decision de llegada
+
+Campos semanticamente permitidos:
+
+- `recommended`
+- `arrival`
+- `distance`
+- `open_now`
+
+Regla:
+
+- este scope solo es valido si el mismo request resuelve origen y contexto suficiente para sostener la decision
+
+### Semantica exacta de campos
+
+- `recommended`: recomendacion contextual de modo o llegada. Solo existe en `origin_enriched`.
+- `arrival`: tiempo estimado contextual hasta el centro desde el origen activo. Solo existe en `origin_enriched`.
+- `distance`: distancia directa centro-origen con origen resuelto dentro del mismo request. Solo existe en `origin_enriched`.
+- `open_now`: estado operativo derivado del horario del centro. Puede existir en ambos scopes.
+
+### Endpoint -> scope
+
+- `GET /api/centers` -> `base_exploration`
+- `GET /api/centers/top-mobility` -> `origin_enriched`
+- `GET /api/centers/:slug` -> `base_exploration`
+- `GET /api/centers/:slug/mobility` -> `origin_enriched`
+
 ## 1. `GET /api/centers`
 
-### Propósito
+### Scope
 
-Payload de listado. Debe servir para:
+`base_exploration`
+
+### Proposito
+
+Payload de listado para:
 
 - explorar
-- ordenar
+- filtrar
 - comparar cards
 
-No debe servir para renderizar el detalle completo.
+No debe servir para:
+
+- prometer una mejor opcion contextual
+- prometer ETA contextual
+- renderizar detalle completo
 
 ### Query params
 
@@ -42,170 +118,59 @@ Opcionales:
 - `user_lat`
 - `user_lon`
 
-### Response shape V1
+Nota semantica:
 
-```ts
-type ListCentersResponseV1 = {
-  items: CenterListCardV1[];
-  total: number;
-  open_count: number;
-  limit: number;
-  offset: number;
-  next_offset?: number | null;
-};
+- en V1 el endpoint puede recibir origen por compatibilidad
+- tras Lote 1B eso no le convierte en `origin_enriched`
 
-type CenterListCardV1 = {
-  id: string;
-  slug: string;
-  kind: "study_room" | "library";
-  kind_label: string;
-  name: string;
-  district: string | null;
-  neighborhood: string | null;
-  address_line: string | null;
-  is_open_now: boolean | null;
-  opens_today: string | null;
-  closes_today: string | null;
-  today_human_schedule: string | null;
-  capacity_value: number | null;
-  ser: {
-    enabled: boolean;
-    zone_name: string | null;
-  } | null;
-  services: {
-    wifi: boolean;
-    sockets: boolean;
-    accessible: boolean;
-    open_air: boolean;
-  };
-  decision: {
-    best_mode: "car" | "bus" | "bike" | "metro" | "walk" | null;
-    best_time_minutes: number | null;
-    confidence: "high" | "medium" | "low";
-    rationale: string[];
-    summary_label: string | null;
-  };
-  mobility_highlights: {
-    primary: MobilityHighlightV1 | null;
-    secondary: MobilityHighlightV1 | null;
-  };
-};
-```
+## 2. `GET /api/centers/top-mobility`
 
-### Required fields
+### Scope
 
-- identidad del centro
-- estado operativo breve
-- servicios mínimos de card
-- `decision`
-- hasta dos `mobility_highlights`
+`origin_enriched`
 
-### Optional fields
+### Proposito
 
-- `ser`
-- `capacity_value`
-- `opens_today`
-- `closes_today`
+Payload de ranking contextual para:
 
-### Prohibiciones
+- resolver top por llegada
+- comparar modos con origen real
+- exponer una recomendacion semantica fuerte
 
-- no incluir `feature_evidence`
-- no incluir horario estructurado completo
-- no incluir arrays completos de anchors
-- no incluir realtime detallado de todos los modos
+No debe servir para:
 
-## 2. `GET /api/centers/:slug`
+- actuar como listado paginado general
 
-### Propósito
+## 3. `GET /api/centers/:slug`
 
-Payload base del detalle.
+### Scope
 
-Debe devolver:
+`base_exploration`
+
+### Proposito
+
+Payload base del detalle. Debe devolver:
 
 - identidad del centro
 - horario
 - contacto
 - servicios
-- anchors estáticos
+- anchors estaticos
 
-No debe exigir realtime embebido.
+No debe exigir:
 
-### Query params
+- realtime embebido
+- decision contextual fuerte
 
-Requeridos:
+## 4. `GET /api/centers/:slug/mobility`
 
-- ninguno
+### Scope
 
-Opcionales:
-- ninguno
+`origin_enriched`
 
-### Response shape V1
+### Proposito
 
-```ts
-type GetCenterDetailResponseV1 = {
-  item: CenterDetailBaseV1;
-};
-
-type CenterDetailBaseV1 = {
-  id: string;
-  slug: string;
-  kind: "study_room" | "library";
-  kind_label: string;
-  name: string;
-  district: string | null;
-  neighborhood: string | null;
-  address_line: string | null;
-  postal_code: string | null;
-  municipality: string;
-  phone: string | null;
-  email: string | null;
-  website_url: string | null;
-  contact_summary: string | null;
-  lat: number | null;
-  lon: number | null;
-  capacity_value: number | null;
-  notes_raw: string | null;
-  ser: {
-    enabled: boolean;
-    zone_name: string | null;
-    coverage_method: string | null;
-    distance_m: number | null;
-  };
-  services: CenterServicesV1;
-  schedule: CenterSchedulePayloadV1;
-  static_transport: StaticTransportAnchorsV1;
-  data_freshness: {
-    center_updated_at: string | null;
-    mobility_static_updated_at: string | null;
-  };
-};
-```
-
-### Required fields
-
-- centro base
-- horario
-- contacto
-- `ser`
-- `services`
-- `static_transport`
-
-### Optional fields
-
-- `capacity_value`
-- `notes_raw`
-
-### Prohibiciones
-
-- no incluir EMT realtime obligatorio
-- no incluir BiciMAD realtime obligatorio
-- no incluir ranking completo de modos
-
-## 3. `GET /api/centers/:slug/mobility`
-
-### Propósito
-
-Endpoint de cálculo dependiente del origen y realtime.
+Endpoint de calculo dependiente del origen y del contexto de movilidad.
 
 ### Query params
 
@@ -217,100 +182,19 @@ Opcionales:
 
 - `user_lat`
 - `user_lon`
-- en V1 no se añade `origin_kind`; se deriva del cliente si hace falta en cabecera o payload futuro
-
-### Response shape V1
-
-```ts
-type GetCenterMobilityResponseV1 = {
-  item: CenterMobilityRuntimeV1;
-};
-
-type CenterMobilityRuntimeV1 = {
-  origin: {
-    available: boolean;
-    kind: "geolocation" | "manual_address" | "preset_area" | null;
-    label: string | null;
-    lat: number | null;
-    lon: number | null;
-  };
-  summary: {
-    best_mode: "car" | "bus" | "bike" | "metro" | "walk" | null;
-    best_time_minutes: number | null;
-    confidence: "high" | "medium" | "low";
-    rationale: string[];
-  };
-  modules: {
-    car: CarModuleV1;
-    bus: BusModuleV1;
-    bike: BikeModuleV1;
-    metro: MetroModuleV1;
-  };
-  degraded_modes: Array<"car" | "bus" | "bike" | "metro">;
-  fetched_at: string;
-};
-```
-
-### Required fields
-
-- `origin`
-- `summary`
-- `modules.car`
-- `modules.bus`
-- `modules.bike`
-- `modules.metro`
-- `degraded_modes`
-- `fetched_at`
-
-### Optional fields
-
-- campos concretos dentro de cada módulo según anchor o realtime disponible
-
-### Fallback states
-
-#### Sin origen
-
-- `origin.available = false`
-- `summary.best_mode = null` o `walk`
-- módulos con anchors destino, pero sin cálculo dependiente del origen
-
-#### EMT upstream caído
-
-- `bus.state = "degraded_upstream"`
-- se mantienen:
-  - parada origen
-  - parada destino
-  - línea candidata si existe
-
-#### BiciMAD upstream caído
-
-- `bike.state = "degraded_upstream"`
-- se mantienen estaciones origen/destino
-- `bikes_available` / `docks_available` pueden ser `null`
-
-#### Centro sin anchor útil de un modo
-
-- módulo concreto en `degraded_missing_anchor`
-- no afecta al resto de modos
 
 ## Frontera exacta
 
-### Listado
+### Base exploration
 
-- resumen
-- highlights
-- sin payload ancho
+- exploracion
+- filtros
+- estado operativo
+- detalle base
 
-### Detalle
+### Origin enriched
 
-- centro base
-- horario
-- static anchors
-- sin realtime obligatorio
-
-### Mobility
-
-- origen
-- realtime
-- ranking
-- degradación controlada
+- recomendacion contextual
+- ETA contextual
+- distancia contextual
+- degradacion controlada por upstream o anchors

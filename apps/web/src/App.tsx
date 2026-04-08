@@ -1,20 +1,17 @@
 ﻿import type {
-  CenterKind,
-  CenterListItem,
-  CenterSortBy,
+  CenterListBaseItemV1,
   GetCenterDetailResponse,
+  ListCentersResponse,
 } from "@alabiblio/contracts/centers";
 import type {
   CenterMobility,
-  CenterTopMobilityCardV1,
-  CenterTopMobilityItem,
+  GetCenterMobilityResponse,
+  GetTopMobilityCentersResponse,
 } from "@alabiblio/contracts/mobility";
 import type {
-  GeocodeAddressOption,
-  OriginPreset,
   UserOrigin,
 } from "@alabiblio/contracts/origin";
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useState } from "react";
 import {
   BrowserRouter,
   Navigate,
@@ -26,185 +23,56 @@ import {
 } from "react-router-dom";
 import {
   ArrowRight,
-  Bike,
-  Bus,
-  Car,
-  Clock3,
-  Flag,
   LayoutGrid,
   List,
   MapPin,
   Navigation,
-  Route as RouteIcon,
   Search,
   SlidersHorizontal,
   Sparkles,
-  TrainFront,
   X,
 } from "lucide-react";
 import { AppShell } from "./app/AppShell";
 import DotGrid from "./components/reactbits/DotGrid";
 import FadeContent from "./components/reactbits/FadeContent";
-import SpotlightCard from "./components/reactbits/SpotlightCard";
 import ShinyText from "./components/reactbits/ShinyText";
 import {
   fetchCenterDetail,
   fetchCenterMobility,
   fetchCenters,
-  fetchGeocodeOptions,
-  fetchOriginPresets,
   fetchTopMobilityCenters,
 } from "./features/centers/api";
 import {
-  buildFeaturedFooterTiles,
-  buildFeaturedTransportRows,
-  buildHumanReason,
-  modeLabel,
-} from "./features/centers/transportCopy";
+  buildTopMobilityQuery,
+  type CatalogBaseSortBy,
+} from "./features/centers/catalogFilters";
+import {
+  formatFetchError,
+} from "./features/centers/screenLogic";
+import { useCatalogFilters } from "./features/centers/hooks/useCatalogFilters";
 import { CenterCard } from "./features/centers/components/CenterCard";
 import { CenterDetailScreen } from "./features/centers/components/CenterDetailScreen";
 import { CenterRowItem } from "./features/centers/components/CenterRowItem";
+import { TopMobilityCard } from "./features/centers/components/TopMobilityCard";
 import { useUserOrigin } from "./features/location/useUserOrigin";
 import { BottomNavBar } from "./features/navigation/BottomNavBar";
 import { OriginSheet } from "./features/origin/components/OriginSheet";
+import { useOriginSearchController } from "./features/origin/hooks/useOriginSearchController";
+import {
+  getBaseCatalogScopeDescription,
+  getBaseCatalogScopeSignal,
+  getTopMobilityScopeSignal,
+} from "./features/centers/scopePresentation";
 import { EmptyStateCard } from "./features/ui/EmptyStateCard";
 import { FilterDrawer } from "./features/ui/FilterDrawer";
 import { LoadingCard } from "./features/ui/LoadingCard";
 import { SearchField } from "./features/ui/SearchField";
+import { getOriginStatusText, getOriginTone } from "./features/origin/originPresentation";
 import "./App.css";
 
-type KindFilter = "all" | CenterKind;
 type ViewMode = "cards" | "rows";
 
 const PAGE_SIZE = 18;
-
-function buildMotivo(mobility: CenterMobility | null): string {
-  return buildHumanReason(mobility);
-}
-
-function formatFetchError(scope: "top" | "catalog", error: Error): string {
-  if (error.message === "Failed to fetch") {
-    return scope === "catalog"
-      ? "No se pudo cargar el listado. La conexion no respondio a tiempo."
-      : "No se pudo cargar el Top 3. La conexion no respondio a tiempo.";
-  }
-
-  if (error.message.startsWith("centers_list_500")) {
-    return "No se pudo cargar el listado base. El endpoint devolvio un error interno.";
-  }
-
-  if (error.message.startsWith("top_mobility_500")) {
-    return "No se pudieron resolver las mejores opciones. El endpoint devolvio un error interno.";
-  }
-
-  return scope === "catalog"
-    ? `No se pudo cargar el listado (${error.message}).`
-    : `No se pudieron cargar las mejores opciones (${error.message}).`;
-}
-
-function getOriginStatusText(
-  origin: UserOrigin | null,
-  geolocationStatus: ReturnType<typeof useUserOrigin>["geolocationStatus"],
-): string {
-  if (origin?.kind === "manual_address") return origin.label;
-  if (origin?.kind === "preset_area") return origin.label;
-  if (origin?.kind === "geolocation") return "Mi ubicacion actual";
-  switch (geolocationStatus) {
-    case "requesting": return "Buscando ubicacion";
-    case "denied": return "Permiso denegado";
-    case "unavailable": return "Ubicacion no disponible";
-    default: return "Sin origen activo";
-  }
-}
-
-function getOriginTone(
-  origin: UserOrigin | null,
-  geolocationStatus: ReturnType<typeof useUserOrigin>["geolocationStatus"],
-): "live" | "approx" | "idle" {
-  if (origin?.kind === "geolocation" || geolocationStatus === "granted") return "live";
-  if (origin?.kind === "manual_address" || origin?.kind === "preset_area") return "approx";
-  return "idle";
-}
-
-function buildCentersListQuery(input: {
-  kindFilter: KindFilter;
-  deferredSearch: string;
-  limit?: number;
-  offset?: number;
-  openNowOnly: boolean;
-  wifiOnly: boolean;
-  accessibleOnly: boolean;
-  serOnly: boolean;
-  districtFilter: string;
-  neighborhoodFilter: string;
-  sortBy: CenterSortBy;
-  userLat?: number;
-  userLon?: number;
-}) {
-  return {
-    kind: input.kindFilter === "all" ? undefined : input.kindFilter,
-    q: input.deferredSearch === "" ? undefined : input.deferredSearch,
-    limit: input.limit,
-    offset: input.offset,
-    open_now: input.openNowOnly || undefined,
-    has_wifi: input.wifiOnly || undefined,
-    accessible: input.accessibleOnly || undefined,
-    has_ser: input.serOnly || undefined,
-    district: input.districtFilter || undefined,
-    neighborhood: input.neighborhoodFilter || undefined,
-    sort_by: input.sortBy,
-    user_lat: input.userLat,
-    user_lon: input.userLon,
-  };
-}
-
-function buildFeaturedCardFrame(
-  center: Pick<CenterTopMobilityCardV1, "is_open_now" | "opens_today" | "decision"> | null,
-  recommendedMode: CenterMobility["summary"]["best_mode"],
-  serverOpenCount: number,
-): {
-  eyebrow: string;
-  sectionTitle: string;
-  sectionSummary: string;
-} {
-  const timingSummary =
-    center && center.decision.best_time_minutes !== null && recommendedMode
-      ? `${center.decision.best_time_minutes} min en ${modeLabel(recommendedMode)}`
-      : "Sin origen suficiente";
-
-  if (!center) {
-    return {
-      eyebrow: "Opcion destacada",
-      sectionTitle: "Planifica el trayecto",
-      sectionSummary: timingSummary,
-    };
-  }
-
-  if (center.is_open_now) {
-    return {
-      eyebrow: "Mejor opcion ahora",
-      sectionTitle: "Llegar ahora",
-      sectionSummary: timingSummary,
-    };
-  }
-
-  if (center.opens_today) {
-    return {
-      eyebrow: serverOpenCount === 0 ? "Mejor opcion proxima" : "Opcion destacada",
-      sectionTitle: "Preparala para cuando abra",
-      sectionSummary:
-        timingSummary === "Sin origen suficiente"
-          ? `Abre a las ${center.opens_today}`
-          : `Abre a las ${center.opens_today} - ${timingSummary}`,
-    };
-  }
-
-  return {
-    eyebrow: "Mejor opcion cercana",
-    sectionTitle: "Planifica el trayecto",
-    sectionSummary: timingSummary,
-  };
-}
 
 const DESKTOP_NAV = [
   { to: "/", label: "Top 3" },
@@ -248,17 +116,10 @@ function DesktopTopBar() {
 function TopPicksScreen() {
   const navigate = useNavigate();
   const [originSheetOpen, setOriginSheetOpen] = useState(false);
-  const [originQuery, setOriginQuery] = useState("");
-  const [originResults, setOriginResults] = useState<GeocodeAddressOption[]>([]);
-  const [originSearchLoading, setOriginSearchLoading] = useState(false);
-  const [originSearchError, setOriginSearchError] = useState<string | null>(null);
-  const [originPresets, setOriginPresets] = useState<OriginPreset[]>([]);
-  const [originPresetsError, setOriginPresetsError] = useState<string | null>(null);
-  const [serverOpenCount, setServerOpenCount] = useState(0);
-  const [topMobilityItems, setTopMobilityItems] = useState<CenterTopMobilityItem[]>([]);
+  const [topMobilityResponse, setTopMobilityResponse] = useState<GetTopMobilityCentersResponse | null>(null);
   const [topPicksResolvedKey, setTopPicksResolvedKey] = useState<string | null>(null);
   const [topPicksErrorState, setTopPicksErrorState] = useState<{ key: string; message: string } | null>(null);
-  const originSearchController = useRef<AbortController | null>(null);
+  const originSearch = useOriginSearchController();
   const {
     origin,
     geolocationStatus,
@@ -268,28 +129,19 @@ function TopPicksScreen() {
 
   const originActive = origin !== null;
   const requestKey = originActive ? `${origin?.lat ?? "none"}:${origin?.lon ?? "none"}` : null;
-  const topPicks = topMobilityItems
-    .map((entry) => ({
+  const topScope = topMobilityResponse?.meta.scope ?? null;
+  const topPicks = (topScope === "origin_enriched" ? topMobilityResponse?.items : [])
+    ?.map((entry) => ({
       rank: entry.rank,
       center: entry.center,
       mobility: entry.item,
-    }));
+    })) ?? [];
+  const serverOpenCount =
+    topScope === "origin_enriched" ? topMobilityResponse?.open_count ?? 0 : 0;
   const hasCurrentTopPicksError =
     topPicksErrorState !== null && topPicksErrorState.key === requestKey;
   const loading = originActive && topPicksResolvedKey !== requestKey && !hasCurrentTopPicksError;
   const error = hasCurrentTopPicksError ? topPicksErrorState.message : null;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetchOriginPresets(controller.signal)
-      .then((response) => setOriginPresets(response.items))
-      .catch((nextError: Error) => {
-        if (!controller.signal.aborted) {
-          setOriginPresetsError(`No se pudieron cargar las zonas (${nextError.message}).`);
-        }
-      });
-    return () => controller.abort();
-  }, []);
 
   useEffect(() => {
     if (!originActive) {
@@ -300,34 +152,24 @@ function TopPicksScreen() {
     const resolvedRequestKey = requestKey ?? "none";
 
     void fetchTopMobilityCenters(
-      buildCentersListQuery({
-        kindFilter: "all",
-        deferredSearch: "",
+      buildTopMobilityQuery({
         limit: 12,
         offset: 0,
-        openNowOnly: false,
-        wifiOnly: false,
-        accessibleOnly: false,
-        serOnly: false,
-        districtFilter: "",
-        neighborhoodFilter: "",
-        sortBy: "recommended",
         userLat: origin?.lat,
         userLon: origin?.lon,
       }),
       controller.signal,
     )
-      .then((topResponse) => {
+      .then((response) => {
         if (!controller.signal.aborted) {
-          setServerOpenCount(topResponse.open_count);
-          setTopMobilityItems(topResponse.items);
+          setTopMobilityResponse(response);
           setTopPicksResolvedKey(resolvedRequestKey);
           setTopPicksErrorState(null);
         }
       })
       .catch((nextError: Error) => {
         if (!controller.signal.aborted) {
-          setTopMobilityItems([]);
+          setTopMobilityResponse(null);
           setTopPicksResolvedKey(resolvedRequestKey);
           setTopPicksErrorState({
             key: resolvedRequestKey,
@@ -339,62 +181,9 @@ function TopPicksScreen() {
     return () => controller.abort();
   }, [originActive, origin?.lat, origin?.lon, requestKey]);
 
-  function handleOriginQueryChange(value: string): void {
-    setOriginQuery(value);
-
-    const trimmed = value.trim();
-    if (trimmed.length < 3) {
-      originSearchController.current?.abort();
-      setOriginResults([]);
-      setOriginSearchError(null);
-      setOriginSearchLoading(false);
-      return;
-    }
-
-    setOriginSearchLoading(true);
-    setOriginSearchError(null);
-  }
-
-  useEffect(() => {
-    const q = originQuery.trim();
-    if (q.length < 3) {
-      return;
-    }
-
-    originSearchController.current?.abort();
-    const controller = new AbortController();
-    originSearchController.current = controller;
-    const timer = window.setTimeout(() => {
-      void fetchGeocodeOptions(q, controller.signal)
-        .then((response) => {
-          if (!controller.signal.aborted) {
-            setOriginResults(response.items);
-            setOriginSearchError(
-              response.items.length === 0 ? "No encuentro esa direccion. Prueba con calle, barrio o estacion." : null,
-            );
-            setOriginSearchLoading(false);
-          }
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) {
-            setOriginSearchError("No se pudo buscar la direccion. Intentalo de nuevo.");
-            setOriginResults([]);
-            setOriginSearchLoading(false);
-          }
-        });
-    }, 350);
-
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [originQuery]);
-
   function applyOrigin(nextOrigin: UserOrigin): void {
     setManualOrigin(nextOrigin);
-    setOriginQuery(nextOrigin.label);
-    setOriginResults([]);
-    setOriginSearchError(null);
+    originSearch.resetSearch(nextOrigin.label);
     setOriginSheetOpen(false);
   }
 
@@ -492,8 +281,9 @@ function TopPicksScreen() {
 
             <section className="top-picks-summary">
               <span className="list-topbar__pill"><strong>{topPicks.length}</strong> opciones resueltas</span>
+              <span className="list-topbar__pill"><strong>{getTopMobilityScopeSignal(topScope)}</strong> scope</span>
               <span className="list-topbar__pill list-topbar__pill--open"><strong>{serverOpenCount}</strong> abiertas ahora</span>
-              {originPresetsError ? <span className="screen__inline-error">{originPresetsError}</span> : null}
+              {originSearch.presetsError ? <span className="screen__inline-error">{originSearch.presetsError}</span> : null}
             </section>
 
             {loading ? (
@@ -502,16 +292,17 @@ function TopPicksScreen() {
               </div>
             ) : error ? (
               <EmptyStateCard title="No se pudo cargar el Top 3" body={error} />
-            ) : topPicks.length === 0 ? (
+            ) : topScope !== "origin_enriched" || topPicks.length === 0 ? (
               <EmptyStateCard title="Sin opciones cercanas" body="Activa otro origen o abre el listado base para explorar todos los centros." />
             ) : (
               <section className="top-picks-grid">
                 {topPicks.map((entry) => (
-                  <TopPickCard
+                  <TopMobilityCard
                     key={entry.center.id}
                     center={entry.center}
                     mobility={entry.mobility}
                     rank={entry.rank}
+                    scope={topScope}
                     serverOpenCount={serverOpenCount}
                     onSelect={(slug) => navigate(`/centers/${slug}`)}
                   />
@@ -526,19 +317,18 @@ function TopPicksScreen() {
         open={originSheetOpen}
         origin={origin}
         geolocationStatus={geolocationStatus}
-        query={originQuery}
-        results={originResults}
-        loading={originSearchLoading}
-        error={originSearchError}
-        presets={originPresets}
+        query={originSearch.query}
+        results={originSearch.results}
+        loading={originSearch.loading}
+        error={originSearch.error}
+        presets={originSearch.presets}
         onClose={() => setOriginSheetOpen(false)}
         onRequestGeolocation={() => {
           requestGeolocation();
-          setOriginResults([]);
-          setOriginSearchError(null);
+          originSearch.resetSearch();
           setOriginSheetOpen(false);
         }}
-        onQueryChange={handleOriginQueryChange}
+        onQueryChange={originSearch.handleQueryChange}
         onSelectAddress={(option) =>
           applyOrigin({
             kind: "manual_address",
@@ -557,6 +347,7 @@ function TopPicksScreen() {
           })
         }
         onContinueWithoutOrigin={() => {
+          originSearch.resetSearch();
           setOriginSheetOpen(false);
           navigate("/listado");
         }}
@@ -565,152 +356,37 @@ function TopPicksScreen() {
   );
 }
 
-function TopPickCard({
-  center,
-  mobility,
-  rank,
-  serverOpenCount,
-  onSelect,
-}: {
-  center: CenterTopMobilityCardV1;
-  mobility: CenterMobility;
-  rank: number;
-  serverOpenCount: number;
-  onSelect: (slug: string) => void;
-}) {
-  const recommendedMode = mobility.summary.best_mode ?? center.decision.best_mode ?? null;
-  const transportRows = buildFeaturedTransportRows(mobility);
-  const footerTiles = buildFeaturedFooterTiles(mobility, center);
-  const frame = buildFeaturedCardFrame(center, recommendedMode, serverOpenCount);
-  const area = [center.neighborhood, center.district].filter(Boolean).join(" - ");
-  const locationLine = center.address_line ?? area;
-  const secondaryLine = center.address_line && area ? area : null;
-  const reason = buildMotivo(mobility).split(".")[0]?.trim() ?? buildMotivo(mobility);
-
-  return (
-    <button
-      type="button"
-      className="best-option-card top-pick-card"
-      onClick={() => onSelect(center.slug)}
-    >
-      <SpotlightCard className="best-option-card__surface top-pick-card__surface">
-        <div className="best-option-card__eyebrow-row">
-          <span className="best-option-card__eyebrow">
-            <Sparkles size={11} />
-            {rank === 1 ? "1a opcion" : rank === 2 ? "2a opcion" : "3a opcion"}
-          </span>
-          <span className="best-option-card__kind-badge">{center.kind_label}</span>
-          <span className={center.is_open_now ? "decision-card__status decision-card__status--open" : "decision-card__status decision-card__status--closed"}>
-            {center.is_open_now ? "Abierta" : "Cerrada"}
-          </span>
-        </div>
-
-        <h2 className="best-option-card__name">{center.name}</h2>
-
-        {locationLine ? (
-          <p className="best-option-card__subline top-pick-card__location">
-            <MapPin size={11} />
-            {locationLine}
-          </p>
-        ) : null}
-
-        {secondaryLine ? <p className="top-pick-card__secondary-line">{secondaryLine}</p> : null}
-        <p className="top-pick-card__state-line">
-          <strong>{frame.sectionTitle}</strong>
-          <span>{frame.sectionSummary}</span>
-        </p>
-
-        <div className="best-option-card__board">
-          {transportRows.map((row) => (
-            <div
-              key={`${center.id}-${row.mode}`}
-              className={`best-option-card__board-row${row.recommended ? " best-option-card__board-row--recommended" : ""}`}
-            >
-              <span className="best-option-card__board-mode top-pick-card__board-mode">
-                <span className={`top-pick-card__mode-icon top-pick-card__mode-icon--${row.mode}`}>
-                  {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
-                </span>
-                <span className="top-pick-card__mode-label">{row.label}</span>
-              </span>
-              <span className="best-option-card__board-copy">
-                <strong className="best-option-card__board-headline">{row.headline}</strong>
-                {row.details.length > 0 ? (
-                  <span className="best-option-card__board-details">
-                    {row.details.map((detail) => (
-                      <span key={`${center.id}-${row.mode}-${detail.kind}-${detail.text}`} className={`best-option-card__board-detail best-option-card__board-detail--${detail.kind}`}>
-                        {detail.kind === "origin" ? <MapPin size={11} /> : null}
-                        {detail.kind === "destination" ? <Flag size={11} /> : null}
-                        {detail.kind === "time" ? <Clock3 size={11} /> : null}
-                        {detail.kind === "route" ? <RouteIcon size={11} /> : null}
-                        {detail.kind === "availability" ? <Bike size={11} /> : null}
-                        {detail.kind === "note" ? <Navigation size={11} /> : null}
-                        {detail.text}
-                      </span>
-                    ))}
-                  </span>
-                ) : null}
-              </span>
-              <span className="best-option-card__board-eta">{row.eta}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="best-option-card__footer-grid">
-          {footerTiles.map((tile) => (
-            <div
-              key={tile.mode}
-              className={`best-option-card__footer-tile best-option-card__footer-tile--${tile.mode}`}
-            >
-              <span className="best-option-card__footer-label">
-                {tile.mode === "car" ? <Car size={13} /> : <Navigation size={13} />}
-                {tile.label}
-              </span>
-              <strong className="best-option-card__footer-body">{tile.body}</strong>
-            </div>
-          ))}
-        </div>
-
-        <p className="best-option-card__reason">{reason}</p>
-
-        <div className="best-option-card__footer">
-          <span className="best-option-card__cta">
-            Ver detalle <ArrowRight size={13} />
-          </span>
-        </div>
-      </SpotlightCard>
-    </button>
-  );
-}
-
 function CatalogScreen() {
   const navigate = useNavigate();
-  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
-  const [sortBy, setSortBy] = useState<CenterSortBy>("recommended");
-  const [searchText, setSearchText] = useState("");
-  const deferredSearch = useDeferredValue(searchText.trim());
-  const [openNowOnly, setOpenNowOnly] = useState(false);
-  const [wifiOnly, setWifiOnly] = useState(false);
-  const [accessibleOnly, setAccessibleOnly] = useState(false);
-  const [serOnly, setSerOnly] = useState(false);
-  const [districtFilter, setDistrictFilter] = useState<string>("");
-  const [neighborhoodFilter, setNeighborhoodFilter] = useState<string>("");
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const {
+    filters,
+    offset,
+    filterDrawerOpen,
+    openFilterDrawer,
+    closeFilterDrawer,
+    activeChips,
+    activeFilterCount,
+    setKindFilter,
+    setSortBy,
+    setSearchText,
+    updateFilters,
+    clearFilter,
+    clearAllFilters: clearCatalogFilters,
+    resetPagination,
+    loadMore,
+    buildRequestQuery,
+  } = useCatalogFilters();
+  const deferredSearch = useDeferredValue(filters.searchText.trim());
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
-  const [items, setItems] = useState<CenterListItem[]>([]);
+  const [items, setItems] = useState<CenterListBaseItemV1[]>([]);
+  const [catalogScope, setCatalogScope] = useState<ListCentersResponse["meta"]["scope"] | null>(null);
   const [total, setTotal] = useState(0);
   const [serverOpenCount, setServerOpenCount] = useState(0);
-  const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [originSheetOpen, setOriginSheetOpen] = useState(false);
-  const [originQuery, setOriginQuery] = useState("");
-  const [originResults, setOriginResults] = useState<GeocodeAddressOption[]>([]);
-  const [originSearchLoading, setOriginSearchLoading] = useState(false);
-  const [originSearchError, setOriginSearchError] = useState<string | null>(null);
-  const [originPresets, setOriginPresets] = useState<OriginPreset[]>([]);
-  const [originPresetsError, setOriginPresetsError] = useState<string | null>(null);
-  const originSearchController = useRef<AbortController | null>(null);
+  const originSearch = useOriginSearchController();
   const {
     origin,
     geolocationStatus,
@@ -721,47 +397,20 @@ function CatalogScreen() {
 
   const hasMore = items.length < total;
 
-  // Active filter count (for badge)
-  const activeFilterCount = [
-    openNowOnly, wifiOnly, accessibleOnly, serOnly,
-    districtFilter !== "", neighborhoodFilter !== "",
-  ].filter(Boolean).length;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetchOriginPresets(controller.signal)
-      .then((response) => setOriginPresets(response.items))
-      .catch((error: Error) => {
-        if (!controller.signal.aborted) {
-          setOriginPresetsError(`No se pudieron cargar las zonas (${error.message}).`);
-        }
-      });
-    return () => controller.abort();
-  }, []);
-
   useEffect(() => {
     const controller = new AbortController();
     const isFirstPage = offset === 0;
 
     void fetchCenters(
-      buildCentersListQuery({
-        kindFilter,
+      buildRequestQuery({
         deferredSearch,
         limit: PAGE_SIZE,
         offset,
-        openNowOnly,
-        wifiOnly,
-        accessibleOnly,
-        serOnly,
-        districtFilter,
-        neighborhoodFilter,
-        sortBy,
-        userLat: origin?.lat,
-        userLon: origin?.lon,
       }),
       controller.signal,
     )
       .then((response) => {
+        setCatalogScope(response.meta.scope);
         setItems((current) =>
           isFirstPage ? response.items : [...current, ...response.items],
         );
@@ -787,96 +436,58 @@ function CatalogScreen() {
 
     return () => controller.abort();
   }, [
-    accessibleOnly,
+    buildRequestQuery,
     deferredSearch,
-    districtFilter,
-    neighborhoodFilter,
-    kindFilter,
     offset,
-    openNowOnly,
-    serOnly,
-    origin?.lat,
-    origin?.lon,
-    sortBy,
-    wifiOnly,
   ]);
 
-  function resetListState(): void {
-    setOffset(0);
+  const resetListState = useCallback((): void => {
     setItems([]);
+    setCatalogScope(null);
     setTotal(0);
     setServerOpenCount(0);
     setLoading(true);
     setLoadingMore(false);
     setListError(null);
-  }
+  }, []);
 
   function clearAllFilters(): void {
-    setOpenNowOnly(false);
-    setWifiOnly(false);
-    setAccessibleOnly(false);
-    setSerOnly(false);
-    setDistrictFilter("");
-    setNeighborhoodFilter("");
+    clearCatalogFilters();
     resetListState();
   }
 
-  function handleOriginQueryChange(value: string): void {
-    setOriginQuery(value);
-
-    const trimmed = value.trim();
-    if (trimmed.length < 3) {
-      originSearchController.current?.abort();
-      setOriginResults([]);
-      setOriginSearchError(null);
-      setOriginSearchLoading(false);
-      return;
-    }
-
-    setOriginSearchLoading(true);
-    setOriginSearchError(null);
+  function handleKindFilterChange(value: "all" | "library" | "study_room"): void {
+    setKindFilter(value);
+    resetListState();
   }
 
-  // Debounced origin autocomplete: fires 350ms after query changes
-  useEffect(() => {
-    const q = originQuery.trim();
-    if (q.length < 3) {
-      return;
-    }
-    originSearchController.current?.abort();
-    const controller = new AbortController();
-    originSearchController.current = controller;
-    const timer = window.setTimeout(() => {
-      void fetchGeocodeOptions(q, controller.signal)
-        .then((response) => {
-          if (!controller.signal.aborted) {
-            setOriginResults(response.items);
-            setOriginSearchError(
-              response.items.length === 0 ? "No encuentro esa direccion. Prueba con calle, barrio o estacion." : null,
-            );
-            setOriginSearchLoading(false);
-          }
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) {
-            setOriginSearchError("No se pudo buscar la direccion. Intentalo de nuevo.");
-            setOriginResults([]);
-            setOriginSearchLoading(false);
-          }
-        });
-    }, 350);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [originQuery]);
+  function handleSortChange(value: CatalogBaseSortBy): void {
+    setSortBy(value);
+    resetListState();
+  }
+
+  function handleSearchChange(value: string): void {
+    setSearchText(value);
+    resetListState();
+  }
+
+  function handleFilterPatch(
+    patch: Partial<Pick<typeof filters, "openNowOnly" | "wifiOnly" | "accessibleOnly" | "serOnly" | "districtFilter" | "neighborhoodFilter">>,
+  ): void {
+    updateFilters(patch);
+    resetListState();
+  }
+
+  function handleClearChip(key: Parameters<typeof clearFilter>[0]): void {
+    clearFilter(key);
+    resetListState();
+  }
 
   function applyOrigin(nextOrigin: UserOrigin): void {
     setManualOrigin(nextOrigin);
-    setOriginQuery(nextOrigin.label);
-    setOriginResults([]);
-    setOriginSearchError(null);
+    originSearch.resetSearch(nextOrigin.label);
     setOriginSheetOpen(false);
+    resetPagination();
     resetListState();
   }
 
@@ -893,10 +504,10 @@ function CatalogScreen() {
               <div className="list-topbar__title">
                 <span className="list-topbar__eyebrow">listado base</span>
                 <h1>Catalogo de bibliotecas y salas</h1>
-                <p>Sin tiempo real en el grid. Solo datos base, filtros y acceso al detalle.</p>
+                <p>{getBaseCatalogScopeDescription(catalogScope)}</p>
               </div>
               <div className="list-topbar__signals">
-                <span className="list-topbar__signal">BASE</span>
+                <span className="list-topbar__signal">{getBaseCatalogScopeSignal(catalogScope)}</span>
                 <button
                   type="button"
                   className="list-topbar__origin-button"
@@ -912,10 +523,13 @@ function CatalogScreen() {
                 <strong>{total}</strong> resultados
               </span>
               <span className="list-topbar__pill list-topbar__pill--open">
-                <strong>{serverOpenCount}</strong> {openNowOnly ? "abiertos en este filtro" : "abiertos ahora"}
+                <strong>{serverOpenCount}</strong> {filters.openNowOnly ? "abiertos en este filtro" : "abiertos ahora"}
               </span>
               <span className="list-topbar__pill">
                 <strong>{items.length}</strong> cargados
+              </span>
+              <span className="list-topbar__pill">
+                <strong>{catalogScope === "base_exploration" ? "base_exploration" : "pendiente"}</strong> scope
               </span>
               <button
                 type="button"
@@ -941,11 +555,8 @@ function CatalogScreen() {
             <div className="list-topbar__search">
               <Search size={16} />
               <SearchField
-                value={searchText}
-                onChange={(value) => {
-                  setSearchText(value);
-                  resetListState();
-                }}
+                value={filters.searchText}
+                onChange={handleSearchChange}
                 placeholder="Buscar por nombre o barrio..."
               />
             </div>
@@ -974,7 +585,7 @@ function CatalogScreen() {
               <button
                 type="button"
                 className={`controls-bar__filters-btn${activeFilterCount > 0 ? " controls-bar__filters-btn--active" : ""}`}
-                onClick={() => setFilterDrawerOpen(true)}
+                onClick={openFilterDrawer}
               >
                 <SlidersHorizontal size={14} />
                 Filtros
@@ -983,89 +594,36 @@ function CatalogScreen() {
                 ) : null}
               </button>
 
-              {kindFilter !== "all" ? (
-                <button type="button" className="active-pill" onClick={() => { setKindFilter("all"); resetListState(); }}>
-                  {kindFilter === "library" ? "Bibliotecas" : "Salas estudio"}
-                  <X size={11} />
+              {activeChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className="active-pill"
+                  onClick={() => handleClearChip(chip.key)}
+                >
+                  {chip.label} <X size={11} />
                 </button>
-              ) : null}
-              {sortBy !== "recommended" ? (
-                <button type="button" className="active-pill" onClick={() => { setSortBy("recommended"); resetListState(); }}>
-                  {sortBy === "distance" ? "Por distancia" : sortBy === "arrival" ? "Mejor ETA" : "Abiertos primero"}
-                  <X size={11} />
-                </button>
-              ) : null}
-              {openNowOnly ? (
-                <button type="button" className="active-pill" onClick={() => { setOpenNowOnly(false); resetListState(); }}>
-                  Abierto ahora <X size={11} />
-                </button>
-              ) : null}
-              {wifiOnly ? (
-                <button type="button" className="active-pill" onClick={() => { setWifiOnly(false); resetListState(); }}>
-                  WiFi <X size={11} />
-                </button>
-              ) : null}
-              {accessibleOnly ? (
-                <button type="button" className="active-pill" onClick={() => { setAccessibleOnly(false); resetListState(); }}>
-                  Accesible <X size={11} />
-                </button>
-              ) : null}
-              {serOnly ? (
-                <button type="button" className="active-pill" onClick={() => { setSerOnly(false); resetListState(); }}>
-                  Zona SER <X size={11} />
-                </button>
-              ) : null}
-              {districtFilter ? (
-                <button type="button" className="active-pill" onClick={() => { setDistrictFilter(""); resetListState(); }}>
-                  {districtFilter} <X size={11} />
-                </button>
-              ) : null}
-              {neighborhoodFilter ? (
-                <button type="button" className="active-pill" onClick={() => { setNeighborhoodFilter(""); resetListState(); }}>
-                  {neighborhoodFilter} <X size={11} />
-                </button>
-              ) : null}
+              ))}
 
               {activeFilterCount > 0 ? (
                 <button type="button" className="controls-bar__clear" onClick={clearAllFilters}>
                   Limpiar todo
                 </button>
               ) : null}
-
-              <div className="controls-bar__spacer" />
-
-              <div className="view-toggle">
-                <button
-                  type="button"
-                  className={`view-toggle__btn${viewMode === "cards" ? " view-toggle__btn--active" : ""}`}
-                  onClick={() => setViewMode("cards")}
-                  aria-label="Vista tarjetas"
-                >
-                  <LayoutGrid size={15} />
-                </button>
-                <button
-                  type="button"
-                  className={`view-toggle__btn${viewMode === "rows" ? " view-toggle__btn--active" : ""}`}
-                  onClick={() => setViewMode("rows")}
-                  aria-label="Vista lista"
-                >
-                  <List size={15} />
-                </button>
-              </div>
             </div>
 
             {origin ? (
               <button
                 type="button"
                 className="origin-clear-button"
-                onClick={() => { clearOrigin(); resetListState(); }}
+                onClick={() => { clearOrigin(); resetPagination(); resetListState(); }}
               >
                 Reiniciar origen
               </button>
             ) : null}
           </section>
 
-          {originPresetsError ? <p className="screen__inline-error">{originPresetsError}</p> : null}
+          {originSearch.presetsError ? <p className="screen__inline-error">{originSearch.presetsError}</p> : null}
 
           <section className="center-list">
             {loading ? (
@@ -1077,13 +635,14 @@ function CatalogScreen() {
             {!loading && !listError && items.length === 0 ? (
               <EmptyStateCard title="Sin resultados" body="Prueba a quitar filtros o cambiar el origen." />
             ) : null}
-            {!loading && items.length > 0 ? (
+            {!loading && catalogScope === "base_exploration" && items.length > 0 ? (
               viewMode === "rows" ? (
                 <div className="center-list__rows">
                   {items.map((center) => (
                     <CenterRowItem
                       key={center.id}
                       center={center}
+                      scope={catalogScope}
                       onSelect={(slug) => navigate(`/centers/${slug}`)}
                     />
                   ))}
@@ -1094,10 +653,7 @@ function CatalogScreen() {
                     <CenterCard
                       key={center.id}
                       center={center}
-                      mobility={null}
-                      mobilityLoading={false}
-                      canLoadMobility={false}
-                      onLoadMobility={() => undefined}
+                      scope={catalogScope}
                       onSelect={(slug) => navigate(`/centers/${slug}`)}
                     />
                   ))}
@@ -1113,7 +669,7 @@ function CatalogScreen() {
                 className="center-list__more"
                 onClick={() => {
                   setLoadingMore(true);
-                  setOffset(items.length);
+                  loadMore(items.length);
                 }}
                 disabled={loadingMore}
               >
@@ -1128,20 +684,20 @@ function CatalogScreen() {
         open={originSheetOpen}
         origin={origin}
         geolocationStatus={geolocationStatus}
-        query={originQuery}
-        results={originResults}
-        loading={originSearchLoading}
-        error={originSearchError}
-        presets={originPresets}
+        query={originSearch.query}
+        results={originSearch.results}
+        loading={originSearch.loading}
+        error={originSearch.error}
+        presets={originSearch.presets}
         onClose={() => setOriginSheetOpen(false)}
         onRequestGeolocation={() => {
           requestGeolocation();
-          setOriginResults([]);
-          setOriginSearchError(null);
+          originSearch.resetSearch();
           setOriginSheetOpen(false);
+          resetPagination();
           resetListState();
         }}
-        onQueryChange={handleOriginQueryChange}
+        onQueryChange={originSearch.handleQueryChange}
         onSelectAddress={(option) =>
           applyOrigin({
             kind: "manual_address",
@@ -1160,30 +716,32 @@ function CatalogScreen() {
           })
         }
         onContinueWithoutOrigin={() => {
+          originSearch.resetSearch();
           setOriginSheetOpen(false);
+          resetPagination();
           resetListState();
         }}
       />
 
       <FilterDrawer
         open={filterDrawerOpen}
-        onClose={() => setFilterDrawerOpen(false)}
-        kindFilter={kindFilter}
-        onKindChange={(v) => { setKindFilter(v); resetListState(); }}
-        sortBy={sortBy}
-        onSortChange={(v) => { setSortBy(v); resetListState(); }}
-        openNowOnly={openNowOnly}
-        onOpenNowChange={(v) => { setOpenNowOnly(v); resetListState(); }}
-        wifiOnly={wifiOnly}
-        onWifiChange={(v) => { setWifiOnly(v); resetListState(); }}
-        accessibleOnly={accessibleOnly}
-        onAccessibleChange={(v) => { setAccessibleOnly(v); resetListState(); }}
-        serOnly={serOnly}
-        onSerChange={(v) => { setSerOnly(v); resetListState(); }}
-        districtFilter={districtFilter}
-        onDistrictChange={(v) => { setDistrictFilter(v); resetListState(); }}
-        neighborhoodFilter={neighborhoodFilter}
-        onNeighborhoodChange={(v) => { setNeighborhoodFilter(v); resetListState(); }}
+        onClose={closeFilterDrawer}
+        kindFilter={filters.kindFilter}
+        onKindChange={handleKindFilterChange}
+        sortBy={filters.sortBy}
+        onSortChange={handleSortChange}
+        openNowOnly={filters.openNowOnly}
+        onOpenNowChange={(value) => handleFilterPatch({ openNowOnly: value })}
+        wifiOnly={filters.wifiOnly}
+        onWifiChange={(value) => handleFilterPatch({ wifiOnly: value })}
+        accessibleOnly={filters.accessibleOnly}
+        onAccessibleChange={(value) => handleFilterPatch({ accessibleOnly: value })}
+        serOnly={filters.serOnly}
+        onSerChange={(value) => handleFilterPatch({ serOnly: value })}
+        districtFilter={filters.districtFilter}
+        onDistrictChange={(value) => handleFilterPatch({ districtFilter: value })}
+        neighborhoodFilter={filters.neighborhoodFilter}
+        onNeighborhoodChange={(value) => handleFilterPatch({ neighborhoodFilter: value })}
         activeCount={activeFilterCount}
         onClearAll={clearAllFilters}
       />
@@ -1195,7 +753,9 @@ function CenterDetailRoute() {
   const { slug } = useParams<{ slug: string }>();
   const { origin } = useUserOrigin();
   const [detail, setDetail] = useState<GetCenterDetailResponse["item"] | null>(null);
+  const [detailScope, setDetailScope] = useState<GetCenterDetailResponse["meta"]["scope"] | null>(null);
   const [mobility, setMobility] = useState<CenterMobility | null>(null);
+  const [mobilityScope, setMobilityScope] = useState<GetCenterMobilityResponse["meta"]["scope"] | null>(null);
   const [detailResolvedSlug, setDetailResolvedSlug] = useState<string | null>(null);
   const [detailErrorState, setDetailErrorState] = useState<{ slug: string; message: string } | null>(null);
   const [mobilityResolvedKey, setMobilityResolvedKey] = useState<string | null>(null);
@@ -1210,6 +770,7 @@ function CenterDetailRoute() {
       .then((detailResponse) => {
         if (!controller.signal.aborted) {
           setDetail(detailResponse.item);
+          setDetailScope(detailResponse.meta.scope);
           setDetailResolvedSlug(slug);
           setDetailErrorState(null);
         }
@@ -1217,6 +778,7 @@ function CenterDetailRoute() {
       .catch((nextError: Error) => {
         if (!controller.signal.aborted) {
           setDetail(null);
+          setDetailScope(null);
           setDetailResolvedSlug(slug);
           setDetailErrorState({ slug, message: `No se pudo cargar el centro (${nextError.message}).` });
         }
@@ -1237,6 +799,7 @@ function CenterDetailRoute() {
       .then((response) => {
         if (!controller.signal.aborted) {
           setMobility(response.item);
+          setMobilityScope(response.meta.scope);
           setMobilityResolvedKey(requestKey);
           setMobilityErrorState(null);
         }
@@ -1244,6 +807,7 @@ function CenterDetailRoute() {
       .catch((nextError: Error) => {
         if (!controller.signal.aborted) {
           setMobility(null);
+          setMobilityScope(null);
           setMobilityResolvedKey(requestKey);
           setMobilityErrorState({ key: requestKey, message: `No se pudo actualizar la movilidad (${nextError.message}).` });
         }
@@ -1265,7 +829,9 @@ function CenterDetailRoute() {
   return (
     <CenterDetailScreen
       item={detailMatches ? detail : null}
+      detailScope={detailMatches ? detailScope : null}
       mobility={mobilityMatches ? mobility : null}
+      mobilityScope={mobilityMatches ? mobilityScope : null}
       origin={origin}
       loading={loading}
       mobilityLoading={mobilityLoading}

@@ -7,22 +7,13 @@ type HealthResponse = {
 };
 
 type CentersListResponse = {
+  meta: {
+    scope: "base_exploration";
+    endpoint: "list_centers";
+  };
   items: Array<{
     slug: string;
-    decision: {
-      summary_label: string | null;
-      confidence: "high" | "medium" | "low";
-    };
-    mobility_highlights: {
-      primary: {
-        mode: "walk" | "car" | "bus" | "bike" | "metro";
-        label: string;
-      } | null;
-      secondary: {
-        mode: "walk" | "car" | "bus" | "bike" | "metro";
-        label: string;
-      } | null;
-    };
+    is_open_now: boolean | null;
     services: {
       wifi: boolean;
       accessible: boolean;
@@ -34,6 +25,10 @@ type CentersListResponse = {
 };
 
 type CenterDetailResponse = {
+  meta: {
+    scope: "base_exploration";
+    endpoint: "center_detail";
+  };
   item: {
     slug: string;
     ser: {
@@ -62,6 +57,10 @@ type CenterDetailResponse = {
 };
 
 type CenterMobilityResponse = {
+  meta: {
+    scope: "origin_enriched";
+    endpoint: "center_mobility";
+  };
   item: {
     origin: {
       available: boolean;
@@ -151,16 +150,13 @@ async function main() {
   assert.ok(firstPreset, "A preset origin is required for mobility smoke");
 
   const list = await fetchJson<CentersListResponse>(
-    `${normalizedBaseUrl}/api/centers?limit=1&sort_by=recommended&user_lat=${firstPreset.lat}&user_lon=${firstPreset.lon}`,
+    `${normalizedBaseUrl}/api/centers?limit=1&sort_by=open_now`,
   );
   assert.ok(list.total > 0, "Centers list must return at least one item");
   assert.ok(list.items.length > 0, "Centers list must include one item");
+  assert.equal(list.meta.scope, "base_exploration", "Centers list must expose base scope");
   assert.equal(typeof list.items[0]?.services.wifi, "boolean", "Centers list must expose compact services");
-  assert.ok(
-    list.items[0]?.mobility_highlights.primary === null ||
-      typeof list.items[0]?.mobility_highlights.primary.label === "string",
-    "Centers list must expose mobility highlights",
-  );
+  assert.equal(typeof list.items[0]?.is_open_now, "boolean", "Centers list must expose open state");
 
   const slug = list.items[0]?.slug;
   assert.ok(slug, "First center slug is required");
@@ -168,6 +164,7 @@ async function main() {
   const detail = await fetchJson<CenterDetailResponse>(
     `${normalizedBaseUrl}/api/centers/${encodeURIComponent(slug)}`,
   );
+  assert.equal(detail.meta.scope, "base_exploration", "Center detail must expose base scope");
   assert.equal(detail.item.slug, slug, "Center detail must match list slug");
   assert.equal(typeof detail.item.ser.enabled, "boolean", "Center detail must expose SER coverage");
   assert.ok(
@@ -178,6 +175,7 @@ async function main() {
   const mobility = await fetchJson<CenterMobilityResponse>(
     `${normalizedBaseUrl}/api/centers/${encodeURIComponent(slug)}/mobility?user_lat=${firstPreset.lat}&user_lon=${firstPreset.lon}`,
   );
+  assert.equal(mobility.meta.scope, "origin_enriched", "Mobility endpoint must expose enriched scope");
   assert.ok(mobility.item.summary.confidence, "Mobility summary must expose confidence");
   assert.ok(
     typeof mobility.item.modules.bus.state === "string",
@@ -201,7 +199,7 @@ async function main() {
           "/api/health",
           "/api/origin/presets",
           "/api/geocode?q=Gran Via 32",
-          "/api/centers?limit=1&sort_by=recommended&user_lat=...&user_lon=...",
+          "/api/centers?limit=1&sort_by=open_now",
           `/api/centers/${slug}`,
           `/api/centers/${slug}/mobility?user_lat=...&user_lon=...`,
         ],

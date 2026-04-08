@@ -1,29 +1,37 @@
-import type { CenterDecisionCardItem } from "@alabiblio/contracts/centers";
-import type { CenterMobility } from "@alabiblio/contracts/mobility";
-import { Accessibility, Bike, Bus, Clock3, MapPin, Navigation, Plug, TrainFront, Trees, Users, Wifi, Zap } from "lucide-react";
+import type {
+  CenterListBaseItemV1,
+  ListCentersResponse,
+} from "@alabiblio/contracts/centers";
+import {
+  Accessibility,
+  Clock3,
+  MapPin,
+  Navigation,
+  Plug,
+  Trees,
+  Users,
+  Wifi,
+} from "lucide-react";
 import SpotlightCard from "../../../components/reactbits/SpotlightCard";
-import { buildFeaturedTransportRows, buildSecondaryCardHighlights } from "../transportCopy";
+import { buildBaseCardPresentation } from "../cardPresentation";
 import "./CenterCard.css";
 
 type CenterCardProps = {
-  center: CenterDecisionCardItem;
-  mobility: CenterMobility | null;
-  mobilityLoading: boolean;
-  canLoadMobility: boolean;
-  onLoadMobility: () => void;
+  center: CenterListBaseItemV1;
+  scope: ListCentersResponse["meta"]["scope"];
   onSelect: (slug: string) => void;
 };
 
-function buildArea(center: CenterDecisionCardItem): string {
+function buildArea(center: CenterListBaseItemV1): string {
   return [center.district, center.neighborhood].filter(Boolean).join(" - ");
 }
 
-function buildNextChange(center: CenterDecisionCardItem): string | null {
+function buildNextChange(center: CenterListBaseItemV1): string | null {
   if (center.is_open_now) return center.closes_today ? `Cierra ${center.closes_today}` : null;
   return center.opens_today ? `Abre ${center.opens_today}` : null;
 }
 
-function serviceItems(center: CenterDecisionCardItem) {
+function serviceItems(center: CenterListBaseItemV1) {
   return [
     center.services.wifi ? { key: "wifi", label: "WiFi", icon: <Wifi size={14} /> } : null,
     center.services.accessible ? { key: "accessible", label: "Accesible", icon: <Accessibility size={14} /> } : null,
@@ -34,18 +42,13 @@ function serviceItems(center: CenterDecisionCardItem) {
 
 export function CenterCard({
   center,
-  mobility,
-  mobilityLoading,
-  canLoadMobility,
-  onLoadMobility,
+  scope,
   onSelect,
 }: CenterCardProps) {
   const area = buildArea(center);
   const nextChange = buildNextChange(center);
   const services = serviceItems(center).slice(0, 4);
-  const highlightRows = buildSecondaryCardHighlights(center);
-  const transportRows = mobility ? buildFeaturedTransportRows(mobility) : [];
-  const showExpandedTransport = mobility !== null;
+  const presentation = buildBaseCardPresentation(center, scope);
 
   return (
     <div className="decision-card">
@@ -96,61 +99,26 @@ export function CenterCard({
             </div>
           ) : null}
 
-          <div className={`decision-card__board${showExpandedTransport ? " decision-card__board--expanded" : ""}`}>
-            {showExpandedTransport ? transportRows.map((row) => (
-              <div key={`${center.id}-${row.mode}`} className="decision-card__board-row">
-                <span className="decision-card__board-label">
-                  {row.mode === "metro"
-                    ? <TrainFront size={13} />
-                    : row.mode === "bus"
-                      ? <Bus size={13} />
-                      : <Bike size={13} />}
-                  {row.label}
-                </span>
-                <span className="decision-card__board-body">
-                  {row.details.length > 0 ? `${row.headline} - ${row.details.map((detail) => detail.text).join(" - ")}` : row.headline}
-                </span>
-                {row.eta ? <span className="decision-card__board-eta">{row.eta}</span> : null}
-              </div>
-            )) : highlightRows.length > 0 ? highlightRows.map((line) => (
+          <div className="decision-card__board">
+            {presentation.highlightRows.length > 0 ? presentation.highlightRows.map((line) => (
               <div key={`${center.id}-${line.label}-${line.body}`} className="decision-card__board-row">
                 <span className="decision-card__board-label">{line.label}</span>
                 <span className="decision-card__board-body">{line.body}</span>
               </div>
             )) : (
               <div className="decision-card__board-row decision-card__board-row--fallback">
-                <span className="decision-card__board-label">LLEGADA</span>
-                <span className="decision-card__board-body">
-                  {center.decision.summary_label ?? "Sin origen suficiente"}
-                </span>
+                <span className="decision-card__board-label">SCOPE</span>
+                <span className="decision-card__board-body">{presentation.fallbackCopy}</span>
               </div>
             )}
           </div>
 
-          {center.decision.distance_m !== null ? (
-            <div className="decision-card__footer">
-              <Navigation size={12} />
-              <span>
-                {center.decision.distance_m < 1000
-                  ? `${Math.round(center.decision.distance_m)} m`
-                  : `${(center.decision.distance_m / 1000).toFixed(1)} km`}
-              </span>
-            </div>
-          ) : null}
+          <div className="decision-card__footer">
+            <Navigation size={12} />
+            <span>{presentation.footerLabel}</span>
+          </div>
         </SpotlightCard>
       </button>
-
-      {!showExpandedTransport && canLoadMobility ? (
-        <button
-          type="button"
-          className="decision-card__mobility-action"
-          onClick={onLoadMobility}
-          disabled={mobilityLoading}
-        >
-          <Zap size={14} />
-          {mobilityLoading ? "Calculando transporte..." : "Ver transporte"}
-        </button>
-      ) : null}
     </div>
   );
 }

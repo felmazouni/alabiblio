@@ -1,3 +1,5 @@
+import type { CenterResponseMetaV1 } from "./scopes";
+
 export type MobilityMode = "car" | "bus" | "bike" | "metro";
 
 export type MobilityConfidence = "high" | "medium" | "low";
@@ -220,6 +222,7 @@ export interface EmtRealtimePayload {
 }
 
 export interface GetCenterMobilityResponse {
+  meta: CenterResponseMetaV1<"origin_enriched", "center_mobility">;
   item: CenterMobilityRuntimeV1;
 }
 
@@ -258,11 +261,13 @@ export interface CenterTopMobilityItem {
 }
 
 export interface GetTopMobilityCentersResponse {
+  meta: CenterResponseMetaV1<"origin_enriched", "top_mobility_centers">;
   items: CenterTopMobilityItem[];
   open_count: number;
 }
 
 export interface GetCenterMobilitySummaryResponse {
+  meta: CenterResponseMetaV1<"origin_enriched", "center_mobility_summary">;
   slug: string;
   item: CenterMobilityRuntimeV1;
 }

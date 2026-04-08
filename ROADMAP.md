@@ -1,336 +1,87 @@
-## 1. Bootstrap del proyecto
-- [x] Fijar `pnpm` como package manager del monorepo
-- [x] Crear `.nvmrc` con version LTS objetivo
-- [x] Crear `.npmrc`
-- [x] Crear `.gitignore`
-- [x] Crear `README.md` tecnico inicial en la raiz
-- [x] Crear `.env.example`
-- [x] Crear `package.json` raiz del monorepo
-- [x] Crear `pnpm-workspace.yaml`
-- [x] Crear `tsconfig.base.json`
-- [x] Crear `apps/web` con Cloudflare CLI sobre React + TypeScript
-- [x] Crear `apps/web/wrangler.jsonc`
-- [x] Crear estructura `packages/*`
-- [x] Crear estructura `sql/migrations` y `sql/seeds`
-- [x] Crear estructura `scripts`
-- [x] Crear estructura `tests/unit`, `tests/integration` y `tests/e2e`
-- [x] Definir scripts raiz `dev`, `build`, `typecheck`, `lint`, `test`
-- [x] Definir convencion de entornos `local`, `staging` y `production`
-- [x] Definir estrategia de ramas con `main` y ramas cortas `feat/*`, `fix/*`, `chore/*`
-- [x] Definir estrategia de migraciones D1 por entorno
-- [x] Definir estrategia de seeds idempotentes por entorno
-- [x] Definir nombres de recursos Cloudflare por entorno
-- [x] Crear primer commit limpio de bootstrap
-- [x] Crear repositorio GitHub `alabiblio`
-- [x] Anadir remote `origin`
-- [x] Subir `main`
-- [x] Configurar workflow CI minimo
-- [x] Ejecutar `pnpm install` en CI
-- [x] Ejecutar `pnpm typecheck` en CI
-- [x] Ejecutar `pnpm lint` en CI
-- [x] Ejecutar `pnpm test` en CI
-- [x] Ejecutar `pnpm build` en CI
-- [x] Crear proyecto Cloudflare `alabiblio`
-- [x] Crear entorno Cloudflare `staging`
-- [x] Crear entorno Cloudflare `production`
-- [x] Asociar `production` a `alabiblio.org`
-- [x] Asociar `staging` a `staging.alabiblio.org`
-- [x] Configurar binding `D1` por entorno
-- [ ] Configurar binding `KV` por entorno
-- [ ] Configurar binding `R2` por entorno
-- [ ] Configurar secretos por entorno para Google Identity
-- [x] Configurar secretos por entorno para EMT
-- [x] Documentar credenciales EMT necesarias por entorno
-- [ ] Configurar secretos por entorno para Turnstile
-- [x] Configurar rutas del Worker para servir frontend en `/`
-- [x] Configurar rutas del Worker para servir API en `/api/*`
+- [x] *Lote 1 - Integridad de ranking y contrato de listado*
+	- [x] *Lote 1A - Contrato semantico y scopes*
+	- [x] Definir formalmente `base_exploration` y `origin_enriched`
+	- [x] Decidir que campos existen en cada scope
+	- [x] Prohibir campos ambiguos en el scope base si no tienen soporte contextual real
+	- [x] Documentar la semantica exacta de `recommended`, `arrival`, `distance`, `open_now`
+	- [x] Decidir que endpoints usan scope base y cuales scope enriquecido
+	- [x] *Lote 1B - Correccion de endpoints y payloads*
+	- [x] Aplicar los scopes a `GET /api/centers`
+	- [x] Aplicar los scopes a `GET /api/centers/top-mobility`
+	- [x] Aplicar los scopes a `GET /api/centers/:slug`
+	- [x] Separar payload base de payload enriquecido sin mezclar naming enganoso
+	- [x] Alinear `open_count`, `total`, `next_offset` y paginacion con la realidad operativa del endpoint
+	- [x] *Lote 1C - Consumo frontend y eliminacion de doble verdad*
+	- [x] Hacer que la UI consuma los scopes correctamente
+	- [x] Eliminar recomputaciones de contexto de decision en cliente
+	- [x] Sacar de `App.tsx` la logica minima necesaria para evitar otra vez mezcla entre Top/List/Detail
+	- [x] Asegurar que la UI no vende como "mejor opcion" lo que es solo exploracion base
+	- [x] *Lote 1D - Proteccion minima de regresion*
+	- [x] Anadir pruebas de contrato para `GET /api/centers`
+	- [x] Anadir pruebas de contrato para `GET /api/centers/top-mobility`
+	- [x] Anadir pruebas de contrato para `GET /api/centers/:slug`
+	- [x] Comparar el mismo centro entre listado, top y detalle con el mismo origen
+	- [x] Dejar fixtures/golden minimos que congelen la semantica nueva
 
-## 2. Descubrimiento y validacion de fuentes
-- [x] Registrar URL, formato, licencia y refresh mode de `study_rooms`
-- [x] Registrar URL, formato, licencia y refresh mode de `libraries`
-- [ ] Registrar URLs oficiales, formato, licencia y frecuencia de cada fuente obligatoria
-- [x] Descargar muestras actuales de salas de estudio
-- [x] Descargar muestras actuales de bibliotecas
-- [x] Inspeccionar columnas reales compartidas de ambos CSV
-- [x] Detectar anomalias iniciales de codificacion, entidades HTML y campos incompletos en fuentes de centros
-- [x] Definir mapping real `study_rooms` -> `Center`
-- [x] Definir mapping real `libraries` -> `Center`
-- [x] Verificar autenticacion real de EMT OpenAPI
-- [x] Descargar muestras actuales de EMT API y EMT realtime
-- [x] Descargar muestras actuales de Bicimad
-- [x] Descargar muestras actuales de parkings EMT
-- [x] Descargar geometria oficial SER del Geoportal
-- [ ] Descargar callejero para fallback de direcciones y coordenadas
-- [ ] Localizar dataset oficial de agenda o eventos de bibliotecas
-- [ ] Verificar que campos faltan, que campos son corruptos y que campos requieren override manual
-- [ ] Verificar si existe fuente abierta usable para Metro o Cercanias
-- [ ] Registrar checklist de validacion por fuente con estado `usable`, `parcial` o `bloqueada`
+- [ ] *Lote 2 - Observabilidad y depuracion operativa*
+	- [ ] Introducir `request_id` en todas las respuestas `/api/*`
+	- [ ] Anadir logs estructurados con `route`, `request_id`, `cache_status`, `upstream_status`, `duration_ms` y `data_version`
+	- [ ] Exponer headers de depuracion para distinguir `HIT`, `MISS`, `BYPASS`, `fallback` y `realtime`
+	- [ ] Registrar errores de upstream con causa tipada y sin texto ambiguo
+	- [ ] Anadir smoke checks con timeout y validacion de headers operativos
 
-## 3. Diseno de modelo de datos
-- [x] Crear migracion inicial de tablas de fuentes e ingestas
-- [x] Crear tabla `centers`
-- [x] Crear tabla `center_source_links`
-- [x] Crear seed inicial de `sources`
-- [x] Crear indices basicos para `sources`, `ingestion_runs`, `centers` y `center_source_links`
-- [x] Crear tabla `schedule_versions`
-- [x] Crear tabla `regular_rules`
-- [x] Crear tabla `holiday_closures`
-- [x] Crear tabla `partial_day_overrides`
-- [x] Crear tabla `schedule_parse_anomalies`
-- [ ] Crear tablas `seasonal_rules` y `exam_extension_rules`
-- [ ] Crear tabla `schedule_manual_overrides`
-- [x] Crear tabla `center_ser_coverage`
-- [x] Crear tabla `transport_nodes`
-- [x] Crear tabla `center_transport_links`
-- [x] Crear tabla `transport_routes`
-- [x] Crear tabla `transport_route_stops`
-- [x] Crear tabla `center_features`
-- [x] Crear tabla `center_feature_evidence`
-- [ ] Crear tabla `library_events`
-- [ ] Crear tablas `users`, `user_identities`, `sessions`, `center_reviews` y `center_review_aggregates`
-- [ ] Crear vista de version activa de horario
-- [ ] Crear vista de frescura por centro y fuente
-- [ ] Crear indices de busqueda, joins y agregados
-- [ ] Crear seeds minimos de fuentes, tipos de centro, tipos de nodo y roles
+- [ ] *Lote 3 - Frontend shell y reduccion de regresiones en `App.tsx`*
+	- [ ] Extraer `TopPicksScreen` a modulo propio
+	- [ ] Extraer `CatalogScreen` a modulo propio
+	- [ ] Extraer `CenterDetailRoute` a modulo propio
+	- [ ] Centralizar estado de origen, filtros y carga remota fuera del entrypoint
+	- [ ] Reducir `apps/web/src/App.tsx` a composicion y routing
 
-## 4. Normalizacion de horarios
-- [x] Crear extractor de horario raw por fuente
-- [x] Crear segmentador de bloques de horario por audiencia operativa
-- [x] Crear clasificador de bloques `sala`, `secretaria`, `centro` y `otros`
-- [x] Implementar parser de `regular_rules`
-- [ ] Implementar parser de `seasonal_rules`
-- [ ] Implementar parser de `exam_extension_rules`
-- [x] Implementar parser de `holiday_closures`
-- [x] Implementar parser de `partial_day_overrides`
-- [x] Implementar deteccion de `open_air_flag`
-- [x] Implementar almacenamiento de `notes_raw`
-- [x] Persistir `raw_schedule_text` en `schedule_versions`
-- [x] Implementar calculo de `parse_confidence`
-- [x] Implementar generacion de `parse_warnings`
-- [x] Detectar y registrar horarios partidos
-- [x] Detectar y registrar cierres puntuales
-- [x] Detectar y registrar reglas especificas de julio y agosto
-- [x] Detectar y registrar ampliaciones de examenes
-- [x] Detectar y registrar horarios multiples incompatibles
-- [x] Crear motor `is_open_now`
-- [x] Crear motor `next_change_at`
-- [x] Crear motor `today_human_schedule`
-- [x] Exponer `schedule_confidence` desde la version activa de horario
-- [x] Derivar `opens_today` en dominio para fecha y timezone de request
-- [x] Derivar `closes_today` en dominio para fecha y timezone de request
-- [x] Crear tests unitarios de parser simple
-- [ ] Crear tests unitarios de parser estacional
-- [x] Crear tests unitarios de cierres y overrides parciales
-- [x] Crear tests unitarios de casos `al aire libre`
-- [x] Crear tests unitarios de horarios multiples con audiencia distinta
-- [x] Crear tests unitarios de textos ambiguos con warnings
-- [ ] Bloquear cierre de fase sin suite verde del parser
+- [ ] *Lote 4 - Backend de centros y query layer*
+	- [ ] Dividir `apps/web/worker/routes/centers.ts` en handlers por endpoint
+	- [ ] Separar parsing, caching, conteo, ranking y serializacion en modulos dedicados
+	- [ ] Eliminar escaneos repetidos de horarios para `open_count` y `closed_count`
+	- [ ] Introducir fixtures de payload para listado, top y detalle
+	- [ ] Anadir pruebas unitarias e integracion para la capa `centersQuery` y serializacion
 
-## 5. Ingenieria geoespacial
-- [x] Implementar geolocalizacion del usuario en cliente para decision por cercania
-- [ ] Normalizar latitud y longitud de todas las fuentes
-- [ ] Detectar coordenadas corruptas, truncadas o invertidas
-- [ ] Resolver centros sin coordenadas usando direccion y callejero
-- [ ] Registrar metodo de resolucion de coordenadas por centro
-- [x] Cargar geometrias oficiales SER
-- [x] Ejecutar proceso batch de proximidad centro-banda SER
-- [x] Persistir resultado precomputado en `center_ser_coverage`
-- [x] Calcular proximidad a paradas EMT
-- [x] Calcular proximidad a estaciones Bicimad
-- [x] Calcular proximidad a parkings EMT
-- [x] Persistir enlaces precomputados en `center_transport_links`
-- [ ] Preparar basemap libre para MapLibre servido desde Cloudflare
-- [ ] Unificar SER en dominio y API como objeto estructurado `{ enabled, zone_name }`
-- [ ] Crear tests de normalizacion de coordenadas
-- [ ] Crear tests de fallback con callejero
-- [ ] Crear tests de precomputacion SER
+- [ ] *Lote 5 - Honestidad de movilidad y dominio*
+	- [ ] Declarar de forma explicita `realtime`, `estimado`, `frecuencia` y `heuristica` en contratos de movilidad
+	- [ ] Sustituir constantes heuristicas opacas por configuracion nombrada y documentada
+	- [ ] Revisar scoring de coche, EMT, BiciMAD y metro para evitar precision falsa
+	- [ ] Alinear copy UI con el nivel real de confianza del dominio
+	- [ ] Anadir golden tests de decisiones de movilidad y ordenacion
 
-## 6. Integracion de movilidad
-- [x] Implementar cliente de autenticacion EMT
-- [ ] Implementar cliente de lineas EMT
-- [x] Implementar cliente de paradas EMT
-- [x] Implementar cliente de tiempos reales EMT
-- [x] Revisar heuristica visible de ETA para evitar recomendaciones absurdas
-- [ ] Implementar cliente de travel plan EMT
-- [x] Implementar cliente de Bicimad
-- [x] Implementar cliente de parkings EMT
-- [x] Ingerir y persistir nodos de movilidad
-- [ ] Validar uso de GTFS abierto donde aporte fallback util
-- [x] Crear heuristica de recomendacion de transporte sin IA
-- [x] Calcular `best_arrival_eta`
-- [x] Calcular `recommended_transport`
-- [x] Calcular lista de alternativas cercanas
-- [ ] Cachear snapshots de movilidad en KV
-- [x] Tipar `nearest_stops`
-- [x] Tipar `realtime_arrivals`
-- [ ] Tipar `travel_plan`
-- [x] Tipar `nearest_stations` de Bicimad
-- [x] Tipar `nearest_parkings` de parkings EMT
-- [x] Construir top 2 trip-centric de `bus` por origen y destino
-- [x] Construir top 2 trip-centric de `bike` por origen y destino
-- [x] Exponer `CenterMobility` como modelo publico trip-centric
-- [ ] Crear tests de clientes externos con fixtures
-- [x] Crear tests del motor heuristico de recomendacion
+- [ ] *Lote 6 - Encoding y texto end-to-end*
+	- [ ] Unificar normalizacion de texto entre ingesta, worker y cliente
+	- [ ] Eliminar reparaciones redundantes en runtime cuando el dato ya llega saneado
+	- [ ] Corregir mojibake persistente en docs y comentarios del repo
+	- [ ] Anadir fixtures de entidades HTML, UTF-8 roto y dobles decodificaciones
+	- [ ] Verificar que detalle, listado, geocode y nodos de movilidad no reintroducen texto corrupto
 
-## 7. API y logica de dominio
-- [x] Implementar endpoint `GET /api/health`
-- [x] Asegurar que ninguna ruta `/api/*` cae en el fallback SPA
-- [x] Servir `GET /api/health` con `cache-control: no-store`
-- [x] Definir contratos TypeScript compartidos de request y response para centros
-- [x] Definir contratos TypeScript de origen manual y geocoding
-- [x] Implementar endpoint de listado de centros
-- [x] Conectar `GET /api/centers` a D1 con datos canonicos persistidos
-- [x] Implementar endpoint de detalle de centro
-- [x] Implementar endpoint de horario operativo de centro
-- [x] Implementar endpoint de movilidad de centro
-- [x] Implementar endpoint `GET /api/geocode`
-- [x] Implementar endpoint `GET /api/origin/presets`
-- [ ] Implementar endpoint de eventos de centro
-- [ ] Implementar endpoint de comparador de centros
-- [ ] Implementar endpoint de metadatos de filtros
-- [ ] Implementar busqueda textual por nombre, barrio, distrito y direccion
-- [ ] Implementar filtros `abierto ahora`, `distancia`, `rating` y servicios
-- [ ] Implementar filtros `distancia` y `rating`
-- [x] Implementar ordenaciones `distancia` y `mejor llegada`
-- [ ] Implementar ordenacion `mejor valoracion`
-- [x] Exponer `schedule_confidence` desde horario activo
-- [x] Exponer `source_last_updated` desde vinculo fuente-centro
-- [x] Exponer `contact_summary` derivado desde contacto canonico
-- [x] Exponer `opens_today`
-- [x] Exponer `closes_today`
-- [x] Exponer `schedule_confidence_label` derivado en dominio y API
-- [x] Exponer `data_freshness` derivado para UI
-- [x] Exponer `distance_m`, `estimated_arrival_minutes` y `best_arrival_mode` cuando hay ubicacion valida
-- [x] Exponer `best_mobility_summary` como ayuda de decision
-- [x] Soportar origen manual geocodificado ademas de GPS en las queries de decision
-- [x] Exponer summary trip-centric de decision y `transport_summary` para cards
-- [x] Exponer prestaciones inferidas y evidencia en detalle
-- [ ] Exponer `recommendation_score` como campo contextual por request
-- [ ] Exponer `quick_flags` como campos derivados
-- [ ] Definir `recommendation_score = null` cuando no exista contexto de ubicacion valido
-- [x] Anadir validacion basica de entrada en `GET /api/centers`
-- [x] Implementar filtros `abierto ahora`, `wifi`, `accesible` y `al aire libre`
-- [ ] Anadir cache selectiva en KV para lecturas calientes
-- [ ] Anadir trazabilidad de source y run en respuestas admin
-- [ ] Crear tests de contratos y tests de integracion de endpoints
+- [ ] *Lote 7 - Testing que proteja de verdad*
+	- [ ] Crear pruebas de integracion HTTP para `health`, `centers`, `top-mobility`, `detail`, `mobility`, `geocode` y `origin/presets`
+	- [ ] Crear E2E de Top, Listado, Detalle, Filtros y cambio de origen
+	- [ ] Anadir snapshots o golden tests de payload para contratos criticos
+	- [ ] Cubrir regresiones de timeout, cancelacion y estados vacios
+	- [ ] Hacer fallar CI si faltan pruebas de contrato en endpoints criticos
 
-## 8. UI publica
-- [x] Sustituir la plantilla base de Vite por una home inicial de `alabiblio`
-- [x] Integrar React Bits open source en la UI visible
-- [x] Crear sistema visual propio para piezas no cubiertas por React Bits
-- [x] Sustituir la home placeholder por un explorador real conectado a `/api/centers`
-- [ ] Crear vista lista + mapa sincronizados
-- [x] Implementar geolocalizacion real del usuario con CTA y fallback honesto
-- [x] Permitir direccion manual como origen de decision
-- [x] Implementar selector visible de direccion con resultados geocodificados
-- [x] Implementar selector serio de origen con `GPS`, direccion manual y preset areas
-- [x] Crear barra de busqueda principal
-- [x] Crear panel de filtros rapidos
-- [ ] Crear panel de filtros avanzados
-- [x] Crear ordenacion por distancia
-- [x] Crear ordenacion por mejor llegada
-- [ ] Crear ordenacion por mejor valoracion
-- [x] Crear cards de centro con datos reales basicos
-- [x] Simplificar cards para decision rapida con ETA y contexto minimo
-- [x] Hacer visible el aforo en la card principal cuando exista
-- [x] Crear bloque visible `mejor opcion ahora`
-- [x] Crear vista de detalle minima con contacto, coordenadas y horario raw
-- [x] Mostrar `abierto/cerrado` en cards y bloque superior del detalle
-- [ ] Mostrar `cierra en X` en bloque superior
-- [ ] Mostrar `aforo` en bloque superior
-- [x] Mostrar `tiempo de llegada` en bloque superior
-- [x] Mostrar CTA `como llegar` en bloque superior
-- [ ] Mostrar `quick_flags` en cards
-- [x] Mostrar `schedule_confidence` cuando el dato operativo tenga baja fiabilidad
-- [x] Crear bloque visible de horario de hoy
-- [x] Crear bloque visible de aforo, contacto y servicios
-- [x] Priorizar estado operativo, horario y contacto en el bloque superior del detalle
-- [x] Priorizar llegada y movilidad antes que datos tecnicos secundarios
-- [x] Mover datos tecnicos secundarios a bloques inferiores del detalle
-- [x] Mejorar legibilidad visual de avisos y anomalias
-- [x] Crear bloque visible de movilidad y como llegar
-- [x] Crear bloque visible de zona SER
-- [x] Crear mapa real visible en el detalle con centro y movilidad cercana
-- [ ] Crear bloque visible de eventos
-- [ ] Crear comparador de centros
-- [x] Crear iconografia clara para metricas de valoracion y servicios
-- [x] Crear estados de carga, vacio y error
-- [x] Mostrar apertura o cierre del dia cuando sea posible en cards y detalle
-- [x] Ajustar UX movil y desktop con foco en decision inmediata
-- [x] Mejorar layout movil del explorador y del panel de detalle
-- [x] Mover detalle a pantalla full-screen con ruta propia
-- [x] Crear bottom nav tipo app
-- [x] Rehacer cards compactas trip-centric para comparacion rapida
+- [ ] *Lote 8 - Performance y bundles*
+	- [ ] Aplicar code splitting por ruta y por mapa
+	- [ ] Lazy-load de MapLibre y aislamiento de CSS pesada del mapa
+	- [ ] Revisar impacto real de `gsap`, `framer-motion` y componentes ReactBits
+	- [ ] Eliminar componentes no usados y dependencias fantasmas
+	- [ ] Reducir bundle cliente inicial por debajo del umbral operativo acordado
 
-## 9. Identidad y valoraciones
-- [ ] Implementar login con Google Identity
-- [ ] Implementar callback OIDC en Worker
-- [ ] Implementar persistencia de sesion
-- [ ] Implementar endpoint `GET /api/me`
-- [ ] Implementar endpoint `PUT /api/me/reviews/:centerId`
-- [ ] Validar una sola valoracion por usuario y centro
-- [ ] Validar rango 1-5 en las ocho metricas obligatorias
-- [ ] Implementar recalculo de agregados de valoracion
-- [ ] Mostrar rating agregado en listado, detalle y comparador
-- [ ] Proteger escrituras con Turnstile
-- [ ] Crear tests de autenticacion
-- [ ] Crear tests de unicidad de valoracion
-- [ ] Crear tests de agregacion de ratings
+- [ ] *Lote 9 - UX operativa y accesibilidad basica*
+	- [ ] Anadir foco gestionado y trap real en drawers y sheets
+	- [ ] Anadir labels accesibles y semantica de lista sugerida en el selector de origen
+	- [ ] Revisar promesas de copy para no vender precision superior a la real
+	- [ ] Unificar estados de error, stale y fallback entre top, listado y detalle
+	- [ ] Resolver incoherencias entre CTA, rutas visibles y rutas redirigidas
 
-## 10. Admin y calidad de dato
-- [ ] Implementar control de acceso admin
-- [ ] Crear panel de runs de ingesta
-- [ ] Crear panel de anomalias de horarios
-- [ ] Crear flujo de override manual de horarios
-- [ ] Crear flujo de override manual de coordenadas
-- [ ] Crear flujo de override manual de flags visibles
-- [ ] Crear accion de refresco manual por fuente
-- [ ] Crear metricas de frescura por fuente
-- [ ] Crear trazabilidad completa por run
-- [ ] Crear vista de errores y rechazos por fuente
-- [ ] Crear auditoria de cambios manuales
-- [ ] Crear tests de permisos admin
-- [ ] Crear tests de overrides y trazabilidad
-
-## 11. Tests y rendimiento
-- [x] Completar suite unitaria minima del motor de horarios
-- [x] Completar suite unitaria minima del dominio de estado operativo
-- [ ] Completar suite unitaria geoespacial
-- [ ] Completar suite de integracion de conectores de datos
-- [ ] Completar suite de integracion de API
-- [ ] Completar suite E2E de listado, detalle, login y valoracion
-- [x] Añadir smoke test publico del endpoint de geocoding
-- [x] Definir TTL por endpoint publico
-- [ ] Definir TTL por endpoint admin
-- [ ] Definir estrategia de cache key por bucket geografico de lat/lon
-- [x] Definir invalidacion tras `ingestion_run` completado
-- [ ] Medir TTFB, payload y latencia de filtros
-- [x] Reducir payload visual del listado para decision rapida
-- [ ] Optimizar cache de queries calientes
-- [ ] Optimizar refresco de snapshots externos
-- [ ] Validar accesibilidad basica de filtros, mapa y formularios
-- [ ] Validar comportamiento movil en escenarios reales
-- [x] Anadir smoke test de despliegue `staging`
-- [x] Anadir smoke test de despliegue `production`
-- [x] Actualizar smoke publico para `origin/presets` y movilidad trip-centric
-- [ ] Bloquear cierre de fase sin budgets de rendimiento cumplidos
-
-## 12. Despliegue y entrega
-- [x] Desplegar `staging` en `https://staging.alabiblio.org`
-- [x] Desplegar `production` en `https://alabiblio.org`
-- [x] Verificar convivencia de SPA en `/` y API en `/api/*`
-- [x] Configurar migraciones D1 por entorno
-- [x] Ejecutar ingesta inicial de centros en `local`, `staging` y `production`
-- [x] Ejecutar sync de movilidad en `staging` y `production`
-- [x] Ejecutar sync de cobertura SER en `staging` y `production`
-- [ ] Configurar buckets R2 por entorno
-- [ ] Configurar namespaces KV por entorno
-- [ ] Configurar secretos por entorno
-- [ ] Configurar cron jobs de refresco
-- [ ] Publicar basemap libre en Cloudflare
-- [ ] Ejecutar seed inicial de datos validados
-- [x] Ejecutar smoke tests en `staging`
-- [x] Ejecutar smoke tests en `production`
-- [x] Desplegar ETA, ordenacion por llegada y UX de decision en `staging` y `production`
-- [x] Marcar checks reales del roadmap segun avance
-- [ ] Preparar build final y assets de entrega del proyecto
+- [ ] *Lote 10 - Documentacion, deploy y seguridad operativa*
+	- [ ] Alinear `README.md` con bindings y runtime reales
+	- [ ] Corregir deriva documental en `ARCHITECTURE-CURRENT.md` y `API-CONTRACTS-V1.md`
+	- [ ] Documentar entorno local minimo para `node`, `pnpm` y `wrangler`
+	- [ ] Revisar rate limiting, timeout y tolerancia a fallos de upstream publico
+	- [ ] Anadir checklist de release y rollback por entorno Cloudflare

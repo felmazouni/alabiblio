@@ -1,10 +1,10 @@
 import type { CenterFeature } from "./features";
 import type {
   MobilityConfidence,
-  MobilityHighlightsV1,
   MobilityMode,
   StaticTransportAnchorsV1,
 } from "./mobility";
+import type { CenterResponseMetaV1 } from "./scopes";
 
 export type CenterKind = "study_room" | "library";
 
@@ -168,7 +168,7 @@ export interface CenterSchedulePayload extends CenterScheduleSummary {
   data_freshness: string | null;
 }
 
-export interface CenterListCardV1 extends CenterScheduleSummary {
+export interface CenterListBaseItemV1 extends CenterScheduleSummary {
   id: string;
   slug: string;
   kind: CenterKind;
@@ -183,8 +183,6 @@ export interface CenterListCardV1 extends CenterScheduleSummary {
     zone_name: string | null;
   } | null;
   services: CenterServicesV1;
-  decision: CenterDecisionSummary;
-  mobility_highlights: MobilityHighlightsV1;
 }
 
 export interface CenterDetailBaseV1 {
@@ -219,13 +217,14 @@ export interface CenterDetailBaseV1 {
   sources: CenterSourceSummary[];
 }
 
-export type CenterDecisionCardItem = CenterListCardV1;
-export type CenterListItem = CenterListCardV1;
+export type CenterDecisionCardItem = CenterListBaseItemV1;
+export type CenterListItem = CenterListBaseItemV1;
 export type CenterDetailDecisionItem = CenterDetailBaseV1;
 export type CenterDetailItem = CenterDetailBaseV1;
 
 export interface ListCentersResponse {
-  items: CenterListCardV1[];
+  meta: CenterResponseMetaV1<"base_exploration", "list_centers">;
+  items: CenterListBaseItemV1[];
   total: number;
   open_count: number;
   limit: number;
@@ -234,6 +233,7 @@ export interface ListCentersResponse {
 }
 
 export interface GetCenterDetailResponse {
+  meta: CenterResponseMetaV1<"base_exploration", "center_detail">;
   item: CenterDetailBaseV1;
 }
 

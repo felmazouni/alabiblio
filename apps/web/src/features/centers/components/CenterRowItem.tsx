@@ -1,38 +1,33 @@
-import type { CenterDecisionCardItem } from "@alabiblio/contracts/centers";
+import type {
+  CenterListBaseItemV1,
+  ListCentersResponse,
+} from "@alabiblio/contracts/centers";
 import {
   ArrowRight,
-  Bike,
-  Bus,
   Clock3,
   MapPin,
   Navigation,
-  TrainFront,
-  Car,
+  Shield,
 } from "lucide-react";
-import { buildSecondaryCardHighlights } from "../transportCopy";
+import { buildBaseCardPresentation } from "../cardPresentation";
 
 type CenterRowItemProps = {
-  center: CenterDecisionCardItem;
+  center: CenterListBaseItemV1;
+  scope: ListCentersResponse["meta"]["scope"];
   onSelect: (slug: string) => void;
 };
 
 function getHighlightIcon(label: string) {
   switch (label) {
-    case "BUS":
-      return <Bus size={12} />;
-    case "METRO":
-      return <TrainFront size={12} />;
-    case "BICIMAD":
-      return <Bike size={12} />;
-    case "COCHE":
-      return <Car size={12} />;
+    case "SER":
+      return <Shield size={12} />;
     default:
       return <Navigation size={12} />;
   }
 }
 
-export function CenterRowItem({ center, onSelect }: CenterRowItemProps) {
-  const highlights = buildSecondaryCardHighlights(center);
+export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
+  const presentation = buildBaseCardPresentation(center, scope);
   const area = [center.neighborhood, center.district].filter(Boolean).join(" - ");
 
   return (
@@ -67,7 +62,7 @@ export function CenterRowItem({ center, onSelect }: CenterRowItemProps) {
       </div>
 
       <div className="center-row-item__middle">
-        {highlights.slice(0, 3).map((highlight) => (
+        {presentation.highlightRows.slice(0, 3).map((highlight) => (
           <div key={`${center.id}-${highlight.label}-${highlight.body}`} className="center-row-item__transport">
             <span className="center-row-item__transport-label">
               {getHighlightIcon(highlight.label)}
@@ -79,13 +74,11 @@ export function CenterRowItem({ center, onSelect }: CenterRowItemProps) {
       </div>
 
       <div className="center-row-item__right">
-        <span className="center-row-item__eta-value">{center.decision.summary_label ?? "Sin origen"}</span>
-        {center.decision.distance_m !== null ? (
+        <span className="center-row-item__eta-value">{presentation.footerLabel}</span>
+        {center.ser?.enabled ? (
           <span className="center-row-item__dist">
             <Navigation size={11} />
-            {center.decision.distance_m < 1000
-              ? `${Math.round(center.decision.distance_m)} m`
-              : `${(center.decision.distance_m / 1000).toFixed(1)} km`}
+            {center.ser.zone_name ? `SER ${center.ser.zone_name}` : "Zona SER"}
           </span>
         ) : null}
         <button type="button" className="center-row-item__cta" onClick={() => onSelect(center.slug)}>

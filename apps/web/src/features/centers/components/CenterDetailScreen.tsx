@@ -1,5 +1,12 @@
-import type { CenterDetailItem, ScheduleRegularRule } from "@alabiblio/contracts/centers";
-import type { CenterMobility } from "@alabiblio/contracts/mobility";
+import type {
+  CenterDetailItem,
+  GetCenterDetailResponse,
+  ScheduleRegularRule,
+} from "@alabiblio/contracts/centers";
+import type {
+  CenterMobility,
+  GetCenterMobilityResponse,
+} from "@alabiblio/contracts/mobility";
 import type { UserOrigin } from "@alabiblio/contracts/origin";
 import {
   ArrowLeft,
@@ -25,13 +32,16 @@ import {
   buildModuleNote,
   modeLabel,
 } from "../transportCopy";
+import { getDetailMobilityScopeLabel } from "../scopePresentation";
 import { CenterFeatureGrid } from "./CenterFeatureGrid";
 import { CenterMobilityMap } from "./CenterMobilityMap";
 import { EmptyStateCard } from "../../ui/EmptyStateCard";
 
 type CenterDetailScreenProps = {
   item: CenterDetailItem | null;
+  detailScope: GetCenterDetailResponse["meta"]["scope"] | null;
   mobility: CenterMobility | null;
+  mobilityScope: GetCenterMobilityResponse["meta"]["scope"] | null;
   origin: UserOrigin | null;
   loading: boolean;
   mobilityLoading: boolean;
@@ -62,7 +72,9 @@ function formatMapsUrl(item: CenterDetailItem): string | null {
 
 export function CenterDetailScreen({
   item,
+  detailScope,
   mobility,
+  mobilityScope,
   origin,
   loading,
   mobilityLoading,
@@ -123,14 +135,13 @@ export function CenterDetailScreen({
   const scheduleRows = buildCompactSchedule(item.schedule.regular_rules);
   const reason = buildHumanReason(mobility);
   const transportRows = mobility ? buildFeaturedTransportRows(mobility) : [];
-  const footerTiles = mobility ? buildFeaturedFooterTiles(mobility, {
+  const hasOriginEnrichedMobility = mobilityScope === "origin_enriched" && mobility !== null;
+  const footerTiles = hasOriginEnrichedMobility ? buildFeaturedFooterTiles(mobility, {
     ser: item.ser,
     decision: {
       best_mode: mobility.summary.best_mode,
       best_time_minutes: mobility.summary.best_time_minutes,
-      distance_m: mobility.origin_dependent.walking_eta_min !== null
-        ? mobility.origin_dependent.walking_eta_min * 83
-        : null,
+      distance_m: null,
       confidence: mobility.summary.confidence,
       rationale: mobility.summary.rationale,
       summary_label: null,
@@ -150,7 +161,10 @@ export function CenterDetailScreen({
         <div className="detail-screen__hero-band" />
         <div className="detail-screen__hero-header">
           <div className="detail-screen__hero-copy">
-            <span className="detail-screen__eyebrow">{item.kind_label}</span>
+            <span className="detail-screen__eyebrow">
+              {item.kind_label}
+              {detailScope === "base_exploration" ? " / detalle base" : ""}
+            </span>
             <h1>{item.name}</h1>
             <p>{[item.address_line, item.neighborhood, item.district].filter(Boolean).join(" / ") || "Madrid"}</p>
           </div>
@@ -165,11 +179,11 @@ export function CenterDetailScreen({
           <div className="detail-screen__kpi">
             <Navigation size={14} />
             <span>
-              {mobility && mobility.summary.best_time_minutes !== null && mobility.summary.best_mode
+              {hasOriginEnrichedMobility && mobility.summary.best_time_minutes !== null && mobility.summary.best_mode
                 ? `${mobility.summary.best_time_minutes} min - ${modeLabel(mobility.summary.best_mode)}`
                 : mobilityLoading
-                  ? "Calculando movilidad"
-                  : "Sin origen suficiente"}
+                  ? "Resolviendo llegada desde tu origen"
+                  : "Detalle base sin llegada contextual"}
             </span>
           </div>
           {origin ? <div className="detail-screen__kpi"><MapPin size={14} /><span>{origin.label}</span></div> : null}
@@ -187,16 +201,26 @@ export function CenterDetailScreen({
 
       <section className="detail-screen__section">
         <div className="detail-screen__section-copy">
-          <span className="detail-screen__section-label">Como llegar</span>
-          <h3>{mobility?.summary.best_mode ? `Opcion recomendada: ${modeLabel(mobility.summary.best_mode)}` : "Movilidad"}</h3>
-          <p>{mobility ? reason : "Cargamos la movilidad de forma independiente para no bloquear el detalle."}</p>
+          <span className="detail-screen__section-label">
+            {getDetailMobilityScopeLabel(mobilityScope)}
+          </span>
+          <h3>
+            {hasOriginEnrichedMobility && mobility.summary.best_mode
+              ? `Llegada resuelta: ${modeLabel(mobility.summary.best_mode)}`
+              : "Movilidad"}
+          </h3>
+          <p>
+            {hasOriginEnrichedMobility
+              ? reason
+              : "El detalle se carga en scope base y la llegada contextual se resuelve aparte cuando hay origen."}
+          </p>
         </div>
         {!mobility && mobilityLoading ? (
           <div className="transport-v1-list transport-v1-list--board">
             <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Calculando coche, EMT, BiciMAD y metro...</div>
             <div className="transport-v1-row transport-v1-row--board transport-v1-row--loading">Cargando anchors y tiempos del origen...</div>
           </div>
-        ) : mobility ? (
+        ) : hasOriginEnrichedMobility ? (
           <div className="transport-v1-list transport-v1-list--board">
             {transportRows.map((row) => (
               <div key={row.mode} className={`transport-v1-row transport-v1-row--board${row.recommended ? " transport-v1-row--recommended" : ""}`}>

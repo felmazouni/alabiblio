@@ -17,6 +17,10 @@ import {
 import {
   groupDestinationTransportNodes,
 } from "../lib/mobility";
+import {
+  buildCenterMobilityResponsePayload,
+  buildCenterMobilitySummaryResponsePayload,
+} from "../lib/centerPayloads";
 import { loadOriginTransportContext } from "../lib/originTransport";
 
 const MOBILITY_CACHE_TTL_SECONDS = 15;
@@ -230,9 +234,7 @@ export async function handleGetCenterMobility(
           );
         }
 
-        const payload: GetCenterMobilityResponse = {
-          item,
-        };
+        const payload: GetCenterMobilityResponse = buildCenterMobilityResponsePayload(item);
 
         return Response.json(payload, {
           headers: buildPublicReadHeaders(dataVersion),
@@ -289,10 +291,11 @@ export async function handleGetCenterMobilitySummary(
           );
         }
 
-        const payload: GetCenterMobilitySummaryResponse = {
-          slug,
-          item,
-        };
+        const payload: GetCenterMobilitySummaryResponse =
+          buildCenterMobilitySummaryResponsePayload({
+            slug,
+            item,
+          });
 
         return Response.json(payload, {
           headers: buildPublicReadHeaders(dataVersion),

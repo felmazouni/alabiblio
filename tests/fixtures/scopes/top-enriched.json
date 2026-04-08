@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "scope": "origin_enriched",
+    "endpoint": "top_mobility_centers"
+  },
+  "open_count": 1,
+  "items": [
+    {
+      "slug": "biblioteca-centro",
+      "rank": 1,
+      "center_keys": [
+        "address_line",
+        "closes_today",
+        "decision",
+        "district",
+        "id",
+        "is_open_now",
+        "kind",
+        "kind_label",
+        "name",
+        "neighborhood",
+        "opens_today",
+        "ser",
+        "slug",
+        "today_human_schedule"
+      ],
+      "center": {
+        "name": "Biblioteca Centro",
+        "kind": "library",
+        "is_open_now": true,
+        "opens_today": "00:00",
+        "closes_today": "23:59",
+        "decision": {
+          "best_mode": "car",
+          "best_time_minutes": 9,
+          "distance_m": 3898.4,
+          "confidence": "medium",
+          "rationale": [
+            "Centro abierto ahora",
+            "Coche con contexto SER"
+          ],
+          "summary_label": "Coche 9 min"
+        },
+        "ser": {
+          "enabled": true,
+          "zone_name": "Centro"
+        }
+      },
+      "mobility": {
+        "origin": {
+          "available": true,
+          "label": "Origen activo"
+        },
+        "origin_dependent": {
+          "estimated_car_eta_min": 9,
+          "walking_eta_min": 47
+        },
+        "summary": {
+          "best_mode": "car",
+          "best_time_minutes": 9,
+          "confidence": "medium",
+          "rationale": [
+            "Centro abierto ahora",
+            "Coche con contexto SER"
+          ]
+        },
+        "module_states": {
+          "car": "ok",
+          "bus": "partial",
+          "bike": "partial",
+          "metro": "ok"
+        },
+        "degraded_modes": [
+          "bus",
+          "bike"
+        ]
+      }
+    }
+  ]
+}

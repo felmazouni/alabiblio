@@ -1,6 +1,7 @@
-import type { CenterKind, CenterSortBy } from "@alabiblio/contracts/centers";
+import type { CenterKind } from "@alabiblio/contracts/centers";
 import { Check, SlidersHorizontal, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
+import type { CatalogBaseSortBy } from "../centers/catalogFilters";
 
 type KindFilter = "all" | CenterKind;
 
@@ -33,8 +34,8 @@ export type FilterDrawerProps = {
   onClose: () => void;
   kindFilter: KindFilter;
   onKindChange: (v: KindFilter) => void;
-  sortBy: CenterSortBy;
-  onSortChange: (v: CenterSortBy) => void;
+  sortBy: CatalogBaseSortBy;
+  onSortChange: (v: CatalogBaseSortBy) => void;
   openNowOnly: boolean;
   onOpenNowChange: (v: boolean) => void;
   wifiOnly: boolean;
@@ -128,6 +129,8 @@ export function FilterDrawer({
   activeCount,
   onClearAll,
 }: FilterDrawerProps) {
+  const titleId = useId();
+
   useEffect(() => {
     if (!open) return;
 
@@ -138,6 +141,19 @@ export function FilterDrawer({
       document.body.style.overflow = previousOverflow;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleEscape(event: KeyboardEvent): void {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [open, onClose]);
 
   return (
     <>
@@ -151,10 +167,10 @@ export function FilterDrawer({
         className={`filter-drawer${open ? " filter-drawer--open" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Filtros"
+        aria-labelledby={titleId}
       >
         <div className="filter-drawer__header">
-          <span className="filter-drawer__title">
+          <span id={titleId} className="filter-drawer__title">
             <SlidersHorizontal size={15} />
             Filtros
             {activeCount > 0 ? <span className="filter-drawer__badge">{activeCount}</span> : null}
@@ -186,17 +202,17 @@ export function FilterDrawer({
           </section>
 
           <section className="filter-drawer__section">
-            <h4 className="filter-drawer__section-title">Ordenar por</h4>
+            <h4 className="filter-drawer__section-title">Orden base</h4>
             <RadioGroup
               value={sortBy}
               onChange={onSortChange}
               options={[
-                { value: "recommended", label: "Recomendado" },
-                { value: "distance", label: "Distancia" },
-                { value: "arrival", label: "Mejor ETA" },
                 { value: "open_now", label: "Abiertos primero" },
               ]}
             />
+            <p className="filter-drawer__footer-note">
+              El listado base no ordena por llegada ni distancia contextual.
+            </p>
           </section>
 
           <section className="filter-drawer__section">
@@ -238,9 +254,11 @@ export function FilterDrawer({
         </div>
 
         <div className="filter-drawer__footer">
+          <span className="filter-drawer__footer-note">
+            Los cambios se aplican al instante.
+          </span>
           <button type="button" className="filter-drawer__apply" onClick={onClose}>
-            Ver resultados
-            {activeCount > 0 ? ` (${activeCount})` : ""}
+            Cerrar filtros
           </button>
         </div>
       </div>
