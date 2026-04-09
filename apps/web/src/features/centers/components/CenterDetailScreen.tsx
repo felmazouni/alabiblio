@@ -23,6 +23,7 @@ import {
   TrainFront,
   Users,
 } from "lucide-react";
+import { Suspense, lazy } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   buildDetailModeSummary,
@@ -35,8 +36,12 @@ import {
 } from "../transportCopy";
 import { getDetailMobilityScopeLabel } from "../scopePresentation";
 import { CenterFeatureGrid } from "./CenterFeatureGrid";
-import { CenterMobilityMap } from "./CenterMobilityMap";
 import { EmptyStateCard } from "../../ui/EmptyStateCard";
+
+const CenterMobilityMap = lazy(async () => {
+  const module = await import("./CenterMobilityMap");
+  return { default: module.CenterMobilityMap };
+});
 
 type CenterDetailScreenProps = {
   item: CenterDetailItem | null;
@@ -251,6 +256,9 @@ export function CenterDetailScreen({
                       {buildDetailModeSummary(row.mode, mobility)}
                     </span>
                   )}
+                  <span className={`transport-confidence-chip transport-confidence-chip--${row.confidenceSource}`}>
+                    {confidenceSourceLabel(row.confidenceSource)}
+                  </span>
                   {buildModuleNote(row.mode, mobility) ? <span className="transport-v1-row__note">{buildModuleNote(row.mode, mobility)}</span> : null}
                 </div>
                 {row.eta ? <span className="transport-v1-row__eta">{row.eta}</span> : null}
@@ -279,7 +287,9 @@ export function CenterDetailScreen({
 
       <section className="detail-screen__section">
         {mobility ? (
-          <CenterMobilityMap center={item} mobility={mobility} ser={item.ser} origin={origin} />
+          <Suspense fallback={<div className="detail-screen__fallback">Cargando mapa de llegada...</div>}>
+            <CenterMobilityMap center={item} mobility={mobility} ser={item.ser} origin={origin} />
+          </Suspense>
         ) : (
           <div className="detail-screen__fallback">Calculando mapa de movilidad y anchors utiles...</div>
         )}

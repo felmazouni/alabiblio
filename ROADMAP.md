@@ -58,19 +58,19 @@
 	- [x] Anadir fixtures de entidades HTML, UTF-8 roto y dobles decodificaciones
 	- [x] Verificar que detalle, listado, geocode y nodos de movilidad no reintroducen texto corrupto
 
-- [ ] *Lote 7 - Testing que proteja de verdad*
-	- [ ] Crear pruebas de integracion HTTP para `health`, `centers`, `top-mobility`, `detail`, `mobility`, `geocode` y `origin/presets`
-	- [ ] Crear E2E de Top, Listado, Detalle, Filtros y cambio de origen
-	- [ ] Anadir snapshots o golden tests de payload para contratos criticos
-	- [ ] Cubrir regresiones de timeout, cancelacion y estados vacios
-	- [ ] Hacer fallar CI si faltan pruebas de contrato en endpoints criticos
+- [x] *Lote 7 - Testing que proteja de verdad*
+	- [x] Crear pruebas de integracion HTTP para `health`, `centers`, `top-mobility`, `detail`, `mobility`, `geocode` y `origin/presets`
+	- [x] Crear E2E de Top, Listado, Detalle, Filtros y cambio de origen
+	- [x] Anadir snapshots o golden tests de payload para contratos criticos
+	- [x] Cubrir regresiones de timeout, cancelacion y estados vacios
+	- [x] Hacer fallar CI si faltan pruebas de contrato en endpoints criticos
 
 - [ ] *Lote 8 - Performance y bundles*
-	- [ ] Aplicar code splitting por ruta y por mapa
-	- [ ] Lazy-load de MapLibre y aislamiento de CSS pesada del mapa
-	- [ ] Revisar impacto real de `gsap`, `framer-motion` y componentes ReactBits
+	- [x] Aplicar code splitting por ruta y por mapa
+	- [x] Lazy-load de MapLibre y aislamiento de CSS pesada del mapa
+	- [x] Revisar impacto real de `gsap`, `framer-motion` y componentes ReactBits
 	- [ ] Eliminar componentes no usados y dependencias fantasmas
-	- [ ] Reducir bundle cliente inicial por debajo del umbral operativo acordado
+	- [x] Reducir bundle cliente inicial por debajo del umbral operativo acordado
 
 - [ ] *Lote 9 - UX operativa y accesibilidad basica*
 	- [ ] Anadir foco gestionado y trap real en drawers y sheets

@@ -207,15 +207,23 @@ test("logApiResponse emite JSON estructurado con request_id y cache_status", () 
     route: string;
     cache_status: string;
     upstream_status: string;
+    data_source: string;
+    realtime_status: string;
     duration_ms: number;
     text_suspect: boolean;
+    text_suspect_count: number;
+    upstream_failure_count: number;
   };
 
   assert.match(payload.request_id, /^[0-9a-f-]{36}$/i);
   assert.equal(payload.route, "health");
   assert.equal(payload.cache_status, "BYPASS");
   assert.equal(payload.upstream_status, "none");
+  assert.equal(payload.data_source, "internal");
+  assert.equal(payload.realtime_status, "none");
   assert.equal(payload.text_suspect, false);
+  assert.equal(payload.text_suspect_count, 0);
+  assert.equal(payload.upstream_failure_count, 0);
   assert.equal(typeof payload.duration_ms, "number");
 });
 
@@ -269,6 +277,7 @@ test("createApiJsonResponse marca text_suspect y loguea hallazgos estructurados"
   };
   const logPayload = JSON.parse(logLine) as {
     text_suspect: boolean;
+    text_suspect_count: number;
   };
 
   assert.equal(warningPayload.source, "response_body");
@@ -276,4 +285,5 @@ test("createApiJsonResponse marca text_suspect y loguea hallazgos estructurados"
   assert.equal(warningPayload.raw_snippet, "Malasa\u00c3\u00b1a");
   assert.equal(warningPayload.text_suspect, true);
   assert.equal(logPayload.text_suspect, true);
+  assert.equal(logPayload.text_suspect_count, 1);
 });

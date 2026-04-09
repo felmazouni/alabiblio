@@ -1,35 +1,49 @@
 .dock-outer {
-  margin: 0;
   display: flex;
+  justify-content: center;
   max-width: 100%;
   align-items: center;
 }
 
 .dock-panel {
-  position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  gap: var(--sp-2);
   width: fit-content;
-  gap: 0.6rem;
-  border-radius: 1.2rem;
-  background-color: rgba(7, 11, 17, 0.9);
-  border: 1px solid rgba(171, 188, 214, 0.16);
-  padding: 0 0.4rem 0.4rem;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  padding: var(--sp-2);
+  border-radius: calc(var(--radius-2xl) + 2px);
+  border: 1px solid var(--color-border-mid);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised) 94%, transparent), color-mix(in srgb, var(--color-surface) 96%, transparent));
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(20px);
 }
 
 .dock-item {
   position: relative;
-  display: inline-flex;
+  display: grid;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  background-color: rgba(8, 12, 18, 0.95);
-  border: 1px solid rgba(171, 188, 214, 0.12);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  cursor: pointer;
-  outline: none;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 94%, transparent);
+  color: var(--color-text-2);
+  transition:
+    transform var(--transition-quick),
+    border-color var(--transition-quick),
+    background-color var(--transition-quick),
+    color var(--transition-quick),
+    box-shadow var(--transition-quick);
+  box-shadow: 0 8px 20px rgba(5, 16, 27, 0.18);
+}
+
+.dock-item:hover,
+.dock-item:focus-visible {
+  transform: translateY(-2px);
+  color: var(--color-text);
+  border-color: var(--color-primary-border);
+  background: color-mix(in srgb, var(--color-primary-surface) 74%, var(--color-surface) 26%);
+  box-shadow: 0 14px 28px rgba(5, 16, 27, 0.26);
 }
 
 .dock-icon {
@@ -40,15 +54,17 @@
 
 .dock-label {
   position: absolute;
-  top: -1.5rem;
+  top: -2rem;
   left: 50%;
-  width: fit-content;
   white-space: pre;
-  border-radius: 0.375rem;
-  border: 1px solid rgba(171, 188, 214, 0.12);
-  background-color: rgba(8, 12, 18, 0.95);
-  padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
-  color: #fff;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-mid);
+  background: color-mix(in srgb, var(--color-surface-raised) 96%, transparent);
+  padding: 0.18rem 0.55rem;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--color-text);
   transform: translateX(-50%);
+  box-shadow: var(--shadow-sm);
 }

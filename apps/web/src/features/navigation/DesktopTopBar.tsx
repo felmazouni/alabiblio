@@ -1,5 +1,6 @@
-import { Navigation } from "lucide-react";
+import { MoonStar, Navigation, SunMedium } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTheme } from "../theme/useTheme";
 
 const DESKTOP_NAV = [
   { to: "/", label: "Top 3" },
@@ -9,6 +10,7 @@ const DESKTOP_NAV = [
 export function DesktopTopBar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="desktop-topbar">
@@ -35,6 +37,15 @@ export function DesktopTopBar() {
             );
           })}
         </nav>
+        <button
+          type="button"
+          className="desktop-topbar__theme-toggle"
+          onClick={toggleTheme}
+          aria-label={theme === "dark" ? "Activar modo claro" : "Activar modo oscuro"}
+        >
+          {theme === "dark" ? <SunMedium size={15} /> : <MoonStar size={15} />}
+          <span>{theme === "dark" ? "Claro" : "Oscuro"}</span>
+        </button>
       </div>
     </div>
   );

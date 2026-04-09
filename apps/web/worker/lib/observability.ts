@@ -46,6 +46,7 @@ export interface ApiRequestContext {
   path: string;
   originBucket: string | null;
   textSuspect: boolean;
+  textSuspectCount: number;
 }
 
 type ApiResponseTelemetry = {
@@ -124,6 +125,7 @@ function logSuspiciousTextFindings(
   }
 
   requestContext.textSuspect = true;
+  requestContext.textSuspectCount = findings.length;
 
   for (const finding of findings) {
     console.warn(
@@ -152,7 +154,68 @@ export function createApiRequestContext(
     path: new URL(request.url).pathname,
     originBucket: null,
     textSuspect: false,
+    textSuspectCount: 0,
   };
+}
+
+function inferDataSource(
+  route: ApiRouteName,
+  upstreamStatus: string | null,
+): string {
+  switch (route) {
+    case "health":
+      return "internal";
+    case "origin_presets":
+      return "static";
+    case "geocode_search":
+      if (upstreamStatus?.includes("callejero:hit")) {
+        return "d1_callejero";
+      }
+      if (upstreamStatus?.includes("nominatim:ok") || upstreamStatus?.includes("nominatim:timeout")) {
+        return "upstream_nominatim";
+      }
+      return "geocode_mixed";
+    case "list_centers":
+    case "center_detail":
+    case "center_schedule":
+      return "d1";
+    case "top_mobility_centers":
+    case "center_mobility":
+    case "center_mobility_summary":
+      return "d1_plus_mobility";
+    default:
+      return "unknown";
+  }
+}
+
+function inferRealtimeStatus(upstreamStatus: string | null): string {
+  if (!upstreamStatus || upstreamStatus === "none") {
+    return "none";
+  }
+
+  const statuses = upstreamStatus
+    .split(";")
+    .map((segment) => segment.split(":")[1] ?? "")
+    .filter(Boolean);
+  const distinct = [...new Set(statuses)];
+
+  if (distinct.length === 0) {
+    return "none";
+  }
+
+  return distinct.length === 1 ? distinct[0]! : distinct.join(",");
+}
+
+function countUpstreamFailures(upstreamStatus: string | null): number {
+  if (!upstreamStatus || upstreamStatus === "none") {
+    return 0;
+  }
+
+  return upstreamStatus
+    .split(";")
+    .map((segment) => segment.split(":")[1] ?? "")
+    .filter((status) => status === "error" || status === "timeout")
+    .length;
 }
 
 export function withRequestContext(
@@ -257,6 +320,8 @@ export function logApiResponse(
   requestContext: ApiRequestContext,
   response: Response,
 ): void {
+  const upstreamStatus = response.headers.get(UPSTREAM_STATUS_HEADER) ?? "none";
+
   console.log(
     JSON.stringify({
       request_id: requestContext.requestId,
@@ -264,13 +329,17 @@ export function logApiResponse(
       method: requestContext.method,
       origin_bucket: requestContext.originBucket,
       cache_status: response.headers.get(CACHE_STATUS_HEADER) ?? "BYPASS",
-      upstream_status: response.headers.get(UPSTREAM_STATUS_HEADER) ?? "none",
+      upstream_status: upstreamStatus,
+      data_source: inferDataSource(requestContext.route, upstreamStatus),
+      realtime_status: inferRealtimeStatus(upstreamStatus),
       duration_ms: Date.now() - requestContext.startedAt,
       data_version: response.headers.get("x-data-version"),
       data_scope: response.headers.get(DATA_SCOPE_HEADER),
       data_state: response.headers.get(DATA_STATE_HEADER),
       error_type: response.headers.get(ERROR_TYPE_HEADER),
       text_suspect: requestContext.textSuspect,
+      text_suspect_count: requestContext.textSuspectCount,
+      upstream_failure_count: countUpstreamFailures(upstreamStatus),
       status: response.status,
     }),
   );

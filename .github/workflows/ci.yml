@@ -25,3 +25,6 @@ jobs:
       - run: pnpm exec tsx scripts/check-text-frontiers.ts
       - run: pnpm exec tsx scripts/check-foreign-keys.ts
       - run: pnpm build
+      - run: pnpm exec tsx scripts/check-architecture.ts
+      - run: pnpm exec tsx scripts/check-performance.ts
+      - run: pnpm exec tsx tests/e2e/app-flow.check.ts

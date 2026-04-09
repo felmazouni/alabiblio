@@ -94,6 +94,19 @@ type CenterFeatureRow = {
   is_filterable: number;
 };
 
+type MadridStreetRow = {
+  id: number;
+  full_via: string;
+  via_type: string;
+  via_name: string;
+  num_from: number | null;
+  num_to: number | null;
+  district: string | null;
+  neighborhood: string | null;
+  lat: number | null;
+  lon: number | null;
+};
+
 const CENTERS: CenterRow[] = [
   {
     id: "center_1",
@@ -332,6 +345,21 @@ const CENTER_FEATURES: CenterFeatureRow[] = [
   },
 ];
 
+const MADRID_STREETS: MadridStreetRow[] = [
+  {
+    id: 501,
+    full_via: "GRAN VIA",
+    via_type: "CALLE",
+    via_name: "GRAN VIA",
+    num_from: 32,
+    num_to: 32,
+    district: "Centro",
+    neighborhood: "Sol",
+    lat: 40.4202,
+    lon: -3.7055,
+  },
+];
+
 function normalizeSql(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
 }
@@ -446,6 +474,14 @@ function buildAll(sql: string, bindings: unknown[]) {
   if (normalizedSql.includes("FROM center_features")) {
     const centerIds = bindings.map(String);
     return CENTER_FEATURES.filter((row) => centerIds.includes(row.center_id));
+  }
+
+  if (normalizedSql.includes("FROM madrid_streets_fts")) {
+    return MADRID_STREETS;
+  }
+
+  if (normalizedSql.includes("FROM madrid_streets")) {
+    return MADRID_STREETS;
   }
 
   return [];

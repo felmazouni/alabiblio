@@ -31,6 +31,7 @@ export function BottomNavBar() {
 
           return {
             label: item.label,
+            ariaLabel: item.label,
             onClick: () => navigate(item.to),
             className: active ? "bottom-nav__item bottom-nav__item--active" : "bottom-nav__item",
             icon: <Icon size={20} strokeWidth={2.1} />,

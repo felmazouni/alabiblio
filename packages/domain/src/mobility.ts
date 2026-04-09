@@ -768,6 +768,11 @@ export function buildDecisionSummary(input: { center: { lat: number | null; lon:
 
 export function sortCenterListItems<T extends { decision: CenterDecisionSummary; is_open_now: boolean | null; schedule_confidence_label: "high" | "medium" | "low"; name: string; id: string }>(items: T[], sortBy: "recommended" | "distance" | "arrival" | "open_now"): T[] {
   return [...items].sort((left, right) => {
+    if (sortBy === "recommended" || sortBy === "open_now") {
+      const leftOpen = left.is_open_now ? 0 : 1;
+      const rightOpen = right.is_open_now ? 0 : 1;
+      if (leftOpen !== rightOpen) return leftOpen - rightOpen;
+    }
     if (sortBy === "distance") {
       const leftDistance = left.decision.distance_m ?? Number.POSITIVE_INFINITY;
       const rightDistance = right.decision.distance_m ?? Number.POSITIVE_INFINITY;
@@ -777,11 +782,6 @@ export function sortCenterListItems<T extends { decision: CenterDecisionSummary;
       const leftArrival = left.decision.best_time_minutes ?? Number.POSITIVE_INFINITY;
       const rightArrival = right.decision.best_time_minutes ?? Number.POSITIVE_INFINITY;
       if (leftArrival !== rightArrival) return leftArrival - rightArrival;
-    }
-    if (sortBy === "open_now" || sortBy === "recommended") {
-      const leftOpen = left.is_open_now ? 0 : 1;
-      const rightOpen = right.is_open_now ? 0 : 1;
-      if (leftOpen !== rightOpen) return leftOpen - rightOpen;
     }
     if (sortBy === "recommended" && confidenceSourceRank(left.decision.confidence_source) !== confidenceSourceRank(right.decision.confidence_source)) {
       return confidenceSourceRank(left.decision.confidence_source) - confidenceSourceRank(right.decision.confidence_source);

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import SpotlightCard from "../../../components/reactbits/SpotlightCard";
 import { buildTopMobilityCardPresentation } from "../cardPresentation";
+import { confidenceSourceLabel } from "../transportCopy";
 
 type TopMobilityCardProps = {
   center: CenterTopMobilityCardV1;
@@ -96,6 +97,9 @@ export function TopMobilityCard({
               </span>
               <span className="best-option-card__board-copy">
                 <strong className="best-option-card__board-headline">{row.headline}</strong>
+                <span className={`transport-confidence-chip transport-confidence-chip--${row.confidenceSource}`}>
+                  {confidenceSourceLabel(row.confidenceSource)}
+                </span>
                 {row.details.length > 0 ? (
                   <span className="best-option-card__board-details">
                     {row.details.map((detail) => (

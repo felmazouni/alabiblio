@@ -25,6 +25,7 @@ export type TransportBoardRow = {
   }>;
   eta: string | null;
   recommended: boolean;
+  confidenceSource: MobilityConfidenceSource;
 };
 
 export type TransportFooterTile = {
@@ -548,6 +549,7 @@ export function buildFeaturedTransportRows(
       }),
       eta: formatEta(metro?.eta_min ?? null),
       recommended: bestMode === "metro",
+      confidenceSource: metro?.confidence_source ?? "fallback",
     },
     {
       mode: "bus",
@@ -562,6 +564,7 @@ export function buildFeaturedTransportRows(
           ? `${bus.next_arrival_min} min`
           : null,
       recommended: bestMode === "bus",
+      confidenceSource: bus?.confidence_source ?? "fallback",
     },
     {
       mode: "bike",
@@ -572,6 +575,7 @@ export function buildFeaturedTransportRows(
       }),
       eta: formatEta(bike?.eta_min ?? null),
       recommended: bestMode === "bike",
+      confidenceSource: bike?.confidence_source ?? "fallback",
     },
   ];
 }

@@ -87,7 +87,13 @@ export function OriginSheet({
     <div className="origin-sheet">
       <div className="origin-sheet__backdrop" onClick={onClose} />
       <div className="origin-sheet__surface">
-        <DotGrid className="origin-sheet__background" dotSize={8} gap={18} />
+        <DotGrid
+          className="origin-sheet__background"
+          dotSize={8}
+          gap={18}
+          baseColor="color-mix(in srgb, var(--color-text-3) 24%, transparent)"
+          activeColor="color-mix(in srgb, var(--color-primary-soft) 30%, transparent)"
+        />
         <FadeContent className="origin-sheet__inner" blur duration={500}>
           <div className="origin-sheet__handle" />
 
@@ -97,7 +103,7 @@ export function OriginSheet({
               <h2>Desde donde buscas?</h2>
               <p>Elige un origen para calcular llegada, orden y mejores alternativas.</p>
             </div>
-            <button type="button" className="origin-sheet__close" onClick={onClose}>
+            <button type="button" className="origin-sheet__close" onClick={onClose} aria-label="Cerrar origen">
               <X size={18} />
             </button>
           </div>
@@ -143,6 +149,7 @@ export function OriginSheet({
                   ref={inputRef}
                   type="text"
                   className="origin-search__input"
+                  aria-label="Buscar direccion de origen"
                   value={query}
                   onChange={(event) => {
                     onQueryChange(event.target.value);

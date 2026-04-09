@@ -45,7 +45,12 @@ export function TopPicksScreen() {
   return (
     <section className="screen screen--list">
       <div className="screen__background">
-        <DotGrid dotSize={10} gap={22} baseColor="#243045" activeColor="#ffb45d" />
+        <DotGrid
+          dotSize={10}
+          gap={22}
+          baseColor="color-mix(in srgb, var(--color-text-3) 26%, transparent)"
+          activeColor="color-mix(in srgb, var(--color-primary-soft) 34%, transparent)"
+        />
       </div>
 
       <FadeContent blur duration={320} className="screen__content">

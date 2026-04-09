@@ -120,6 +120,20 @@ export default {
           );
         }
 
+        if (nestedPath.endsWith("/transport")) {
+          const slug = nestedPath.replace(/\/transport$/, "");
+
+          if (slug === "") {
+            return runApiRoute(request, "api_not_found", (requestWithContext, requestContext) =>
+              handleApiNotFound(requestWithContext, requestContext)
+            );
+          }
+
+          return runApiRoute(request, "center_mobility", (requestWithContext, requestContext) =>
+            handleGetCenterMobility(slug, env, ctx, requestWithContext, requestContext)
+          );
+        }
+
         if (nestedPath.endsWith("/mobility-summary")) {
           const slug = nestedPath.replace(/\/mobility-summary$/, "");
 
