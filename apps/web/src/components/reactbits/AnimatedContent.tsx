@@ -1,9 +1,5 @@
-import React, { useRef, useEffect } from "react";
+import React from "react";
 import type { ReactNode } from "react";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
 
 interface AnimatedContentProps {
   children: ReactNode;
@@ -34,57 +30,23 @@ const AnimatedContent: React.FC<AnimatedContentProps> = ({
   delay = 0,
   onComplete,
 }) => {
-  const ref = useRef<HTMLDivElement>(null);
+  const translate = direction === "horizontal"
+    ? `translate3d(${reverse ? -distance : distance}px, 0, 0)`
+    : `translate3d(0, ${reverse ? -distance : distance}px, 0)`;
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const axis = direction === "horizontal" ? "x" : "y";
-    const offset = reverse ? -distance : distance;
-    const startPct = (1 - threshold) * 100;
-
-    gsap.set(el, {
-      [axis]: offset,
-      scale,
-      opacity: animateOpacity ? initialOpacity : 1,
-    });
-
-    gsap.to(el, {
-      [axis]: 0,
-      scale: 1,
-      opacity: 1,
-      duration,
-      ease,
-      delay,
-      onComplete,
-      scrollTrigger: {
-        trigger: el,
-        start: `top ${startPct}%`,
-        toggleActions: "play none none none",
-        once: true,
-      },
-    });
-
-    return () => {
-      ScrollTrigger.getAll().forEach((t) => t.kill());
-      gsap.killTweensOf(el);
-    };
-  }, [
-    distance,
-    direction,
-    reverse,
-    duration,
-    ease,
-    initialOpacity,
-    animateOpacity,
-    scale,
-    threshold,
-    delay,
-    onComplete,
-  ]);
-
-  return <div ref={ref}>{children}</div>;
+  return (
+    <div
+      style={{
+        opacity: animateOpacity ? initialOpacity : 1,
+        transform: scale !== 1 ? `${translate} scale(${scale})` : translate,
+        transition: `transform ${duration}s ${typeof ease === "string" ? ease : "ease-out"} ${delay}s, opacity ${duration}s ${typeof ease === "string" ? ease : "ease-out"} ${delay}s`,
+      }}
+      onTransitionEnd={onComplete}
+      data-threshold={threshold}
+    >
+      {children}
+    </div>
+  );
 };
 
 export default AnimatedContent;

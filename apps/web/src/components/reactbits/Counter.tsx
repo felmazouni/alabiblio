@@ -1,52 +1,4 @@
-import { MotionValue, motion, useSpring, useTransform } from "framer-motion";
-import { useEffect } from "react";
-
 import "./Counter.css";
-
-interface NumberProps {
-  mv: MotionValue<number>;
-  number: number;
-  height: number;
-}
-
-function Number({ mv, number, height }: NumberProps) {
-  const y = useTransform(mv, (latest) => {
-    const placeValue = latest % 10;
-    const offset = (10 + number - placeValue) % 10;
-    let memo = offset * height;
-    if (offset > 5) {
-      memo -= 10 * height;
-    }
-    return memo;
-  });
-  return (
-    <motion.span className="counter-number" style={{ y }}>
-      {number}
-    </motion.span>
-  );
-}
-
-interface DigitProps {
-  place: number;
-  value: number;
-  height: number;
-  digitStyle?: React.CSSProperties;
-}
-
-function Digit({ place, value, height, digitStyle }: DigitProps) {
-  const valueRoundedToPlace = Math.floor(value / place);
-  const animatedValue = useSpring(valueRoundedToPlace);
-  useEffect(() => {
-    animatedValue.set(valueRoundedToPlace);
-  }, [animatedValue, valueRoundedToPlace]);
-  return (
-    <div className="counter-digit" style={{ height, ...digitStyle }}>
-      {Array.from({ length: 10 }, (_, i) => (
-        <Number key={i} mv={animatedValue} number={i} height={height} />
-      ))}
-    </div>
-  );
-}
 
 interface CounterProps {
   value: number;
@@ -111,15 +63,11 @@ export default function Counter({
         className="counter-counter"
         style={{ ...defaultCounterStyle, ...counterStyle }}
       >
-        {places.map((place) => (
-          <Digit
-            key={place}
-            place={place}
-            value={value}
-            height={height}
-            digitStyle={digitStyle}
-          />
-        ))}
+        <div className="counter-digit" style={{ height, ...digitStyle }}>
+          <span className="counter-number" style={{ transform: "translateY(0)" }}>
+            {places.map((place) => Math.floor(value / place) % 10).join("")}
+          </span>
+        </div>
       </div>
       <div className="gradient-container">
         <div
