@@ -17,7 +17,6 @@
 		"@alabiblio/contracts": "workspace:*",
 		"@alabiblio/domain": "workspace:*",
 		"@alabiblio/geo": "workspace:*",
-		"@alabiblio/ingestion": "workspace:*",
 		"@alabiblio/mobility": "workspace:*",
 		"@alabiblio/schedule-engine": "workspace:*",
 		"@alabiblio/ui": "workspace:*",

@@ -1,5 +1,5 @@
 import type { GeocodeAddressOption, GeocodeSearchResponse } from "@alabiblio/contracts/origin";
-import { normalizeSourceText } from "@alabiblio/ingestion/text";
+import { normalizeSourceText } from "../../../../packages/ingestion/src/text";
 import type { WorkerEnv } from "../lib/db";
 import type { ApiRequestContext } from "../lib/observability";
 import {
