@@ -22,5 +22,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm exec tsx scripts/check-text-frontiers.ts
+      - run: pnpm exec tsx scripts/check-foreign-keys.ts
       - run: pnpm build
-

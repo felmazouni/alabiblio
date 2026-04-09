@@ -13,5 +13,10 @@
     "name": "mojibake_utf8_latin1",
     "input": "Jos\u00c3\u00a9 Cast\u00c3\u00a1n Tobe\u00c3\u00b1as",
     "expected": "Jos\u00e9 Cast\u00e1n Tobe\u00f1as"
+  },
+  {
+    "name": "mixed_entities_mojibake_unicode",
+    "input": "Cafe\u0301 &amp; Co. Malasa\u00c3\u00b1a \u00c2\u00b7 Centro",
+    "expected": "Caf\u00e9 & Co. Malasa\u00f1a \u00b7 Centro"
   }
 ]

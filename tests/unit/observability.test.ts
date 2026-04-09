@@ -208,11 +208,72 @@ test("logApiResponse emite JSON estructurado con request_id y cache_status", () 
     cache_status: string;
     upstream_status: string;
     duration_ms: number;
+    text_suspect: boolean;
   };
 
   assert.match(payload.request_id, /^[0-9a-f-]{36}$/i);
   assert.equal(payload.route, "health");
   assert.equal(payload.cache_status, "BYPASS");
   assert.equal(payload.upstream_status, "none");
+  assert.equal(payload.text_suspect, false);
   assert.equal(typeof payload.duration_ms, "number");
+});
+
+test("createApiJsonResponse marca text_suspect y loguea hallazgos estructurados", async () => {
+  const request = new Request("https://example.test/api/centers");
+  const requestContext = createApiRequestContext(request, "list_centers");
+  const originalConsoleWarn = console.warn;
+  const originalConsoleLog = console.log;
+  const warnings: string[] = [];
+  let logLine = "";
+
+  console.warn = (message?: unknown) => {
+    warnings.push(String(message ?? ""));
+  };
+  console.log = (message?: unknown) => {
+    logLine = String(message ?? "");
+  };
+
+  try {
+    const response = createApiJsonResponse(
+      requestContext,
+      {
+        meta: {
+          scope: "base_exploration",
+          endpoint: "list_centers",
+        },
+        items: [{ name: "Malasa\u00c3\u00b1a" }],
+      },
+      {
+        cacheStatus: "BYPASS",
+        dataScope: "base_exploration",
+        upstreamStatus: "none",
+        dataState: "estimated",
+      },
+    );
+
+    await response.text();
+    logApiResponse(requestContext, response);
+  } finally {
+    console.warn = originalConsoleWarn;
+    console.log = originalConsoleLog;
+  }
+
+  assert.equal(warnings.length, 1);
+
+  const warningPayload = JSON.parse(warnings[0] ?? "{}") as {
+    source: string;
+    field: string;
+    raw_snippet: string;
+    text_suspect: boolean;
+  };
+  const logPayload = JSON.parse(logLine) as {
+    text_suspect: boolean;
+  };
+
+  assert.equal(warningPayload.source, "response_body");
+  assert.equal(warningPayload.field, "items[0].name");
+  assert.equal(warningPayload.raw_snippet, "Malasa\u00c3\u00b1a");
+  assert.equal(warningPayload.text_suspect, true);
+  assert.equal(logPayload.text_suspect, true);
 });

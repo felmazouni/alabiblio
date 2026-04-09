@@ -8,6 +8,7 @@ import type {
   CenterTopMobilityItem,
   MobilityRealtimeStatus,
 } from "@alabiblio/contracts/mobility";
+import { findSuspiciousTextEntries } from "../../../../packages/ingestion/src/text";
 
 const REQUEST_ID_HEADER = "x-request-id";
 const CACHE_STATUS_HEADER = "x-cache-status";
@@ -44,6 +45,7 @@ export interface ApiRequestContext {
   startedAt: number;
   path: string;
   originBucket: string | null;
+  textSuspect: boolean;
 }
 
 type ApiResponseTelemetry = {
@@ -111,6 +113,33 @@ function annotateMeta<T>(body: T, options: ApiResponseTelemetry): T {
   return candidate;
 }
 
+function logSuspiciousTextFindings(
+  requestContext: ApiRequestContext,
+  body: unknown,
+): void {
+  const findings = findSuspiciousTextEntries(body);
+
+  if (findings.length === 0) {
+    return;
+  }
+
+  requestContext.textSuspect = true;
+
+  for (const finding of findings) {
+    console.warn(
+      JSON.stringify({
+        request_id: requestContext.requestId,
+        route: requestContext.route,
+        method: requestContext.method,
+        source: "response_body",
+        field: finding.field,
+        raw_snippet: finding.rawSnippet,
+        text_suspect: true,
+      }),
+    );
+  }
+}
+
 export function createApiRequestContext(
   request: Request,
   route: ApiRouteName,
@@ -122,6 +151,7 @@ export function createApiRequestContext(
     startedAt: Date.now(),
     path: new URL(request.url).pathname,
     originBucket: null,
+    textSuspect: false,
   };
 }
 
@@ -150,6 +180,7 @@ export function createApiJsonResponse<T>(
   options: ApiJsonResponseOptions = {},
 ): Response {
   const annotatedBody = annotateMeta(body, options);
+  logSuspiciousTextFindings(requestContext, annotatedBody);
 
   return Response.json(annotatedBody, {
     status: options.status,
@@ -239,6 +270,7 @@ export function logApiResponse(
       data_scope: response.headers.get(DATA_SCOPE_HEADER),
       data_state: response.headers.get(DATA_STATE_HEADER),
       error_type: response.headers.get(ERROR_TYPE_HEADER),
+      text_suspect: requestContext.textSuspect,
       status: response.status,
     }),
   );

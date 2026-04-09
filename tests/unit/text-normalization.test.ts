@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { normalizeMadridCenterRecord } from "../../packages/ingestion/src/normalizers/center";
-import { normalizeSourceText } from "../../packages/ingestion/src/text";
+import {
+  containsSuspiciousText,
+  findSuspiciousTextEntries,
+  normalizeSourceText,
+} from "../../packages/ingestion/src/text";
 import { loadBicimadStationNodes } from "../../packages/mobility/src/sources/bicimadStations";
 import { loadParkingNodes } from "../../packages/mobility/src/sources/parkings";
 
@@ -26,21 +30,31 @@ function loadNormalizationFixtures(): NormalizationFixture[] {
 test("normalizeSourceText sanea fixtures de utf8, entidades HTML y mojibake real", () => {
   const fixtures = loadNormalizationFixtures();
 
-  assert.ok(fixtures.length >= 3);
+  assert.ok(fixtures.length >= 4);
 
   for (const fixture of fixtures) {
     assert.equal(normalizeSourceText(fixture.input), fixture.expected, fixture.name);
   }
 });
 
-test("normalizeSourceText decodifica entidades dobles sin tocar texto sano", () => {
-  assert.equal(normalizeSourceText("VI&amp;Ntilde;A VIRGEN"), "VIÑA VIRGEN");
-  assert.equal(normalizeSourceText("Sala de estudio Luis García Berlanga"), "Sala de estudio Luis García Berlanga");
+test("normalizeSourceText decodifica entidades HTML sin tocar texto sano", () => {
+  assert.equal(normalizeSourceText("VI&amp;Ntilde;A VIRGEN"), "VI\u00d1A VIRGEN");
+  assert.equal(
+    normalizeSourceText("Sala de estudio Luis Garc\u00eda Berlanga"),
+    "Sala de estudio Luis Garc\u00eda Berlanga",
+  );
 });
 
 test("normalizeSourceText repara mojibake UTF-8/latin1 real", () => {
-  assert.equal(normalizeSourceText("Malasa\u00c3\u00b1a"), "Malasaña");
-  assert.equal(normalizeSourceText("Jos\u00c3\u00a9 Cast\u00c3\u00a1n Tobe\u00c3\u00b1as"), "José Castán Tobeñas");
+  assert.equal(normalizeSourceText("Malasa\u00c3\u00b1a"), "Malasa\u00f1a");
+  assert.equal(
+    normalizeSourceText("Jos\u00c3\u00a9 Cast\u00c3\u00a1n Tobe\u00c3\u00b1as"),
+    "Jos\u00e9 Cast\u00e1n Tobe\u00f1as",
+  );
+  assert.equal(
+    normalizeSourceText("Caf\u00e9 &amp; Co. Malasa\u00c3\u00b1a \u00c2\u00b7 Centro"),
+    "Caf\u00e9 & Co. Malasa\u00f1a \u00b7 Centro",
+  );
 });
 
 test("normalizeSourceText no hace doble decode sobre texto ya sano", () => {
@@ -49,11 +63,46 @@ test("normalizeSourceText no hace doble decode sobre texto ya sano", () => {
   assert.equal(normalizeSourceText("Rock & Roll"), "Rock & Roll");
 });
 
+test("normalizeSourceText es idempotente para utf8, entidades, mojibake y casos mixtos", () => {
+  const cases = [
+    "Sala de estudio Luis Garc\u00eda Berlanga",
+    "Malasa\u00c3\u00b1a",
+    "VI&amp;Ntilde;A VIRGEN",
+    "Caf\u0065\u0301 &amp; Co. Malasa\u00c3\u00b1a \u00c2\u00b7 Centro",
+  ];
+
+  for (const input of cases) {
+    const once = normalizeSourceText(input);
+    const twice = normalizeSourceText(once);
+    assert.equal(twice, once, input);
+  }
+});
+
+test("containsSuspiciousText y findSuspiciousTextEntries detectan mojibake sin mutar payloads", () => {
+  assert.equal(containsSuspiciousText("Malasa\u00c3\u00b1a"), true);
+  assert.equal(containsSuspiciousText("Malasa\u00f1a"), false);
+  assert.equal(containsSuspiciousText("Caf\u00e9 \u00b7 Centro"), false);
+
+  const findings = findSuspiciousTextEntries({
+    items: [
+      { name: "Malasa\u00c3\u00b1a", safe: "Centro" },
+      { address: "Calle Gran V\u00eda" },
+    ],
+  });
+
+  assert.deepEqual(findings, [
+    {
+      field: "items[0].name",
+      rawSnippet: "Malasa\u00c3\u00b1a",
+    },
+  ]);
+});
+
 test("normalizeMadridCenterRecord persiste direcciones HTML como texto real", () => {
   const normalized = normalizeMadridCenterRecord(
     {
       PK: "6468021",
-      NOMBRE: "Sala de estudio Luis García Berlanga (Tetuán)",
+      NOMBRE: "Sala de estudio Luis Garc\u00c3\u00ada Berlanga (Tetu\u00c3\u00a1n)",
       DISTRITO: "TETUAN",
       BARRIO: "ALMENARA",
       "CLASE-VIAL": "CALLE",
@@ -80,13 +129,14 @@ test("normalizeMadridCenterRecord persiste direcciones HTML como texto real", ()
   );
 
   assert.ok(normalized);
-  assert.equal(normalized?.center.address_line, "CALLE VIÑA VIRGEN 2");
+  assert.equal(normalized?.center.address_line, "CALLE VI\u00d1A VIRGEN 2");
 });
 
 test("loadParkingNodes sanea nombres con mojibake antes de persistir", async () => {
+  const onceMojibake = Buffer.from("Jos\u00e9 Cast\u00e1n Tobe\u00f1as", "utf8").toString("latin1");
   const csv = [
     "id,name,address,long,lat,isEmtParking,Plazas_standard,Plazas_PMR",
-    "30,JosÃ© CastÃ¡n TobeÃ±as,CALLE JOSE CASTAN TOBENAS 1,-3.69225,40.46473,Y,100,4",
+    `30,${onceMojibake},CALLE JOSE CASTAN TOBENAS 1,-3.69225,40.46473,Y,100,4`,
   ].join("\n");
 
   const rows = await loadParkingNodes(async () =>
@@ -96,7 +146,7 @@ test("loadParkingNodes sanea nombres con mojibake antes de persistir", async () 
     }),
   );
 
-  assert.equal(rows[0]?.name, "José Castán Tobeñas");
+  assert.equal(rows[0]?.name, "Jos\u00e9 Cast\u00e1n Tobe\u00f1as");
 });
 
 test("loadBicimadStationNodes sanea nombres JSON con mojibake antes de persistir", async () => {
@@ -158,6 +208,6 @@ test("loadBicimadStationNodes sanea nombres JSON con mojibake antes de persistir
 
   const rows = await loadBicimadStationNodes(mockFetch);
 
-  assert.equal(rows[0]?.name, "4 - Malasaña");
-  assert.equal(rows[0]?.address_line, "Calle Manuela Malasaña 28004");
+  assert.equal(rows[0]?.name, "4 - Malasa\u00f1a");
+  assert.equal(rows[0]?.address_line, "Calle Manuela Malasa\u00f1a 28004");
 });
