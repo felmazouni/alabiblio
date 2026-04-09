@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./text": "./src/text.ts",
     "./types": "./src/types.ts",
     "./sources/libraries": "./src/sources/libraries.ts",
     "./sources/studyRooms": "./src/sources/studyRooms.ts",

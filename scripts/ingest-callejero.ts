@@ -20,6 +20,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse as parseCsv } from "csv-parse/sync";
 import { getDatabaseName } from "../packages/ingestion/src";
+import { normalizeSourceText } from "../packages/ingestion/src/text";
 
 // Default: direcciones vigentes — has street+number+district+barrio+coords
 const DEFAULT_CSV_URL =
@@ -171,6 +172,10 @@ function normalizeColName(name: string): string {
 
 type CallejeroRow = Record<string, string>;
 
+function cleanText(value: string | null | undefined): string | null {
+  return normalizeSourceText(value);
+}
+
 function mapColumns(row: CallejeroRow): {
   via_type: string;
   via_name: string;
@@ -188,21 +193,25 @@ function mapColumns(row: CallejeroRow): {
 
   // Via type — new CSV uses VIA_CLASE, old used TIPO_VIA
   const via_type =
-    norm.via_clase ??
-    norm.tipo_via ??
-    norm.tipovia ??
-    norm.tipo ??
-    "";
+    cleanText(
+      norm.via_clase ??
+      norm.tipo_via ??
+      norm.tipovia ??
+      norm.tipo ??
+      "",
+    ) ?? "";
 
   // Via name — prefer accented version
   const via_name =
-    norm.via_nombre_acentos ??
-    norm.via_nombre ??
-    norm.nombre_via_acentuado ??
-    norm.nombre_via ??
-    norm.nombrevia ??
-    norm.nombre ??
-    "";
+    cleanText(
+      norm.via_nombre_acentos ??
+      norm.via_nombre ??
+      norm.nombre_via_acentuado ??
+      norm.nombre_via ??
+      norm.nombrevia ??
+      norm.nombre ??
+      "",
+    ) ?? "";
 
   // House number — single number in new CSV
   const numRaw = norm.numero ?? norm.num ?? norm.primero ?? norm.num_inicio ?? "";
@@ -216,14 +225,14 @@ function mapColumns(row: CallejeroRow): {
     district = DISTRICT_CODE_TO_NAME[districtCode] ?? null;
   } else if (districtRaw !== "" && !/^\d+$/.test(districtRaw)) {
     // Already a text name (old CSV format)
-    district = districtRaw.toUpperCase();
+    district = cleanText(districtRaw)?.toUpperCase() ?? null;
   }
 
   // Neighborhood — new CSV uses numeric barrio code; old CSV may have text
   const barrioRaw = norm.barrio ?? norm.desc_barrio ?? norm.descripcion_barrio ?? norm.nombre_barrio ?? "";
   let neighborhood: string | null = null;
   if (barrioRaw !== "" && !/^\d+$/.test(barrioRaw)) {
-    neighborhood = barrioRaw; // text name from old CSV
+    neighborhood = cleanText(barrioRaw); // text name from old CSV
   }
   // For new CSV, barrio is just a code — we leave neighborhood null
   // (not needed for autocomplete, district is sufficient)

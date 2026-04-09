@@ -1,5 +1,6 @@
 import { parse } from "csv-parse/sync";
 import { utm30ToWgs84 } from "@alabiblio/geo/utm";
+import { normalizeSourceText } from "@alabiblio/ingestion/text";
 import type {
   MobilitySourceDefinition,
   TransportNodeRecord,
@@ -40,7 +41,7 @@ function parseNumber(value: string): number | null {
 }
 
 function cleanText(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
+  return normalizeSourceText(value) ?? "";
 }
 
 export async function loadEmtStopNodes(

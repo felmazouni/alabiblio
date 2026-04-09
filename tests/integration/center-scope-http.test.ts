@@ -14,9 +14,30 @@ import workerScopeHarness from "../support/worker-scope-harness.ts";
 
 const { createWorkerScopeHarness } = workerScopeHarness;
 
+const SUSPICIOUS_MOJIBAKE_PATTERN = /(?:Ã.|Â.|â.|ï¿½)/;
+
 function loadFixture<T>(name: string): T {
   const fixturePath = path.join(process.cwd(), "tests", "fixtures", "scopes", name);
   return JSON.parse(readFileSync(fixturePath, "utf8")) as T;
+}
+
+function assertNoMojibake(value: unknown, context: string): void {
+  if (typeof value === "string") {
+    assert.ok(
+      !SUSPICIOUS_MOJIBAKE_PATTERN.test(value),
+      `Suspicious mojibake detected at ${context}: ${value}`,
+    );
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertNoMojibake(entry, `${context}[${index}]`));
+    return;
+  }
+
+  if (value && typeof value === "object") {
+    Object.entries(value).forEach(([key, nested]) => assertNoMojibake(nested, `${context}.${key}`));
+  }
 }
 
 function normalizeBaseListPayload(payload: ListCentersResponse) {
@@ -97,6 +118,7 @@ test("GET /api/centers mantiene scope base y no filtra campos enriquecidos aunqu
     assert.equal(payload.total, 2);
     assert.equal(payload.open_count, 1);
     assert.equal(payload.next_offset, null);
+    assertNoMojibake(payload, "list");
 
     for (const item of payload.items) {
       assert.equal("decision" in item, false);
@@ -132,6 +154,7 @@ test("GET /api/centers/top-mobility mantiene scope origin_enriched y expone deci
     assert.ok(payload.items[0]?.item.summary.best_mode);
     assert.ok(payload.items[0]?.center.decision.confidence_source);
     assert.ok(payload.items[0]?.item.summary.confidence_source);
+    assertNoMojibake(payload, "top");
 
     assert.deepEqual(
       normalizeTopMobilityPayload(payload),
@@ -157,6 +180,7 @@ test("GET /api/centers/:slug mantiene scope base y no expone decision contextual
     assert.equal("arrival" in payload.item, false);
     assert.equal("distance" in payload.item, false);
     assert.equal(payload.item.schedule.is_open_now, true);
+    assertNoMojibake(payload, "detail");
   } finally {
     harness.cleanup();
   }
@@ -178,6 +202,7 @@ test("GET /api/centers/:slug/mobility mantiene scope origin_enriched y expone la
     assert.equal(payload.item.summary.best_mode, "car");
     assert.equal(payload.item.origin_dependent.estimated_car_eta_min, 9);
     assert.ok(payload.item.summary.confidence_source);
+    assertNoMojibake(payload, "mobility");
   } finally {
     harness.cleanup();
   }

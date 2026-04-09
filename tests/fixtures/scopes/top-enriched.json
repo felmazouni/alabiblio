@@ -2,7 +2,7 @@
   "meta": {
     "scope": "origin_enriched",
     "endpoint": "top_mobility_centers",
-    "data_state": "estimated",
+    "data_state": "stale",
     "upstream_status": "emt:unconfigured;bicimad:unavailable;metro:unconfigured"
   },
   "open_count": 1,

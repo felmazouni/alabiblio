@@ -2,7 +2,7 @@
   "meta": {
     "scope": "base_exploration",
     "endpoint": "list_centers",
-    "data_state": "estimated",
+    "data_state": "stale",
     "upstream_status": "none"
   },
   "total": 2,

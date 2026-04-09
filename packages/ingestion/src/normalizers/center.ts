@@ -1,6 +1,6 @@
-import { decode } from "he";
 import { slugifyCenterName } from "../../../domain/src/centers";
 import { inferCenterFeatures } from "../../../domain/src/features";
+import { normalizeSourceText } from "../text";
 import type {
   CenterMappingContext,
   CoordinateNormalization,
@@ -9,8 +9,7 @@ import type {
 } from "../types";
 
 function toNullableString(value: string | undefined): string | null {
-  const trimmed = value?.trim() ?? "";
-  return trimmed === "" ? null : decode(trimmed);
+  return normalizeSourceText(value);
 }
 
 function toNullableNumber(value: string | undefined): number | null {

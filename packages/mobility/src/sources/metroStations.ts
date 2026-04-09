@@ -1,4 +1,5 @@
 import { utm30ToWgs84 } from "@alabiblio/geo/utm";
+import { normalizeSourceText } from "@alabiblio/ingestion/text";
 import type { MobilitySourceDefinition, TransportNodeRecord } from "../types";
 
 interface ArcGisMetroFeature {
@@ -30,12 +31,7 @@ export const metroStationsSource: MobilitySourceDefinition = {
 };
 
 function cleanText(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const cleaned = value.trim().replace(/\s+/g, " ");
-  return cleaned === "" ? null : cleaned;
+  return normalizeSourceText(value);
 }
 
 function normalizeMetroLines(rawValue: string | null | undefined): string[] {

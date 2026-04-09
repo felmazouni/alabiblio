@@ -1,4 +1,5 @@
 import type { MobilitySourceDefinition, TransportNodeRecord } from "../types";
+import { normalizeSourceText } from "@alabiblio/ingestion/text";
 
 interface GbfsRootFeed {
   name?: string;
@@ -58,12 +59,7 @@ export const bicimadStationsSource: MobilitySourceDefinition = {
 };
 
 function cleanText(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const cleaned = value.trim().replace(/\s+/g, " ");
-  return cleaned === "" ? null : cleaned;
+  return normalizeSourceText(value);
 }
 
 function buildAddress(record: BicimadStationInformationRecord): string | null {

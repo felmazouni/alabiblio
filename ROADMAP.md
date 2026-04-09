@@ -51,12 +51,12 @@
 	- [x] Alinear copy UI con el nivel real de confianza del dominio
 	- [x] Anadir golden tests de decisiones de movilidad y ordenacion
 
-- [ ] *Lote 6 - Encoding y texto end-to-end*
-	- [ ] Unificar normalizacion de texto entre ingesta, worker y cliente
-	- [ ] Eliminar reparaciones redundantes en runtime cuando el dato ya llega saneado
-	- [ ] Corregir mojibake persistente en docs y comentarios del repo
-	- [ ] Anadir fixtures de entidades HTML, UTF-8 roto y dobles decodificaciones
-	- [ ] Verificar que detalle, listado, geocode y nodos de movilidad no reintroducen texto corrupto
+- [x] *Lote 6 - Encoding y texto end-to-end*
+	- [x] Unificar normalizacion de texto entre ingesta, worker y cliente
+	- [x] Eliminar reparaciones redundantes en runtime cuando el dato ya llega saneado
+	- [x] Corregir mojibake persistente en docs y comentarios del repo
+	- [x] Anadir fixtures de entidades HTML, UTF-8 roto y dobles decodificaciones
+	- [x] Verificar que detalle, listado, geocode y nodos de movilidad no reintroducen texto corrupto
 
 - [ ] *Lote 7 - Testing que proteja de verdad*
 	- [ ] Crear pruebas de integracion HTTP para `health`, `centers`, `top-mobility`, `detail`, `mobility`, `geocode` y `origin/presets`

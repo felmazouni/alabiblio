@@ -12,7 +12,6 @@ import type {
   GeocodeSearchResponse,
   GetOriginPresetsResponse,
 } from "@alabiblio/contracts/origin";
-import { sanitizeApiPayload } from "../../lib/displayText";
 import {
   requireBaseCatalogResponse,
   requireBaseCenterDetailResponse,
@@ -24,9 +23,8 @@ const FETCH_RETRY_ATTEMPTS = 2;
 const FETCH_RETRY_DELAY_MS = 250;
 const FETCH_TIMEOUT_MS = 6000;
 
-async function readSanitizedJson<T>(response: Response): Promise<T> {
-  const payload = await response.json() as T;
-  return sanitizeApiPayload(payload);
+async function readJson<T>(response: Response): Promise<T> {
+  return await response.json() as T;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -193,7 +191,7 @@ export async function fetchCenters(
     throw new Error(`centers_list_${response.status}`);
   }
 
-  return requireBaseCatalogResponse(await readSanitizedJson<ListCentersResponse>(response));
+  return requireBaseCatalogResponse(await readJson<ListCentersResponse>(response));
 }
 
 export async function fetchTopMobilityCenters(
@@ -210,7 +208,7 @@ export async function fetchTopMobilityCenters(
   }
 
   return requireOriginTopMobilityResponse(
-    await readSanitizedJson<GetTopMobilityCentersResponse>(response),
+    await readJson<GetTopMobilityCentersResponse>(response),
   );
 }
 
@@ -229,7 +227,7 @@ export async function fetchCenterDetail(
   }
 
   return requireBaseCenterDetailResponse(
-    await readSanitizedJson<GetCenterDetailResponse>(response),
+    await readJson<GetCenterDetailResponse>(response),
   );
 }
 
@@ -260,7 +258,7 @@ export async function fetchCenterMobility(
   }
 
   return requireOriginCenterMobilityResponse(
-    await readSanitizedJson<GetCenterMobilityResponsePayload>(response),
+    await readJson<GetCenterMobilityResponsePayload>(response),
   );
 }
 
@@ -290,7 +288,7 @@ export async function fetchCenterMobilitySummary(
     throw new Error(`center_mobility_summary_${response.status}`);
   }
 
-  return readSanitizedJson<GetCenterMobilitySummaryResponse>(response);
+  return readJson<GetCenterMobilitySummaryResponse>(response);
 }
 
 export async function fetchGeocodeOptions(
@@ -306,7 +304,7 @@ export async function fetchGeocodeOptions(
     throw new Error(`geocode_${response.status}`);
   }
 
-  return readSanitizedJson<GeocodeSearchResponse>(response);
+  return readJson<GeocodeSearchResponse>(response);
 }
 
 export async function fetchOriginPresets(
@@ -318,5 +316,5 @@ export async function fetchOriginPresets(
     throw new Error(`origin_presets_${response.status}`);
   }
 
-  return readSanitizedJson<GetOriginPresetsResponse>(response);
+  return readJson<GetOriginPresetsResponse>(response);
 }

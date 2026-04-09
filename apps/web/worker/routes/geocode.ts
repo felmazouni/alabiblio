@@ -1,4 +1,5 @@
 import type { GeocodeAddressOption, GeocodeSearchResponse } from "@alabiblio/contracts/origin";
+import { normalizeSourceText } from "@alabiblio/ingestion/text";
 import type { WorkerEnv } from "../lib/db";
 import type { ApiRequestContext } from "../lib/observability";
 import {
@@ -55,6 +56,18 @@ function normalizeQuery(value: string): string {
   return trimmed;
 }
 
+function normalizeText(value: string | null | undefined): string | null {
+  return normalizeSourceText(value);
+}
+
+function joinAddressParts(parts: Array<string | null | undefined>, separator = ", "): string | null {
+  const normalized = parts
+    .map((part) => normalizeText(part))
+    .filter((part): part is string => part !== null);
+
+  return normalized.length > 0 ? normalized.join(separator) : null;
+}
+
 async function fetchWithTimeout(
   input: string | URL,
   init: RequestInit,
@@ -86,23 +99,21 @@ function mapNominatimToOption(result: NominatimResult): GeocodeAddressOption | n
     return null;
   }
 
-  const road = result.address?.road ?? null;
-  const houseNumber = result.address?.house_number ?? null;
-  const addressLine =
-    road !== null
-      ? [road, houseNumber].filter((value): value is string => value !== null).join(", ")
-      : null;
+  const road = normalizeText(result.address?.road);
+  const houseNumber = normalizeText(result.address?.house_number);
+  const addressLine = road !== null ? joinAddressParts([road, houseNumber]) : null;
+  const displayName = normalizeText(result.display_name);
 
   return {
     id: String(result.place_id),
-    label: addressLine ?? result.display_name,
-    display_name: result.display_name,
+    label: addressLine ?? displayName ?? `Lugar ${result.place_id}`,
+    display_name: displayName ?? `Lugar ${result.place_id}`,
     address_line: addressLine,
-    neighborhood: result.address?.neighbourhood ?? result.address?.suburb ?? null,
-    district: result.address?.city_district ?? null,
+    neighborhood: normalizeText(result.address?.neighbourhood ?? result.address?.suburb ?? null),
+    district: normalizeText(result.address?.city_district ?? null),
     municipality:
-      result.address?.city ?? result.address?.town ?? result.address?.village ?? "Madrid",
-    postal_code: result.address?.postcode ?? null,
+      normalizeText(result.address?.city ?? result.address?.town ?? result.address?.village) ?? "Madrid",
+    postal_code: normalizeText(result.address?.postcode ?? null),
     lat,
     lon,
   };
@@ -113,19 +124,22 @@ function mapCallejeroToOption(row: CallejeroRow): GeocodeAddressOption | null {
     return null;
   }
 
-  const label = [row.via_type, row.via_name].filter(Boolean).join(" ");
+  const label = joinAddressParts([row.via_type, row.via_name], " ") ?? row.full_via;
   const numInfo =
     row.num_from !== null
       ? ` (${row.num_from}${row.num_to && row.num_to !== row.num_from ? "-" + String(row.num_to) : ""})`
       : "";
+  const district = normalizeText(row.district);
+  const neighborhood = normalizeText(row.neighborhood);
+  const displayName = joinAddressParts([`${label}${numInfo}`, district]);
 
   return {
     id: `callejero:${row.id}`,
     label: `${label}${numInfo}`,
-    display_name: `${label}${numInfo}${row.district ? ", " + row.district : ""}`,
+    display_name: displayName ?? `${label}${numInfo}`,
     address_line: label + numInfo,
-    neighborhood: row.neighborhood,
-    district: row.district,
+    neighborhood,
+    district,
     municipality: "Madrid",
     postal_code: null,
     lat: row.lat,

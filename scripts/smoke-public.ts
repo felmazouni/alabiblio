@@ -137,6 +137,8 @@ type FetchResult<T> = {
   durationMs: number;
 };
 
+const SUSPICIOUS_MOJIBAKE_PATTERN = /(?:Ã.|Â.|â.|ï¿½)/;
+
 function assertOperationalHeaders(
   url: string,
   headers: Headers,
@@ -164,6 +166,25 @@ function assertDuration(url: string, durationMs: number, thresholdMs: number): v
     durationMs <= thresholdMs,
     `Unexpected slow response for ${url}: ${durationMs}ms > ${thresholdMs}ms`,
   );
+}
+
+function assertNoMojibake(value: unknown, context: string): void {
+  if (typeof value === "string") {
+    assert.ok(
+      !SUSPICIOUS_MOJIBAKE_PATTERN.test(value),
+      `Suspicious mojibake detected at ${context}: ${value}`,
+    );
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertNoMojibake(entry, `${context}[${index}]`));
+    return;
+  }
+
+  if (value && typeof value === "object") {
+    Object.entries(value).forEach(([key, nested]) => assertNoMojibake(nested, `${context}.${key}`));
+  }
 }
 
 async function fetchJson<T>(url: string): Promise<FetchResult<T>> {
@@ -207,6 +228,7 @@ async function main() {
   assert.ok(geocode.payload.items.length > 0, "Geocode endpoint must return at least one address");
   assertOperationalHeaders("/api/geocode", geocode.headers, "not_applicable");
   assertDuration("/api/geocode", geocode.durationMs, 8000);
+  assertNoMojibake(geocode.payload, "/api/geocode");
 
   const firstPreset = presets.payload.items[0];
   assert.ok(firstPreset, "A preset origin is required for mobility smoke");
@@ -223,6 +245,7 @@ async function main() {
   assert.equal(list.headers.get("x-data-scope"), list.payload.meta.scope);
   assert.equal(list.headers.get("x-data-state"), list.payload.meta.data_state);
   assertDuration("/api/centers", list.durationMs, 8000);
+  assertNoMojibake(list.payload, "/api/centers");
 
   const slug = list.payload.items[0]?.slug;
   assert.ok(slug, "First center slug is required");
@@ -238,6 +261,7 @@ async function main() {
   assert.equal(top.headers.get("x-data-scope"), top.payload.meta.scope);
   assert.equal(top.headers.get("x-data-state"), top.payload.meta.data_state);
   assertDuration("/api/centers/top-mobility", top.durationMs, 8000);
+  assertNoMojibake(top.payload, "/api/centers/top-mobility");
 
   const detail = await fetchJson<CenterDetailResponse>(
     `${normalizedBaseUrl}/api/centers/${encodeURIComponent(slug)}`,
@@ -253,6 +277,7 @@ async function main() {
   assert.equal(detail.headers.get("x-data-scope"), detail.payload.meta.scope);
   assert.equal(detail.headers.get("x-data-state"), detail.payload.meta.data_state);
   assertDuration(`/api/centers/${slug}`, detail.durationMs, 8000);
+  assertNoMojibake(detail.payload, `/api/centers/${slug}`);
 
   const mobility = await fetchJson<CenterMobilityResponse>(
     `${normalizedBaseUrl}/api/centers/${encodeURIComponent(slug)}/mobility?user_lat=${firstPreset.lat}&user_lon=${firstPreset.lon}`,
@@ -278,6 +303,7 @@ async function main() {
   assert.equal(mobility.headers.get("x-data-scope"), mobility.payload.meta.scope);
   assert.equal(mobility.headers.get("x-data-state"), mobility.payload.meta.data_state);
   assertDuration(`/api/centers/${slug}/mobility`, mobility.durationMs, 8000);
+  assertNoMojibake(mobility.payload, `/api/centers/${slug}/mobility`);
 
   console.log(
     JSON.stringify(

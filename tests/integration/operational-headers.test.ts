@@ -23,7 +23,7 @@ test("GET /api/centers expone headers operativos y distingue MISS/HIT", async ()
     assert.equal(secondResponse.headers.get("x-cache-status"), "HIT");
     assert.equal(firstResponse.headers.get("x-data-scope"), "base_exploration");
     assert.equal(firstResponse.headers.get("x-upstream-status"), "none");
-    assert.equal(firstResponse.headers.get("x-data-state"), "estimated");
+    assert.equal(firstResponse.headers.get("x-data-state"), "stale");
   } finally {
     harness.cleanup();
   }
@@ -50,7 +50,7 @@ test("top, detail y mobility emiten scope, upstream y errores tipados", async ()
 
     assert.equal(detailResponse.headers.get("x-data-scope"), "base_exploration");
     assert.equal(detailResponse.headers.get("x-upstream-status"), "none");
-    assert.equal(detailResponse.headers.get("x-data-state"), "estimated");
+    assert.equal(detailResponse.headers.get("x-data-state"), "stale");
 
     assert.equal(mobilityResponse.headers.get("x-data-scope"), "origin_enriched");
     assert.match(

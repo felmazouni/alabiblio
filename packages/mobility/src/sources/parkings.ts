@@ -1,4 +1,5 @@
 import { parse } from "csv-parse/sync";
+import { normalizeSourceText } from "@alabiblio/ingestion/text";
 import type {
   MobilitySourceDefinition,
   TransportNodeRecord,
@@ -26,7 +27,7 @@ export const emtParkingsSource: MobilitySourceDefinition = {
 };
 
 function cleanText(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
+  return normalizeSourceText(value) ?? "";
 }
 
 function parseDecimal(value: string): number | null {
