@@ -9,7 +9,6 @@ import {
   MapPin,
   Navigation,
   Plug,
-  Shield,
   Wifi,
 } from "lucide-react";
 import { buildBaseCardPresentation } from "../cardPresentation";
@@ -23,7 +22,7 @@ type CenterRowItemProps = {
 function getHighlightIcon(label: string) {
   switch (label) {
     case "SER":
-      return <Shield size={12} />;
+      return <MapPin size={12} />;
     default:
       return <Navigation size={12} />;
   }
@@ -43,13 +42,15 @@ export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
   return (
     <article className="center-row-item center-row-item--catalog">
       <div className="center-row-item__left">
-        <div className="center-row-item__name-row">
-          <span
-            className={`center-row-item__dot center-row-item__dot--${center.is_open_now ? "open" : "closed"}`}
-          />
-          <span className="center-row-item__name">{center.name}</span>
+        <div className="center-row-item__catalog-badges">
           <span className="center-row-item__kind">{center.kind_label}</span>
+          <span className={center.is_open_now ? "center-row-item__open" : "center-row-item__closed"}>
+            {center.is_open_now ? "Abierta" : "Cerrada"}
+          </span>
+          {center.ser?.enabled ? <span className="center-row-item__catalog-chip">SER</span> : null}
         </div>
+
+        <span className="center-row-item__name">{center.name}</span>
 
         {locationLine ? (
           <span className="center-row-item__area">
@@ -61,9 +62,6 @@ export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
         {secondaryArea ? <span className="center-row-item__subarea">{secondaryArea}</span> : null}
 
         <div className="center-row-item__meta">
-          <span className={center.is_open_now ? "center-row-item__open" : "center-row-item__closed"}>
-            {center.is_open_now ? "Abierta" : "Cerrada"}
-          </span>
           {center.today_human_schedule ? (
             <span className="center-row-item__hours">
               <Clock3 size={11} />
@@ -92,6 +90,7 @@ export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
       </div>
 
       <div className="center-row-item__right">
+        <span className="center-row-item__catalog-chip center-row-item__catalog-chip--scope">BASE</span>
         <span className="center-row-item__eta-value">{presentation.footerLabel}</span>
         {center.ser?.enabled ? (
           <span className="center-row-item__dist">

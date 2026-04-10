@@ -145,6 +145,70 @@ export function BackgroundIllustration({ className = "" }: BackgroundIllustratio
           <path d="M600 150 L620 170" />
           <path d="M800 250 L820 230" />
         </g>
+
+        <g
+          stroke="color-mix(in srgb, var(--color-primary-soft) 14%, transparent)"
+          strokeWidth="1.5"
+          fill="none"
+          transform="translate(280, 660)"
+        >
+          <ellipse cx="0" cy="0" rx="15" ry="5" />
+          <path d="M-15 0 L-12 20 L12 20 L15 0" />
+          <path d="M15 5 Q25 5 25 12 Q25 19 15 19" />
+          <path d="M-5 -5 Q-8 -15 -3 -20" />
+          <path d="M5 -5 Q8 -15 3 -20" />
+        </g>
+
+        <g
+          stroke="color-mix(in srgb, var(--color-primary) 12%, transparent)"
+          strokeWidth="1.5"
+          fill="none"
+          transform="translate(550, 550)"
+        >
+          <path d="M-30 -20 L-30 30 L0 20 L30 30 L30 -20 L0 -30 L-30 -20" />
+          <path d="M0 -30 L0 20" />
+        </g>
+
+        <g
+          stroke="color-mix(in srgb, var(--color-primary-soft) 16%, transparent)"
+          strokeWidth="1.5"
+          fill="none"
+          transform="translate(100, 620)"
+        >
+          <ellipse cx="0" cy="0" rx="12" ry="4" />
+          <path d="M0 0 L0 -30" />
+          <path d="M-15 -45 L0 -30 L15 -45 L15 -60 L-15 -60 Z" />
+        </g>
+
+        <g
+          stroke="color-mix(in srgb, var(--color-primary) 10%, transparent)"
+          strokeWidth="1.5"
+          fill="none"
+        >
+          <g transform="translate(600, 800)">
+            <rect x="-25" y="-15" width="50" height="30" rx="8" />
+            <circle cx="-12" cy="15" r="6" />
+            <circle cx="12" cy="15" r="6" />
+            <path d="M-15 -5 L15 -5" />
+          </g>
+
+          <g transform="translate(750, 800)">
+            <circle cx="-15" cy="5" r="12" />
+            <circle cx="15" cy="5" r="12" />
+            <path d="M-15 5 L0 -15 L15 5" />
+            <path d="M0 -15 L0 -25" />
+            <path d="M-5 -25 L5 -25" />
+          </g>
+
+          <g transform="translate(900, 800)">
+            <rect x="-20" y="-20" width="40" height="35" rx="5" />
+            <path d="M-20 0 L20 0" />
+            <circle cx="-10" cy="15" r="5" />
+            <circle cx="10" cy="15" r="5" />
+            <rect x="-15" y="-15" width="10" height="10" rx="2" />
+            <rect x="5" y="-15" width="10" height="10" rx="2" />
+          </g>
+        </g>
       </svg>
 
       <div className="background-illustration__noise" />

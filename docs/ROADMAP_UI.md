@@ -3,7 +3,7 @@
 - [x] Objetivo
   - [x] Integrar solo el diseño visual del listado del ZIP de v0 dentro de la app actual.
   - [x] Mantener intactas la lógica, la navegación, los contratos API y la arquitectura existente.
-  - [x] Reutilizar únicamente ideas visuales y composición de UI, nunca la infraestructura del demo.
+  - [x] Reutilizar únicamente composición, jerarquía y estilo visual del ZIP, nunca su infraestructura.
 
 - [x] Reglas de integración
   - [x] No copiar el demo entero ni importar páginas `app/*` del ZIP.
@@ -14,12 +14,12 @@
   - [x] No tocar backend, scopes ni contratos API por un rediseño visual.
   - [x] No meter estilos globales del ZIP dentro de la app actual.
 
-- [x] Fuentes del ZIP que si sirven
-  - [x] `tmp/v0-import/extracted/app/listado/page.tsx` como referencia de jerarquía visual del listado.
-  - [x] `tmp/v0-import/extracted/components/library-card.tsx` como referencia de composición de cards.
-  - [x] `tmp/v0-import/extracted/components/filters-panel.tsx` como referencia de estructura interna del panel de filtros.
-  - [x] `tmp/v0-import/extracted/components/background-illustration.tsx` solo como referencia ornamental.
-  - [x] `tmp/v0-import/extracted/app/globals.css` solo como referencia de paleta, contraste y radios.
+- [x] Fuentes del ZIP que sí sirven
+  - [x] `tmp/v0-import/extracted/app/listado/page.tsx`
+  - [x] `tmp/v0-import/extracted/components/library-card.tsx`
+  - [x] `tmp/v0-import/extracted/components/filters-panel.tsx`
+  - [x] `tmp/v0-import/extracted/components/background-illustration.tsx`
+  - [x] `tmp/v0-import/extracted/app/globals.css`
 
 - [x] Fuentes del ZIP prohibidas
   - [x] `tmp/v0-import/extracted/app/page.tsx`
@@ -31,7 +31,7 @@
   - [x] `tmp/v0-import/extracted/public/placeholder*`
   - [x] `tmp/v0-import/extracted/package.json`
 
-- [x] Fase 1 - Preparacion
+- [x] Fase 1 - Preparación
   - [x] Mantener el ZIP en `tmp/v0-import/` fuera de `src`.
   - [x] Usar el ZIP solo como referencia de composición y estilo.
   - [x] Confirmar que los puntos de entrada reales siguen siendo `CatalogScreen.tsx`, `CenterCard.tsx`, `CenterRowItem.tsx` y `FilterDrawer.tsx`.
@@ -40,7 +40,7 @@
   - [x] Reordenar la jerarquía visual del listado inspirándose en `app/listado/page.tsx`.
   - [x] Mantener `useCatalogScreen` como única fuente de lógica.
   - [x] Reusar `SearchField`, `FilterDrawer`, navegación y estados existentes.
-  - [x] Eliminar UI técnica o redundante si estorba al nuevo layout del listado.
+  - [x] Eliminar UI técnica o redundante que estorbaba al layout del listado.
 
 - [x] Fase 3 - CenterCard y CenterRowItem
   - [x] Adaptar composición visual y densidad desde `components/library-card.tsx`.
@@ -51,15 +51,15 @@
 - [x] Fase 4 - FilterDrawer
   - [x] Adaptar estructura visual usando referencias de `components/filters-panel.tsx`.
   - [x] Mantener filtros, orden y semántica reales del catálogo base.
-  - [x] No convertir el drawer en un sistema Radix/shadcn paralelo.
+  - [x] No convertir el drawer en un sistema paralelo.
 
 - [x] Fase 5 - Tokens y estilos
-  - [x] Llevar solo decisiones visuales útiles a `tokens.css`, `product.css` o CSS local existente.
+  - [x] Llevar solo decisiones visuales útiles a `product.css` y CSS local existente.
   - [x] No importar `globals.css` del ZIP.
   - [x] Mantener el sistema de tema actual con `data-theme`.
-  - [x] Evitar CSS global agresivo que rompa top, detalle o shell.
+  - [x] Evitar CSS global agresivo que rompa Top, Detalle o shell.
 
-- [x] Fase 6 - Validacion
+- [x] Fase 6 - Validación
   - [x] `typecheck`
   - [x] `lint`
   - [x] `test`
@@ -68,11 +68,14 @@
   - [x] Verificar que no entran mocks, rutas paralelas ni dependencias nuevas.
   - [x] Verificar que listado sigue respetando `base_exploration`.
 
-- [x] Fase 7 - Handoff
+- [x] Fase 7 - Iteración 2 de fidelidad
+  - [x] Compactar hero, búsqueda y controles para eliminar paneles vacíos y acercar la composición al ZIP.
+  - [x] Rehacer la fila base y la card base con jerarquía y badges más cercanos a `library-card.tsx`.
+  - [x] Recentrar visualmente el panel de filtros hacia el look de `filters-panel.tsx` sin cambiar su lógica real.
+  - [x] Completar la ilustración de fondo y el ambiente visual con más elementos del SVG del ZIP.
+
+- [ ] Fase 8 - Handoff
   - [x] Dejar constancia de qué partes del ZIP ya se absorbieron visualmente.
-  - [x] Dejar pendientes explícitos antes de tocar Top o Detalle.
-  - [x] Decidir si el fondo ornamental del ZIP entra también en listado o si se mantiene `DotGrid` como base.
-  - [x] Decidir si la vista filas debe converger más hacia la card del ZIP o mantenerse más compacta.
-  - [x] Registrar cualquier decisión aplazada sobre densidad, iconografía o tokens.
-  - [ ] Revisar visualmente producción contra el ZIP y corregir diferencias residuales de layout.
-  - [ ] No tocar Top ni Detalle hasta validar formalmente el listado en producción.
+  - [x] Registrar que el listado ya tiene una segunda pasada de fidelidad visual.
+  - [ ] Verificar producción contra el ZIP y decidir si hace falta una tercera pasada solo de listado.
+  - [ ] No tocar Top ni Detalle hasta cerrar formalmente el listado.

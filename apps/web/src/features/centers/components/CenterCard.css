@@ -1,7 +1,5 @@
-/* ── CenterCard ─────────────────────────────────────────────────
-   Decision card for the explorer grid.
-   Primary hierarchy: status → name → ETA → schedule → transport
-──────────────────────────────────────────────────────────────── */
+/* CenterCard
+   Base listing card adapted to the ZIP visual hierarchy without inventing enriched data. */
 
 .decision-card__name {
   margin: 0;
@@ -12,7 +10,6 @@
   color: var(--color-text);
 }
 
-/* ── Decision strip: ETA / distance ────────────────────────── */
 .decision-card__decision {
   display: flex;
   align-items: center;
@@ -49,21 +46,20 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
+  margin-left: auto;
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--color-text-3);
-  margin-left: auto;
 }
 
-/* ── Schedule line ──────────────────────────────────────────── */
 .decision-card__schedule {
   display: inline-flex;
-  gap: var(--sp-2);
   align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
   margin: 0;
   color: var(--color-text-3);
   font-size: var(--text-sm);
-  flex-wrap: wrap;
   line-height: var(--leading-normal);
 }
 
@@ -113,11 +109,13 @@
 .decision-card__catalog-highlight-body {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
+  line-height: 1.35;
   text-align: right;
   color: var(--color-text);
 }
 
 .decision-card__footer--catalog {
+  align-items: center;
   justify-content: space-between;
 }
 

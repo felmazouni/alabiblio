@@ -138,28 +138,7 @@ export function CatalogScreen() {
               placeholder="Buscar por nombre o barrio..."
             />
           </div>
-          <div className="view-toggle">
-            <button
-              type="button"
-              className={`view-toggle__btn${viewMode === "cards" ? " view-toggle__btn--active" : ""}`}
-              onClick={() => setViewMode("cards")}
-              aria-label="Vista tarjetas"
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              type="button"
-              className={`view-toggle__btn${viewMode === "rows" ? " view-toggle__btn--active" : ""}`}
-              onClick={() => setViewMode("rows")}
-              aria-label="Vista lista"
-            >
-              <List size={16} />
-            </button>
-          </div>
-        </section>
-
-        <section className="controls-bar catalog-screen__controls">
-          <div className="controls-bar__row">
+          <div className="catalog-screen__search-actions">
             <button
               type="button"
               className={`controls-bar__filters-btn${activeFilterCount > 0 ? " controls-bar__filters-btn--active" : ""}`}
@@ -172,51 +151,66 @@ export function CatalogScreen() {
               ) : null}
             </button>
 
-            {activeChips.map((chip) => (
+            {origin ? (
               <button
-                key={chip.key}
                 type="button"
-                className="active-pill"
-                onClick={() => handleClearChip(chip.key)}
+                className="origin-clear-button"
+                onClick={clearOriginAndReset}
               >
-                {chip.label} <X size={11} />
-              </button>
-            ))}
-
-            {activeFilterCount > 0 ? (
-              <button type="button" className="controls-bar__clear" onClick={clearAllFilters}>
-                Limpiar todo
+                Reiniciar origen
               </button>
             ) : null}
-          </div>
 
-          {origin ? (
-            <button
-              type="button"
-              className="origin-clear-button"
-              onClick={clearOriginAndReset}
-            >
-              Reiniciar origen
-            </button>
-          ) : null}
+            <div className="view-toggle">
+              <button
+                type="button"
+                className={`view-toggle__btn${viewMode === "cards" ? " view-toggle__btn--active" : ""}`}
+                onClick={() => setViewMode("cards")}
+                aria-label="Vista tarjetas"
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                type="button"
+                className={`view-toggle__btn${viewMode === "rows" ? " view-toggle__btn--active" : ""}`}
+                onClick={() => setViewMode("rows")}
+                aria-label="Vista lista"
+              >
+                <List size={16} />
+              </button>
+            </div>
+          </div>
         </section>
 
-        <section className="catalog-screen__results-head">
-          <div className="catalog-screen__results-copy">
-            <span className="catalog-screen__results-kicker">
-              {loading ? "Cargando listado" : `${visibleResults} de ${total} visibles`}
+        <section className="controls-bar catalog-screen__controls">
+          <div className="catalog-screen__controls-summary">
+            <span className="catalog-screen__summary-pill">
+              {loading ? "Cargando listado..." : `${visibleResults} de ${total} visibles`}
             </span>
-            <h2>Listado exploratorio</h2>
-            <p>
-              {hasActiveSearch
-                ? "La busqueda y los filtros afinan el catalogo sin convertirlo en ranking contextual."
-                : "El grid mantiene orden base y acceso al detalle sin vender llegada contextual."}
-            </p>
+            <span className="catalog-screen__summary-pill">
+              {hasActiveSearch ? "Busqueda activa" : "Listado base sin ranking contextual"}
+            </span>
           </div>
-          <div className="catalog-screen__results-meta">
-            <span className="catalog-screen__results-chip">Orden base</span>
-            <span className="catalog-screen__results-chip">Sin recomendacion</span>
-          </div>
+          {activeChips.length > 0 || activeFilterCount > 0 ? (
+            <div className="controls-bar__row">
+              {activeChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className="active-pill"
+                  onClick={() => handleClearChip(chip.key)}
+                >
+                  {chip.label} <X size={11} />
+                </button>
+              ))}
+
+              {activeFilterCount > 0 ? (
+                <button type="button" className="controls-bar__clear" onClick={clearAllFilters}>
+                  Limpiar todo
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         {originSearch.presetsError ? <p className="screen__inline-error">{originSearch.presetsError}</p> : null}
