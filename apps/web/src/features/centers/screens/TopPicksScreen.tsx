@@ -198,7 +198,7 @@ export function TopPicksScreen() {
             ) : topScope !== "origin_enriched" || topPicks.length === 0 ? (
               <EmptyStateCard title="Sin opciones cercanas" body="Activa otro origen o abre el listado base para explorar todos los centros." />
             ) : (
-              <section className="top-picks-grid">
+              <section className="top-picks-list">
                 {topPicks.map((entry) => (
                   <TopMobilityCard
                     key={entry.center.id}

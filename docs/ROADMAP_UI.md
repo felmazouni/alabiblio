@@ -144,11 +144,12 @@
 
 - [ ] Próxima pantalla - Top
   - [x] Mapear referencia visual del ZIP para Top contra `TopPicksScreen` y `TopMobilityCard`.
-  - [x] Ejecutar una primera iteración visual de Top sobre `TopPicksScreen.tsx`, `TopMobilityCard.tsx` y `product.css`.
-  - [x] Validar y desplegar la primera iteración de Top sin romper listado ya cerrado.
+  - [x] Rehacer `TopMobilityCard.tsx` desde la estructura visual de `components/library-card.tsx` para eliminar mezcla con estilos heredados.
+  - [x] Ejecutar una segunda iteración visual de Top sobre `TopPicksScreen.tsx`, `TopMobilityCard.tsx`, `TopMobilityCard.css` y `product.css`.
+  - [x] Validar y desplegar la reescritura de Top sin romper listado ya cerrado.
   - [ ] Cerrar Top dentro del alcance real de la pantalla.
   - Evidencia:
     - referencia ZIP: `tmp/v0-import/extracted/app/page.tsx`, `tmp/v0-import/extracted/components/library-card.tsx`, `tmp/v0-import/extracted/components/background-illustration.tsx`
-    - archivos tocados: `apps/web/src/features/centers/screens/TopPicksScreen.tsx`, `apps/web/src/features/centers/components/TopMobilityCard.tsx`, `apps/web/src/styles/product.css`
-    - estado actual: primera iteración aplicada sobre hero, ambientación y cards; Top queda abierto hasta una revisión específica ZIP vs producción
+    - archivos tocados: `apps/web/src/features/centers/screens/TopPicksScreen.tsx`, `apps/web/src/features/centers/components/TopMobilityCard.tsx`, `apps/web/src/features/centers/components/TopMobilityCard.css`, `apps/web/src/styles/product.css`
+    - estado actual: hero y cards rehechos; Top sigue abierto hasta contrastar ZIP vs producción y decidir si la fidelidad ya es suficiente dentro del alcance real
     - limitaciones previsibles: no se clonan ratings, reviews ni occupancy fake del demo porque el dominio real de `top-mobility` no los soporta

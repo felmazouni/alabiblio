@@ -1,0 +1,638 @@
+.top-mobility-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 1.9rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface-raised) 97%, transparent),
+      color-mix(in srgb, var(--color-surface) 98%, transparent)
+    );
+  box-shadow: var(--shadow-card);
+}
+
+.top-mobility-card__header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.95rem;
+  align-items: start;
+}
+
+.top-mobility-card__rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.15rem;
+  height: 3.15rem;
+  border-radius: 1rem;
+  background: linear-gradient(145deg, var(--color-primary), var(--color-primary-soft));
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: var(--weight-extrabold);
+  box-shadow: 0 16px 28px color-mix(in srgb, var(--color-primary-glow) 52%, transparent);
+}
+
+.top-mobility-card__header-copy {
+  display: grid;
+  gap: 0.34rem;
+  min-width: 0;
+}
+
+.top-mobility-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.top-mobility-card__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.55rem;
+  padding: 0 0.68rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 96%, transparent);
+  font-size: 0.72rem;
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-2);
+}
+
+.top-mobility-card__chip--open {
+  border-color: var(--color-open-border);
+  background: var(--color-open-surface);
+  color: var(--color-open-text);
+}
+
+.top-mobility-card__chip--closed {
+  border-color: var(--color-closed-border);
+  background: var(--color-closed-surface);
+  color: var(--color-closed-text);
+}
+
+.top-mobility-card__title {
+  margin: 0;
+  font-size: clamp(1.18rem, 2vw, 1.52rem);
+  line-height: 1.14;
+  color: var(--color-text);
+}
+
+.top-mobility-card__address-line,
+.top-mobility-card__area-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  margin: 0;
+  color: var(--color-text-2);
+}
+
+.top-mobility-card__address-line {
+  font-size: 0.98rem;
+}
+
+.top-mobility-card__area-line {
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+}
+
+.top-mobility-card__separator {
+  color: var(--color-text-3);
+}
+
+.top-mobility-card__summary-panel {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem 1.05rem;
+  border-radius: 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 95%, transparent);
+}
+
+.top-mobility-card__summary-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.top-mobility-card__summary-row--bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.top-mobility-card__summary-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+  color: var(--color-text-2);
+  font-size: 0.96rem;
+}
+
+.top-mobility-card__summary-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.top-mobility-card__confidence-bar,
+.top-mobility-card__signal-bar {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-3) 96%, transparent);
+}
+
+.top-mobility-card__confidence-bar {
+  height: 0.6rem;
+}
+
+.top-mobility-card__signal-bar {
+  height: 0.38rem;
+}
+
+.top-mobility-card__confidence-bar-fill,
+.top-mobility-card__signal-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.top-mobility-card__confidence-bar-fill {
+  background: linear-gradient(90deg, #f59e0b 0%, #ffb740 100%);
+}
+
+.top-mobility-card__signal-bar-fill {
+  background: linear-gradient(90deg, #52b15b 0%, #7fd36e 100%);
+}
+
+.top-mobility-card__metrics {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.top-mobility-card__metrics-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.top-mobility-card__metrics-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.62rem;
+  color: var(--color-text-2);
+}
+
+.top-mobility-card__metrics-summary strong {
+  color: var(--color-text);
+  font-size: 1.08rem;
+}
+
+.top-mobility-card__metrics-stars {
+  display: inline-flex;
+  gap: 0.15rem;
+  color: #f6b91a;
+}
+
+.top-mobility-card__review-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.2rem;
+  padding: 0 0.9rem;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 96%, transparent);
+  color: var(--color-text);
+  font-size: 0.92rem;
+  font-weight: var(--weight-semibold);
+}
+
+.top-mobility-card__signals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem 1.4rem;
+}
+
+.top-mobility-card__signal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.4rem auto;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.top-mobility-card__signal-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.top-mobility-card__signal-copy span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-mobility-card__signal-value {
+  color: var(--color-text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.top-mobility-card__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.92rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(245, 158, 11, 0.36);
+  background: color-mix(in srgb, #f59e0b 10%, var(--color-surface) 90%);
+  color: #d97706;
+}
+
+.top-mobility-card__notice p {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.45;
+}
+
+.top-mobility-card__accordion {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.top-mobility-card__accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 3rem;
+  padding: 0 1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 95%, transparent);
+  color: var(--color-text);
+}
+
+.top-mobility-card__accordion-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.98rem;
+  font-weight: var(--weight-semibold);
+}
+
+.top-mobility-card__accordion-title span {
+  color: var(--color-text-2);
+  font-size: 0.86rem;
+  font-weight: var(--weight-medium);
+}
+
+.top-mobility-card__transport-list {
+  display: grid;
+  gap: 0.78rem;
+}
+
+.top-mobility-card__transport-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 95%, transparent);
+}
+
+.top-mobility-card__transport-row--metro {
+  border-color: rgba(239, 68, 68, 0.34);
+  background: color-mix(in srgb, #ef4444 10%, var(--color-surface) 90%);
+}
+
+.top-mobility-card__transport-row--bus {
+  border-color: rgba(59, 130, 246, 0.34);
+  background: color-mix(in srgb, #3b82f6 10%, var(--color-surface) 90%);
+}
+
+.top-mobility-card__transport-row--bike {
+  border-color: rgba(16, 185, 129, 0.34);
+  background: color-mix(in srgb, #10b981 10%, var(--color-surface) 90%);
+}
+
+.top-mobility-card__transport-row--car {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: color-mix(in srgb, #f59e0b 10%, var(--color-surface) 90%);
+}
+
+.top-mobility-card__transport-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  background: color-mix(in srgb, var(--color-surface-raised) 98%, transparent);
+}
+
+.top-mobility-card__transport-row--metro .top-mobility-card__transport-icon {
+  color: #ef4444;
+}
+
+.top-mobility-card__transport-row--bus .top-mobility-card__transport-icon {
+  color: #3b82f6;
+}
+
+.top-mobility-card__transport-row--bike .top-mobility-card__transport-icon {
+  color: #10b981;
+}
+
+.top-mobility-card__transport-row--car .top-mobility-card__transport-icon {
+  color: #f59e0b;
+}
+
+.top-mobility-card__transport-copy {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.top-mobility-card__transport-headline,
+.top-mobility-card__transport-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: var(--color-text);
+}
+
+.top-mobility-card__transport-points {
+  display: grid;
+  gap: 0.32rem;
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.top-mobility-card__transport-points span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.top-mobility-card__point {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.top-mobility-card__point--origin {
+  background: #10b981;
+}
+
+.top-mobility-card__point--destination {
+  background: #ef4444;
+}
+
+.top-mobility-card__mini-tag,
+.top-mobility-card__confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 0.55rem;
+  border-radius: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  background: color-mix(in srgb, var(--color-surface-raised) 98%, transparent);
+  font-size: 0.72rem;
+  color: var(--color-text-2);
+}
+
+.top-mobility-card__confidence-badge--realtime {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: color-mix(in srgb, #10b981 13%, var(--color-surface-raised) 87%);
+  color: #0f9a6a;
+}
+
+.top-mobility-card__confidence-badge--estimated {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: color-mix(in srgb, #3b82f6 12%, var(--color-surface-raised) 88%);
+  color: #2563eb;
+}
+
+.top-mobility-card__confidence-badge--frequency {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: color-mix(in srgb, #f59e0b 12%, var(--color-surface-raised) 88%);
+  color: #d97706;
+}
+
+.top-mobility-card__confidence-badge--heuristic,
+.top-mobility-card__confidence-badge--fallback {
+  color: var(--color-text-2);
+}
+
+.top-mobility-card__transport-eta {
+  display: grid;
+  justify-items: end;
+  gap: 0.1rem;
+  text-align: right;
+  color: var(--color-text);
+}
+
+.top-mobility-card__transport-eta strong {
+  font-size: 1.7rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-mobility-card__transport-eta span {
+  color: var(--color-text-2);
+  font-size: 0.82rem;
+}
+
+.top-mobility-card__transport-eta--bus {
+  gap: 0.35rem;
+}
+
+.top-mobility-card__transport-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  color: #f59e0b;
+  font-size: 0.95rem;
+  font-weight: var(--weight-semibold);
+}
+
+.top-mobility-card__station-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.top-mobility-card__station-card {
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.82rem 0.9rem;
+  border-radius: 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  background: color-mix(in srgb, var(--color-surface-raised) 98%, transparent);
+}
+
+.top-mobility-card__station-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  color: var(--color-text-2);
+  font-size: 0.7rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.top-mobility-card__station-card strong {
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.top-mobility-card__station-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  color: var(--color-text-2);
+  font-size: 0.88rem;
+}
+
+.top-mobility-card__transport-meta {
+  color: var(--color-text-2);
+  font-size: 0.96rem;
+}
+
+.top-mobility-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.72rem;
+}
+
+.top-mobility-card__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 3rem;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  font-size: 0.98rem;
+  font-weight: var(--weight-semibold);
+  transition:
+    transform var(--transition-quick),
+    background-color var(--transition-quick),
+    border-color var(--transition-quick);
+}
+
+.top-mobility-card__action:hover {
+  transform: translateY(-1px);
+}
+
+.top-mobility-card__action--secondary {
+  background: color-mix(in srgb, var(--color-surface-2) 95%, transparent);
+  color: var(--color-text);
+}
+
+.top-mobility-card__action--primary {
+  background: linear-gradient(145deg, var(--color-primary), var(--color-primary-strong));
+  border-color: color-mix(in srgb, var(--color-primary) 36%, transparent);
+  color: #ffffff;
+  box-shadow: 0 16px 28px color-mix(in srgb, var(--color-primary-glow) 44%, transparent);
+}
+
+:root[data-theme="light"] .top-mobility-card {
+  border-color: rgba(145, 178, 201, 0.32);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 255, 0.96));
+  box-shadow: 0 18px 42px rgba(58, 96, 122, 0.1);
+}
+
+:root[data-theme="light"] .top-mobility-card__summary-panel,
+:root[data-theme="light"] .top-mobility-card__accordion-toggle,
+:root[data-theme="light"] .top-mobility-card__review-chip,
+:root[data-theme="light"] .top-mobility-card__action--secondary,
+:root[data-theme="light"] .top-mobility-card__station-card {
+  border-color: rgba(145, 178, 201, 0.34);
+  background: rgba(248, 252, 255, 0.98);
+}
+
+:root[data-theme="light"] .top-mobility-card__transport-row {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+:root[data-theme="light"] .top-mobility-card__title {
+  color: #203247;
+}
+
+:root[data-theme="light"] .top-mobility-card__address-line,
+:root[data-theme="light"] .top-mobility-card__area-line,
+:root[data-theme="light"] .top-mobility-card__summary-label,
+:root[data-theme="light"] .top-mobility-card__signal-value,
+:root[data-theme="light"] .top-mobility-card__transport-meta,
+:root[data-theme="light"] .top-mobility-card__station-meta,
+:root[data-theme="light"] .top-mobility-card__accordion-title span {
+  color: #5f7b91;
+}
+
+@media (max-width: 900px) {
+  .top-mobility-card__signals-grid,
+  .top-mobility-card__station-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .top-mobility-card__transport-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .top-mobility-card__transport-eta {
+    grid-column: 2;
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 640px) {
+  .top-mobility-card {
+    padding: 1rem;
+    border-radius: 1.4rem;
+  }
+
+  .top-mobility-card__header {
+    grid-template-columns: 1fr;
+  }
+
+  .top-mobility-card__rank {
+    width: 2.8rem;
+    height: 2.8rem;
+    font-size: 1.25rem;
+  }
+
+  .top-mobility-card__summary-row--bar,
+  .top-mobility-card__signal {
+    grid-template-columns: 1fr;
+  }
+
+  .top-mobility-card__metrics-head,
+  .top-mobility-card__actions {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .top-mobility-card__transport-row {
+    grid-template-columns: 1fr;
+  }
+
+  .top-mobility-card__transport-eta {
+    grid-column: auto;
+  }
+}

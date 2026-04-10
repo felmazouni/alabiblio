@@ -1,23 +1,36 @@
+import { useId, useState } from "react";
 import type {
+  BikeModuleV1,
+  BusModuleV1,
   CenterMobility,
   CenterTopMobilityCardV1,
+  MetroModuleV1,
+  MobilityConfidence,
+  MobilityConfidenceSource,
 } from "@alabiblio/contracts/mobility";
 import {
+  AlertTriangle,
   ArrowRight,
   Bike,
   Bus,
   Car,
+  ChevronDown,
+  ChevronUp,
   Clock3,
-  Flag,
+  ExternalLink,
+  Gauge,
   MapPin,
   Navigation,
-  Route as RouteIcon,
   Sparkles,
   TrainFront,
 } from "lucide-react";
-import SpotlightCard from "../../../components/reactbits/SpotlightCard";
 import { buildTopMobilityCardPresentation } from "../cardPresentation";
-import { confidenceSourceLabel } from "../transportCopy";
+import {
+  confidenceSourceLabel,
+  formatDistanceCompact,
+  modeLabel,
+} from "../transportCopy";
+import "./TopMobilityCard.css";
 
 type TopMobilityCardProps = {
   center: CenterTopMobilityCardV1;
@@ -27,6 +40,346 @@ type TopMobilityCardProps = {
   onSelect: (slug: string) => void;
 };
 
+type SignalMetric = {
+  key: string;
+  label: string;
+  value: string;
+  percent: number;
+  icon: "best" | "bus" | "metro" | "bike" | "car" | "walk";
+};
+
+function getConfidencePercent(
+  confidence: MobilityConfidence,
+  source: MobilityConfidenceSource,
+): number {
+  const base =
+    confidence === "high" ? 88 : confidence === "medium" ? 68 : 44;
+
+  switch (source) {
+    case "realtime":
+      return Math.min(100, base + 8);
+    case "estimated":
+      return base;
+    case "frequency":
+      return Math.max(28, base - 8);
+    case "heuristic":
+      return Math.max(20, base - 16);
+    case "fallback":
+      return Math.max(16, base - 22);
+  }
+}
+
+function getScheduleCopy(center: CenterTopMobilityCardV1): string {
+  if (center.is_open_now && center.closes_today) {
+    return `Abierta hasta ${center.closes_today}`;
+  }
+  if (center.is_open_now) {
+    return center.today_human_schedule ?? "Abierta ahora";
+  }
+  if (center.opens_today) {
+    return `Abre a las ${center.opens_today}`;
+  }
+  return center.today_human_schedule ?? "Horario por confirmar";
+}
+
+function buildSignalMetrics(
+  center: CenterTopMobilityCardV1,
+  mobility: CenterMobility,
+): SignalMetric[] {
+  return [
+    {
+      key: "best",
+      label: "Mejor llegada",
+      value:
+        center.decision.best_time_minutes !== null && center.decision.best_mode
+          ? `${center.decision.best_time_minutes} min en ${modeLabel(center.decision.best_mode)}`
+          : "Sin ETA cerrada",
+      percent: getConfidencePercent(
+        center.decision.confidence,
+        center.decision.confidence_source,
+      ),
+      icon: "best",
+    },
+    {
+      key: "bus",
+      label: "Bus",
+      value:
+        mobility.modules.bus.estimated_total_min !== null
+          ? `${mobility.modules.bus.estimated_total_min} min`
+          : confidenceSourceLabel(mobility.modules.bus.confidence_source),
+      percent: getConfidencePercent("medium", mobility.modules.bus.confidence_source),
+      icon: "bus",
+    },
+    {
+      key: "metro",
+      label: "Metro",
+      value:
+        mobility.modules.metro.eta_min !== null
+          ? `${mobility.modules.metro.eta_min} min`
+          : confidenceSourceLabel(mobility.modules.metro.confidence_source),
+      percent: getConfidencePercent("medium", mobility.modules.metro.confidence_source),
+      icon: "metro",
+    },
+    {
+      key: "bike",
+      label: "BiciMAD",
+      value:
+        mobility.modules.bike.eta_min !== null
+          ? `${mobility.modules.bike.eta_min} min`
+          : confidenceSourceLabel(mobility.modules.bike.confidence_source),
+      percent: getConfidencePercent("medium", mobility.modules.bike.confidence_source),
+      icon: "bike",
+    },
+    {
+      key: "car",
+      label: "Coche",
+      value:
+        mobility.modules.car.eta_min !== null
+          ? `${mobility.modules.car.eta_min} min`
+          : "Sin ETA",
+      percent: getConfidencePercent("medium", mobility.modules.car.confidence_source),
+      icon: "car",
+    },
+    {
+      key: "walk",
+      label: "A pie",
+      value:
+        mobility.origin_dependent.walking_eta_min !== null
+          ? `${mobility.origin_dependent.walking_eta_min} min`
+          : "Fallback",
+      percent: 24,
+      icon: "walk",
+    },
+  ];
+}
+
+function getDistanceLabel(center: CenterTopMobilityCardV1): string | null {
+  return formatDistanceCompact(center.decision.distance_m);
+}
+
+function renderSignalIcon(icon: SignalMetric["icon"]) {
+  switch (icon) {
+    case "bus":
+      return <Bus size={15} />;
+    case "metro":
+      return <TrainFront size={15} />;
+    case "bike":
+      return <Bike size={15} />;
+    case "car":
+      return <Car size={15} />;
+    case "walk":
+      return <Navigation size={15} />;
+    default:
+      return <Sparkles size={15} />;
+  }
+}
+
+function getPrimarySummary(center: CenterTopMobilityCardV1): string {
+  if (center.decision.best_time_minutes !== null && center.decision.best_mode) {
+    return `${center.decision.best_time_minutes} min en ${modeLabel(center.decision.best_mode)}`;
+  }
+
+  return "Sin ETA cerrada";
+}
+
+function renderMetroSection(module: MetroModuleV1) {
+  const origin = module.origin_station?.name ?? "Origen sin estacion clara";
+  const destination =
+    module.destination_station?.name ?? "Destino sin estacion clara";
+
+  return (
+    <div className="top-mobility-card__transport-row top-mobility-card__transport-row--metro">
+      <div className="top-mobility-card__transport-icon">
+        <TrainFront size={18} />
+      </div>
+      <div className="top-mobility-card__transport-copy">
+        <div className="top-mobility-card__transport-headline">
+          <strong>{origin}</strong>
+          <ArrowRight size={14} />
+          <strong>{destination}</strong>
+        </div>
+        <div className="top-mobility-card__transport-tags">
+          {module.line_labels.length > 0 ? (
+            module.line_labels.slice(0, 3).map((line) => (
+              <span key={line} className="top-mobility-card__mini-tag">
+                {line}
+              </span>
+            ))
+          ) : (
+            <span className="top-mobility-card__mini-tag">
+              {confidenceSourceLabel(module.confidence_source)}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="top-mobility-card__transport-eta">
+        <strong>{module.eta_min !== null ? `${module.eta_min} min` : "s/d"}</strong>
+        <span>trayecto</span>
+      </div>
+    </div>
+  );
+}
+
+function renderBusSection(module: BusModuleV1) {
+  return (
+    <div className="top-mobility-card__transport-row top-mobility-card__transport-row--bus">
+      <div className="top-mobility-card__transport-icon">
+        <Bus size={18} />
+      </div>
+      <div className="top-mobility-card__transport-copy">
+        <div className="top-mobility-card__transport-line">
+          <strong>{module.selected_line ? `L${module.selected_line}` : "Bus"}</strong>
+          <span
+            className={`top-mobility-card__confidence-badge top-mobility-card__confidence-badge--${module.confidence_source}`}
+          >
+            {confidenceSourceLabel(module.confidence_source)}
+          </span>
+        </div>
+        <div className="top-mobility-card__transport-points">
+          <span>
+            <span className="top-mobility-card__point top-mobility-card__point--origin" />
+            Subida: {module.origin_stop?.name ?? "Parada sin confirmar"}
+          </span>
+          <span>
+            <span className="top-mobility-card__point top-mobility-card__point--destination" />
+            Bajada: {module.destination_stop?.name ?? module.selected_destination ?? "Destino sin parada clara"}
+          </span>
+        </div>
+      </div>
+      <div className="top-mobility-card__transport-eta top-mobility-card__transport-eta--bus">
+        {module.next_arrival_min !== null ? (
+          <span className="top-mobility-card__transport-wait">
+            <Clock3 size={14} />
+            {module.next_arrival_min} min espera
+          </span>
+        ) : null}
+        <strong>
+          {module.estimated_total_min !== null
+            ? `${module.estimated_total_min} min`
+            : "s/d"}
+        </strong>
+        <span>trayecto</span>
+      </div>
+    </div>
+  );
+}
+
+function renderBikeStationCard(
+  tone: "origin" | "destination",
+  title: string,
+  label: string,
+  availability: string,
+  distance: string | null,
+) {
+  return (
+    <div className="top-mobility-card__station-card">
+      <span className="top-mobility-card__station-label">
+        <span
+          className={`top-mobility-card__point top-mobility-card__point--${tone}`}
+        />
+        {title}
+      </span>
+      <strong>{label}</strong>
+      <div className="top-mobility-card__station-meta">
+        <span>{availability}</span>
+        <span>{distance ?? "s/d"}</span>
+      </div>
+    </div>
+  );
+}
+
+function renderBikeSection(module: BikeModuleV1) {
+  const originLabel =
+    module.origin_station?.station_number
+      ? `Estacion ${module.origin_station.station_number}`
+      : module.origin_station?.name ?? "Origen sin estacion";
+  const destinationLabel =
+    module.destination_station?.station_number
+      ? `Estacion ${module.destination_station.station_number}`
+      : module.destination_station?.name ?? "Destino sin estacion";
+
+  return (
+    <div className="top-mobility-card__transport-row top-mobility-card__transport-row--bike">
+      <div className="top-mobility-card__transport-icon">
+        <Bike size={18} />
+      </div>
+      <div className="top-mobility-card__transport-copy">
+        <div className="top-mobility-card__transport-line">
+          <strong>Red BiciMAD</strong>
+          <span
+            className={`top-mobility-card__confidence-badge top-mobility-card__confidence-badge--${module.confidence_source}`}
+          >
+            {confidenceSourceLabel(module.confidence_source)}
+          </span>
+        </div>
+        <div className="top-mobility-card__station-grid">
+          {renderBikeStationCard(
+            "origin",
+            "Origen",
+            originLabel,
+            module.bikes_available !== null
+              ? `${module.bikes_available} bicis`
+              : "Stock sin confirmar",
+            module.origin_station
+              ? formatDistanceCompact(module.origin_station.distance_m)
+              : null,
+          )}
+          {renderBikeStationCard(
+            "destination",
+            "Destino",
+            destinationLabel,
+            module.docks_available !== null
+              ? `${module.docks_available} anclajes`
+              : "Anclajes sin confirmar",
+            module.destination_station
+              ? formatDistanceCompact(module.destination_station.distance_m)
+              : null,
+          )}
+        </div>
+      </div>
+      <div className="top-mobility-card__transport-eta">
+        <strong>{module.eta_min !== null ? `${module.eta_min} min` : "s/d"}</strong>
+        <span>trayecto</span>
+      </div>
+    </div>
+  );
+}
+
+function renderCarSection(
+  center: CenterTopMobilityCardV1,
+  mobility: CenterMobility,
+) {
+  const car = mobility.modules.car;
+  const distance = formatDistanceCompact(
+    car.distance_m ?? center.decision.distance_m,
+  );
+  const serZone = car.ser_zone_name
+    ? `Zona SER ${car.ser_zone_name}`
+    : center.ser?.zone_name
+      ? `Zona SER ${center.ser.zone_name}`
+      : null;
+
+  return (
+    <div className="top-mobility-card__transport-row top-mobility-card__transport-row--car">
+      <div className="top-mobility-card__transport-icon">
+        <Car size={18} />
+      </div>
+      <div className="top-mobility-card__transport-copy">
+        <div className="top-mobility-card__transport-line">
+          <strong>En coche</strong>
+        </div>
+        <div className="top-mobility-card__transport-meta">
+          {[distance, serZone].filter(Boolean).join(" | ") || "Sin contexto adicional"}
+        </div>
+      </div>
+      <div className="top-mobility-card__transport-eta">
+        <strong>{car.eta_min !== null ? `${car.eta_min} min` : "s/d"}</strong>
+        <span>trayecto</span>
+      </div>
+    </div>
+  );
+}
+
 export function TopMobilityCard({
   center,
   mobility,
@@ -34,6 +387,8 @@ export function TopMobilityCard({
   serverOpenCount,
   onSelect,
 }: TopMobilityCardProps) {
+  const accordionId = useId();
+  const [expanded, setExpanded] = useState(rank === 1);
   const presentation = buildTopMobilityCardPresentation({
     center,
     mobility,
@@ -41,125 +396,167 @@ export function TopMobilityCard({
     serverOpenCount,
   });
   const area = [center.neighborhood, center.district].filter(Boolean).join(" - ");
-  const locationLine = center.address_line ?? area;
-  const secondaryLine = center.address_line && area ? area : null;
-  const rankLabel = rank === 1 ? "1a opcion" : rank === 2 ? "2a opcion" : "3a opcion";
+  const address = center.address_line ?? area;
+  const distanceLabel = getDistanceLabel(center);
+  const confidencePercent = getConfidencePercent(
+    center.decision.confidence,
+    center.decision.confidence_source,
+  );
+  const signalMetrics = buildSignalMetrics(center, mobility);
+  const bestSourceLabel = confidenceSourceLabel(center.decision.confidence_source);
+  const summaryTitle = center.decision.best_mode
+    ? `Llegada ${modeLabel(center.decision.best_mode)}`
+    : "Mejor llegada";
 
   return (
-    <button
-      type="button"
-      className="best-option-card top-pick-card"
-      onClick={() => onSelect(center.slug)}
-    >
-      <SpotlightCard className="best-option-card__surface top-pick-card__surface">
-        <div className="top-pick-card__hero">
-          <div className="top-pick-card__rank-block" aria-hidden="true">
-            <strong className="top-pick-card__rank-number">{rank}</strong>
-            <span className="top-pick-card__rank-copy">{rankLabel}</span>
-          </div>
+    <article className="top-mobility-card">
+      <header className="top-mobility-card__header">
+        <div className="top-mobility-card__rank">{rank}</div>
 
-          <div className="top-pick-card__hero-copy">
-            <div className="best-option-card__eyebrow-row top-pick-card__eyebrow-row">
-              <span className="best-option-card__eyebrow best-option-card__eyebrow--rank">
-                <Sparkles size={11} />
-                {presentation.frame.eyebrow}
-              </span>
-              <span className="best-option-card__kind-badge">{center.kind_label}</span>
-              <span className={center.is_open_now ? "decision-card__status decision-card__status--open" : "decision-card__status decision-card__status--closed"}>
-                {center.is_open_now ? "Abierta" : "Cerrada"}
-              </span>
-            </div>
-
-            <h2 className="best-option-card__name">{center.name}</h2>
-
-            {locationLine ? (
-              <p className="best-option-card__subline top-pick-card__location">
-                <MapPin size={11} />
-                {locationLine}
-              </p>
-            ) : null}
-
-            {secondaryLine ? <p className="top-pick-card__secondary-line">{secondaryLine}</p> : null}
-          </div>
-        </div>
-
-        <div className="top-pick-card__summary">
-          <div className="top-pick-card__summary-copy">
-            <span className="top-pick-card__summary-label">{presentation.frame.sectionTitle}</span>
-            <strong className="top-pick-card__summary-body">{presentation.frame.sectionSummary}</strong>
-          </div>
-          <span className="top-pick-card__summary-scope">{presentation.scopeSignal}</span>
-        </div>
-
-        <div className="best-option-card__board">
-          {presentation.transportRows.map((row) => {
-            const compactDetails = row.details
-              .filter((detail) => detail.kind !== "note")
-              .slice(0, row.recommended ? 2 : 1);
-
-            return (
-              <div
-                key={`${center.id}-${row.mode}`}
-                className={`best-option-card__board-row${row.recommended ? " best-option-card__board-row--recommended" : ""}`}
-              >
-                <span className="best-option-card__board-mode top-pick-card__board-mode">
-                  <span className={`top-pick-card__mode-icon top-pick-card__mode-icon--${row.mode}`}>
-                    {row.mode === "metro" ? <TrainFront size={14} /> : row.mode === "bus" ? <Bus size={14} /> : <Bike size={14} />}
-                  </span>
-                  <span className="top-pick-card__mode-label">{row.label}</span>
-                </span>
-                <span className="best-option-card__board-copy">
-                  <span className="top-pick-card__board-header">
-                    <strong className="best-option-card__board-headline">{row.headline}</strong>
-                    <span className={`transport-confidence-chip transport-confidence-chip--${row.confidenceSource}`}>
-                      {confidenceSourceLabel(row.confidenceSource)}
-                    </span>
-                  </span>
-                  {compactDetails.length > 0 ? (
-                    <span className="best-option-card__board-details">
-                      {compactDetails.map((detail) => (
-                        <span key={`${center.id}-${row.mode}-${detail.kind}-${detail.text}`} className={`best-option-card__board-detail best-option-card__board-detail--${detail.kind}`}>
-                          {detail.kind === "origin" ? <MapPin size={11} /> : null}
-                          {detail.kind === "destination" ? <Flag size={11} /> : null}
-                          {detail.kind === "time" ? <Clock3 size={11} /> : null}
-                          {detail.kind === "route" ? <RouteIcon size={11} /> : null}
-                          {detail.kind === "availability" ? <Bike size={11} /> : null}
-                          {detail.kind === "note" ? <Navigation size={11} /> : null}
-                          {detail.text}
-                        </span>
-                      ))}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="best-option-card__board-eta">{row.eta}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="best-option-card__footer-grid">
-          {presentation.footerTiles.map((tile) => (
-            <div
-              key={tile.mode}
-              className={`best-option-card__footer-tile best-option-card__footer-tile--${tile.mode}`}
+        <div className="top-mobility-card__header-copy">
+          <div className="top-mobility-card__chips">
+            <span className="top-mobility-card__chip top-mobility-card__chip--kind">
+              {center.kind_label}
+            </span>
+            <span
+              className={`top-mobility-card__chip ${
+                center.is_open_now
+                  ? "top-mobility-card__chip--open"
+                  : "top-mobility-card__chip--closed"
+              }`}
             >
-              <span className="best-option-card__footer-label">
-                {tile.mode === "car" ? <Car size={13} /> : <Navigation size={13} />}
-                {tile.label}
+              {center.is_open_now ? "Abierta" : "Cerrada"}
+            </span>
+          </div>
+
+          <h3 className="top-mobility-card__title">{center.name}</h3>
+
+          {address ? (
+            <p className="top-mobility-card__address-line">
+              <MapPin size={15} />
+              <span>{address}</span>
+              {distanceLabel ? (
+                <>
+                  <span className="top-mobility-card__separator">|</span>
+                  <strong>{distanceLabel}</strong>
+                </>
+              ) : null}
+            </p>
+          ) : null}
+
+          {area && center.address_line ? (
+            <p className="top-mobility-card__area-line">{area}</p>
+          ) : null}
+        </div>
+      </header>
+
+      <section className="top-mobility-card__summary-panel">
+        <div className="top-mobility-card__summary-row">
+          <span className="top-mobility-card__summary-label">
+            <Clock3 size={15} />
+            Horario
+          </span>
+          <strong>{getScheduleCopy(center)}</strong>
+        </div>
+
+        <div className="top-mobility-card__summary-row top-mobility-card__summary-row--bar">
+          <span className="top-mobility-card__summary-label">
+            <Gauge size={15} />
+            Confianza de movilidad
+          </span>
+          <div className="top-mobility-card__confidence-bar" aria-hidden="true">
+            <span
+              className="top-mobility-card__confidence-bar-fill"
+              style={{ width: `${confidencePercent}%` }}
+            />
+          </div>
+          <strong className="top-mobility-card__summary-value">
+            {confidencePercent}/100
+          </strong>
+        </div>
+      </section>
+
+      <section className="top-mobility-card__metrics">
+        <div className="top-mobility-card__metrics-head">
+          <div className="top-mobility-card__metrics-summary">
+            <div className="top-mobility-card__metrics-stars" aria-hidden="true">
+              <Sparkles size={16} />
+              <Sparkles size={16} />
+              <Sparkles size={16} />
+              <Sparkles size={16} />
+            </div>
+            <strong>{summaryTitle}</strong>
+            <span>{getPrimarySummary(center)}</span>
+          </div>
+          <span className="top-mobility-card__review-chip">{bestSourceLabel}</span>
+        </div>
+
+        <div className="top-mobility-card__signals-grid">
+          {signalMetrics.map((metric) => (
+            <div key={metric.key} className="top-mobility-card__signal">
+              <span className="top-mobility-card__signal-copy">
+                {renderSignalIcon(metric.icon)}
+                <span>{metric.label}</span>
               </span>
-              <strong className="best-option-card__footer-body">{tile.body}</strong>
+              <div className="top-mobility-card__signal-bar" aria-hidden="true">
+                <span
+                  className="top-mobility-card__signal-bar-fill"
+                  style={{ width: `${metric.percent}%` }}
+                />
+              </div>
+              <span className="top-mobility-card__signal-value">{metric.value}</span>
             </div>
           ))}
         </div>
+      </section>
 
-        <p className="best-option-card__reason">{presentation.reason}</p>
+      <section className="top-mobility-card__notice">
+        <AlertTriangle size={16} />
+        <p>{presentation.reason}</p>
+      </section>
 
-        <div className="best-option-card__footer">
-          <span className="best-option-card__cta">
-            Ver detalle <ArrowRight size={13} />
+      <section className="top-mobility-card__accordion">
+        <button
+          type="button"
+          className="top-mobility-card__accordion-toggle"
+          aria-expanded={expanded}
+          aria-controls={accordionId}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <span className="top-mobility-card__accordion-title">
+            Como llegar <span>(4 opciones)</span>
           </span>
-        </div>
-      </SpotlightCard>
-    </button>
+          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+
+        {expanded ? (
+          <div id={accordionId} className="top-mobility-card__transport-list">
+            {renderMetroSection(mobility.modules.metro)}
+            {renderBusSection(mobility.modules.bus)}
+            {renderBikeSection(mobility.modules.bike)}
+            {renderCarSection(center, mobility)}
+          </div>
+        ) : null}
+      </section>
+
+      <div className="top-mobility-card__actions">
+        <button
+          type="button"
+          className="top-mobility-card__action top-mobility-card__action--secondary"
+          onClick={() => onSelect(center.slug)}
+        >
+          <ExternalLink size={16} />
+          Ver detalles
+        </button>
+        <button
+          type="button"
+          className="top-mobility-card__action top-mobility-card__action--primary"
+          onClick={() => onSelect(center.slug)}
+        >
+          <Navigation size={16} />
+          Ver movilidad
+        </button>
+      </div>
+    </article>
   );
 }
