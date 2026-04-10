@@ -52,31 +52,44 @@ export function TopMobilityCard({
       onClick={() => onSelect(center.slug)}
     >
       <SpotlightCard className="best-option-card__surface top-pick-card__surface">
-        <div className="best-option-card__eyebrow-row">
-          <span className="best-option-card__eyebrow best-option-card__eyebrow--rank">
-            <Sparkles size={11} />
-            {rankLabel}
-          </span>
-          <span className="best-option-card__kind-badge">{center.kind_label}</span>
-          <span className={center.is_open_now ? "decision-card__status decision-card__status--open" : "decision-card__status decision-card__status--closed"}>
-            {center.is_open_now ? "Abierta" : "Cerrada"}
-          </span>
+        <div className="top-pick-card__hero">
+          <div className="top-pick-card__rank-block" aria-hidden="true">
+            <strong className="top-pick-card__rank-number">{rank}</strong>
+            <span className="top-pick-card__rank-copy">{rankLabel}</span>
+          </div>
+
+          <div className="top-pick-card__hero-copy">
+            <div className="best-option-card__eyebrow-row top-pick-card__eyebrow-row">
+              <span className="best-option-card__eyebrow best-option-card__eyebrow--rank">
+                <Sparkles size={11} />
+                {presentation.frame.eyebrow}
+              </span>
+              <span className="best-option-card__kind-badge">{center.kind_label}</span>
+              <span className={center.is_open_now ? "decision-card__status decision-card__status--open" : "decision-card__status decision-card__status--closed"}>
+                {center.is_open_now ? "Abierta" : "Cerrada"}
+              </span>
+            </div>
+
+            <h2 className="best-option-card__name">{center.name}</h2>
+
+            {locationLine ? (
+              <p className="best-option-card__subline top-pick-card__location">
+                <MapPin size={11} />
+                {locationLine}
+              </p>
+            ) : null}
+
+            {secondaryLine ? <p className="top-pick-card__secondary-line">{secondaryLine}</p> : null}
+          </div>
         </div>
 
-        <h2 className="best-option-card__name">{center.name}</h2>
-
-        {locationLine ? (
-          <p className="best-option-card__subline top-pick-card__location">
-            <MapPin size={11} />
-            {locationLine}
-          </p>
-        ) : null}
-
-        {secondaryLine ? <p className="top-pick-card__secondary-line">{secondaryLine}</p> : null}
-        <p className="top-pick-card__state-line">
-          <strong>{presentation.frame.sectionTitle}</strong>
-          <span>{presentation.frame.sectionSummary}</span>
-        </p>
+        <div className="top-pick-card__summary">
+          <div className="top-pick-card__summary-copy">
+            <span className="top-pick-card__summary-label">{presentation.frame.sectionTitle}</span>
+            <strong className="top-pick-card__summary-body">{presentation.frame.sectionSummary}</strong>
+          </div>
+          <span className="top-pick-card__summary-scope">{presentation.scopeSignal}</span>
+        </div>
 
         <div className="best-option-card__board">
           {presentation.transportRows.map((row) => {

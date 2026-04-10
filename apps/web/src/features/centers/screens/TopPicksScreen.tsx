@@ -1,14 +1,14 @@
 import type { UserOrigin } from "@alabiblio/contracts/origin";
 import {
   ArrowRight,
+  BookOpen,
+  Clock3,
   MapPin,
   Navigation,
   Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import DotGrid from "../../../components/reactbits/DotGrid";
 import FadeContent from "../../../components/reactbits/FadeContent";
-import ShinyText from "../../../components/reactbits/ShinyText";
 import { getTopMobilityScopeSignal } from "../scopePresentation";
 import { TopMobilityCard } from "../components/TopMobilityCard";
 import { useTopPicksScreen } from "../hooks/useTopPicksScreen";
@@ -16,6 +16,7 @@ import { OriginSheet } from "../../origin/components/OriginSheet";
 import { getOriginStatusText, getOriginTone } from "../../origin/originPresentation";
 import { EmptyStateCard } from "../../ui/EmptyStateCard";
 import { LoadingCard } from "../../ui/LoadingCard";
+import { BackgroundIllustration } from "../../ui/BackgroundIllustration";
 
 export function TopPicksScreen() {
   const navigate = useNavigate();
@@ -38,87 +39,89 @@ export function TopPicksScreen() {
     continueWithoutOrigin,
   } = useTopPicksScreen();
 
+  const originStatusText = getOriginStatusText(origin, geolocationStatus);
+  const scopeSignal = topScope ? getTopMobilityScopeSignal(topScope) : "sin origen";
+  const heroTitle = !originActive
+    ? "Encuentra tu espacio de estudio ideal"
+    : serverOpenCount > 0
+      ? "Las mejores opciones abiertas ahora"
+      : "Las mejores opciones para tu siguiente visita";
+  const heroCopy = !originActive
+    ? "Resolvemos las tres mejores opciones cerca de ti con movilidad real y acceso directo al listado completo."
+    : serverOpenCount > 0
+      ? "Priorizamos centros abiertos y resolvemos transporte real o estimado para las tres mejores opciones."
+      : "No hay centros abiertos elegibles ahora mismo. Dejamos preparadas las opciones mas utiles para cuando vuelvan a abrir.";
+
   function handleApplyOrigin(nextOrigin: UserOrigin): void {
     applyOrigin(nextOrigin);
   }
 
   return (
-    <section className="screen screen--list">
+    <section className="screen screen--list top-screen">
       <div className="screen__background">
-        <DotGrid
-          dotSize={10}
-          gap={22}
-          baseColor="color-mix(in srgb, var(--color-text-3) 26%, transparent)"
-          activeColor="color-mix(in srgb, var(--color-primary-soft) 34%, transparent)"
-        />
+        <BackgroundIllustration className="top-screen__background-illustration" />
       </div>
 
-      <FadeContent blur duration={320} className="screen__content">
-        {!originActive ? (
-          <section className="entry-screen">
-            <div className="entry-screen__brand">
-              <div className="entry-screen__logo">
-                <div className="entry-screen__logo-mark">
-                  <Navigation size={26} />
-                </div>
-                <div className="entry-screen__logo-copy">
-                  <ShinyText text="alabiblio" className="entry-screen__wordmark" />
-                  <span className="entry-screen__eyebrow">TOP 3 / MADRID / TIEMPO REAL</span>
-                </div>
-              </div>
-              <span className="entry-screen__live-pill">
-                <Sparkles size={12} />
-                DATOS EN TIEMPO REAL
-              </span>
-              <h1>Las 3 mejores opciones para ir ahora.</h1>
-              <p>
-                Resolvemos solo las tres bibliotecas mas utiles desde tu origen y dejamos el listado completo aparte.
-              </p>
-            </div>
+      <FadeContent blur duration={320} className="screen__content top-screen__content">
+        <section className="top-screen__hero">
+          <div className="top-screen__hero-copy">
+            <span className="top-screen__hero-kicker">Top 3 / Madrid / tiempo real</span>
+            <h1>{heroTitle}</h1>
+            <p>{heroCopy}</p>
+          </div>
 
-            <div className="entry-screen__actions">
-              <button
-                type="button"
-                className="entry-screen__primary"
-                onClick={() => requestGeolocation()}
-              >
-                <Navigation size={16} />
-                Usar mi ubicacion
-              </button>
-              <button
-                type="button"
-                className="entry-screen__secondary"
-                onClick={openOriginSheet}
-              >
-                <MapPin size={16} />
-                Introducir direccion
-              </button>
-              <button
-                type="button"
-                className="entry-screen__ghost"
-                onClick={() => navigate("/listado")}
-              >
-                Ver listado base
-                <ArrowRight size={14} />
-              </button>
-              <span className="entry-screen__status">
-                {getOriginStatusText(origin, geolocationStatus)}
+          <div className="top-screen__hero-stats">
+            <div className="top-screen__stat-card">
+              <span className="top-screen__stat-icon">
+                <BookOpen size={16} />
               </span>
-            </div>
-          </section>
-        ) : (
-          <>
-            <section className="top-picks-header">
-              <div className="top-picks-header__copy">
-                <span className="list-topbar__eyebrow">cerca de ti</span>
-                <h1>{serverOpenCount > 0 ? "Las mejores opciones abiertas ahora" : "Las mejores opciones proximas"}</h1>
-                <p>
-                  {serverOpenCount > 0
-                    ? "Priorizamos solo centros abiertos y resolvemos transporte completo para las tres mejores opciones."
-                    : "No hay centros abiertos elegibles ahora mismo. Mostramos las opciones mas utiles para mas tarde."}
-                </p>
+              <div className="top-screen__stat-copy">
+                <strong>{originActive ? topPicks.length : "Top 3"}</strong>
+                <span>{originActive ? "opciones resueltas" : "mejores opciones"}</span>
               </div>
-              <div className="top-picks-header__actions">
+            </div>
+            <div className="top-screen__stat-card">
+              <span className="top-screen__stat-icon top-screen__stat-icon--open">
+                <Clock3 size={16} />
+              </span>
+              <div className="top-screen__stat-copy">
+                <strong>{originActive ? serverOpenCount : "Real"}</strong>
+                <span>{originActive ? "abiertas ahora" : "datos de movilidad"}</span>
+              </div>
+            </div>
+            <div className="top-screen__stat-card">
+              <span className="top-screen__stat-icon top-screen__stat-icon--origin">
+                <MapPin size={16} />
+              </span>
+              <div className="top-screen__stat-copy">
+                <strong>{originActive ? scopeSignal : "Origen"}</strong>
+                <span>{originStatusText}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="top-screen__hero-actions">
+            {!originActive ? (
+              <>
+                <button
+                  type="button"
+                  className="entry-screen__primary"
+                  onClick={() => requestGeolocation()}
+                >
+                  <Navigation size={16} />
+                  Usar mi ubicacion
+                </button>
+                <button
+                  type="button"
+                  className="entry-screen__secondary"
+                  onClick={openOriginSheet}
+                >
+                  <MapPin size={16} />
+                  Introducir direccion
+                </button>
+              </>
+            ) : (
+              <>
                 <button
                   type="button"
                   className={`list-topbar__origin list-topbar__origin--${getOriginTone(origin, geolocationStatus)}`}
@@ -126,26 +129,66 @@ export function TopPicksScreen() {
                 >
                   <span className="list-topbar__origin-dot" />
                   <Navigation size={15} />
-                  <span>{getOriginStatusText(origin, geolocationStatus)}</span>
+                  <span>{originStatusText}</span>
                 </button>
                 <button
                   type="button"
-                  className="entry-screen__ghost top-picks-header__link"
-                  onClick={() => navigate("/listado")}
+                  className="entry-screen__secondary"
+                  onClick={() => requestGeolocation()}
                 >
-                  Ver listado base
-                  <ArrowRight size={14} />
+                  <Navigation size={16} />
+                  Reubicar con GPS
                 </button>
-              </div>
-            </section>
+              </>
+            )}
+            <button
+              type="button"
+              className="entry-screen__ghost"
+              onClick={() => navigate("/listado")}
+            >
+              Ver listado base
+              <ArrowRight size={14} />
+            </button>
+          </div>
 
-            <section className="top-picks-summary">
-              <span className="list-topbar__pill"><strong>{topPicks.length}</strong> opciones resueltas</span>
-              <span className="list-topbar__pill"><strong>{getTopMobilityScopeSignal(topScope)}</strong> desde origen</span>
-              <span className="list-topbar__pill list-topbar__pill--open"><strong>{serverOpenCount}</strong> abiertas ahora</span>
-              {originSearch.presetsError ? <span className="screen__inline-error">{originSearch.presetsError}</span> : null}
-            </section>
+          <div className="top-screen__hero-meta">
+            <span className="entry-screen__live-pill">
+              <Sparkles size={12} />
+              {originActive ? "TOP RESUELTO CON ORIGEN" : "ELIGE ORIGEN PARA ACTIVAR EL TOP"}
+            </span>
+            {originSearch.presetsError ? <span className="screen__inline-error">{originSearch.presetsError}</span> : null}
+          </div>
+        </section>
 
+        <section className="top-screen__section-head">
+          <div className="top-screen__section-copy">
+            <span className="top-screen__section-kicker">Top 3 opciones para ti</span>
+            <h2>{originActive ? "Bibliotecas priorizadas para salir ahora" : "Activa un origen para resolver el Top"}</h2>
+            <p>
+              {originActive
+                ? "Mantenemos solo tres opciones y dejamos el listado completo aparte para explorar el resto."
+                : "Cuando fijes un origen mostramos las tres mejores opciones con contexto real de movilidad y apertura."}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="top-screen__section-link"
+            onClick={() => navigate("/listado")}
+          >
+            Ver listado base
+            <ArrowRight size={14} />
+          </button>
+        </section>
+
+        {!originActive ? (
+          <section className="top-screen__state">
+            <EmptyStateCard
+              title="Activa un origen para resolver el Top 3"
+              body="Usa tu ubicacion o introduce una direccion para comparar solo las tres opciones mas utiles. El listado base sigue disponible aparte."
+            />
+          </section>
+        ) : (
+          <>
             {loading ? (
               <div className="center-list__grid">
                 <LoadingCard count={3} />
@@ -170,6 +213,16 @@ export function TopPicksScreen() {
             )}
           </>
         )}
+
+        <footer className="top-screen__footer">
+          <div className="top-screen__footer-brand">
+            <div className="top-screen__footer-mark">
+              <BookOpen size={16} />
+            </div>
+            <span>alabiblio</span>
+          </div>
+          <p>Top con datos reales de movilidad y acceso directo al listado base.</p>
+        </footer>
       </FadeContent>
 
       <OriginSheet
