@@ -4,6 +4,7 @@ import type {
 } from "@alabiblio/contracts/centers";
 import {
   Accessibility,
+  ArrowRight,
   Clock3,
   MapPin,
   Navigation,
@@ -46,12 +47,14 @@ export function CenterCard({
   onSelect,
 }: CenterCardProps) {
   const area = buildArea(center);
+  const locationLine = center.address_line ?? area;
+  const secondaryArea = center.address_line && area ? area : null;
   const nextChange = buildNextChange(center);
   const services = serviceItems(center).slice(0, 2);
   const presentation = buildBaseCardPresentation(center, scope);
 
   return (
-    <div className="decision-card">
+    <article className="decision-card decision-card--catalog">
       <button type="button" className="decision-card__main" onClick={() => onSelect(center.slug)}>
         <SpotlightCard className="decision-card__surface">
           <div className="decision-card__header">
@@ -69,11 +72,15 @@ export function CenterCard({
 
           <h2 className="decision-card__name">{center.name}</h2>
 
-          {area ? (
+          {locationLine ? (
             <div className="decision-card__zone">
               <MapPin size={12} />
-              <span>{area}</span>
+              <span>{locationLine}</span>
             </div>
+          ) : null}
+
+          {secondaryArea ? (
+            <p className="decision-card__catalog-area">{secondaryArea}</p>
           ) : null}
 
           <p className="decision-card__schedule">
@@ -99,26 +106,32 @@ export function CenterCard({
             </div>
           ) : null}
 
-          <div className="decision-card__board">
+          <div className="decision-card__catalog-highlights">
             {presentation.highlightRows.length > 0 ? presentation.highlightRows.map((line) => (
-              <div key={`${center.id}-${line.label}-${line.body}`} className="decision-card__board-row">
-                <span className="decision-card__board-label">{line.label}</span>
-                <span className="decision-card__board-body">{line.body}</span>
+              <div key={`${center.id}-${line.label}-${line.body}`} className="decision-card__catalog-highlight">
+                <span className="decision-card__catalog-highlight-label">{line.label}</span>
+                <span className="decision-card__catalog-highlight-body">{line.body}</span>
               </div>
             )) : (
-              <div className="decision-card__board-row decision-card__board-row--fallback">
-                <span className="decision-card__board-label">SCOPE</span>
-                <span className="decision-card__board-body">{presentation.fallbackCopy}</span>
+              <div className="decision-card__catalog-highlight decision-card__catalog-highlight--muted">
+                <span className="decision-card__catalog-highlight-label">BASE</span>
+                <span className="decision-card__catalog-highlight-body">{presentation.fallbackCopy}</span>
               </div>
             )}
           </div>
 
-          <div className="decision-card__footer">
-            <Navigation size={12} />
-            <span>{presentation.footerLabel}</span>
+          <div className="decision-card__footer decision-card__footer--catalog">
+            <span className="decision-card__footer-tag">
+              <Navigation size={12} />
+              {presentation.footerLabel}
+            </span>
+            <span className="decision-card__footer-link">
+              Ver detalle
+              <ArrowRight size={13} />
+            </span>
           </div>
         </SpotlightCard>
       </button>
-    </div>
+    </article>
   );
 }

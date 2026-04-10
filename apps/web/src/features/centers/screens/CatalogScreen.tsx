@@ -1,6 +1,7 @@
 import type { UserOrigin } from "@alabiblio/contracts/origin";
 import {
   ArrowRight,
+  BookOpen,
   LayoutGrid,
   List,
   Navigation,
@@ -9,7 +10,6 @@ import {
   X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import DotGrid from "../../../components/reactbits/DotGrid";
 import FadeContent from "../../../components/reactbits/FadeContent";
 import { CenterCard } from "../components/CenterCard";
 import { CenterRowItem } from "../components/CenterRowItem";
@@ -21,6 +21,7 @@ import { EmptyStateCard } from "../../ui/EmptyStateCard";
 import { FilterDrawer } from "../../ui/FilterDrawer";
 import { LoadingCard } from "../../ui/LoadingCard";
 import { SearchField } from "../../ui/SearchField";
+import { BackgroundIllustration } from "../../ui/BackgroundIllustration";
 
 export function CatalogScreen() {
   const navigate = useNavigate();
@@ -64,19 +65,17 @@ export function CatalogScreen() {
     applyOrigin(nextOrigin);
   }
 
+  const visibleResults = items.length;
+  const hasActiveSearch = filters.searchText.trim().length > 0;
+
   return (
-    <section className="screen screen--list">
+    <section className="screen screen--list catalog-screen">
       <div className="screen__background">
-        <DotGrid
-          dotSize={10}
-          gap={22}
-          baseColor="color-mix(in srgb, var(--color-text-3) 26%, transparent)"
-          activeColor="color-mix(in srgb, var(--color-primary-soft) 34%, transparent)"
-        />
+        <BackgroundIllustration />
       </div>
 
       <FadeContent blur duration={320} className="screen__content">
-        <section className="list-topbar">
+        <section className="list-topbar catalog-screen__hero">
           <div className="list-topbar__row list-topbar__row--headline">
             <div className="list-topbar__title">
               <span className="list-topbar__eyebrow">listado base</span>
@@ -102,6 +101,14 @@ export function CatalogScreen() {
             <span className="list-topbar__pill list-topbar__pill--open">
               <strong>{serverOpenCount}</strong> {filters.openNowOnly ? "abiertos en este filtro" : "abiertos ahora"}
             </span>
+            <span className="list-topbar__pill">
+              <strong>{visibleResults}</strong> cargados
+            </span>
+            {activeFilterCount > 0 ? (
+              <span className="list-topbar__pill">
+                <strong>{activeFilterCount}</strong> filtros
+              </span>
+            ) : null}
             <button
               type="button"
               className={`list-topbar__origin list-topbar__origin--${getOriginTone(origin, geolocationStatus)}`}
@@ -122,7 +129,7 @@ export function CatalogScreen() {
           </div>
         </section>
 
-        <section className="list-search-strip">
+        <section className="list-search-strip catalog-screen__search-strip">
           <div className="list-topbar__search">
             <Search size={16} />
             <SearchField
@@ -151,7 +158,7 @@ export function CatalogScreen() {
           </div>
         </section>
 
-        <section className="controls-bar">
+        <section className="controls-bar catalog-screen__controls">
           <div className="controls-bar__row">
             <button
               type="button"
@@ -192,6 +199,24 @@ export function CatalogScreen() {
               Reiniciar origen
             </button>
           ) : null}
+        </section>
+
+        <section className="catalog-screen__results-head">
+          <div className="catalog-screen__results-copy">
+            <span className="catalog-screen__results-kicker">
+              {loading ? "Cargando listado" : `${visibleResults} de ${total} visibles`}
+            </span>
+            <h2>Listado exploratorio</h2>
+            <p>
+              {hasActiveSearch
+                ? "La busqueda y los filtros afinan el catalogo sin convertirlo en ranking contextual."
+                : "El grid mantiene orden base y acceso al detalle sin vender llegada contextual."}
+            </p>
+          </div>
+          <div className="catalog-screen__results-meta">
+            <span className="catalog-screen__results-chip">Orden base</span>
+            <span className="catalog-screen__results-chip">Sin recomendacion</span>
+          </div>
         </section>
 
         {originSearch.presetsError ? <p className="screen__inline-error">{originSearch.presetsError}</p> : null}
@@ -245,6 +270,17 @@ export function CatalogScreen() {
             </button>
           ) : null}
         </section>
+
+        <footer className="catalog-screen__footer">
+          <div className="catalog-screen__footer-brand">
+            <div className="catalog-screen__footer-mark">
+              <BookOpen size={18} />
+            </div>
+            <span>AlaBiblio</span>
+          </div>
+          <p>Proyecto de la Comunidad de Madrid</p>
+          <span>Catalogo base con filtros reales y acceso al detalle</span>
+        </footer>
       </FadeContent>
 
       <OriginSheet

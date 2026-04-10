@@ -188,6 +188,13 @@ export function FilterDrawer({
         </div>
 
         <div className="filter-drawer__body">
+          <div className="filter-drawer__intro">
+            <p className="filter-drawer__intro-title">Ajusta el catalogo base</p>
+            <p className="filter-drawer__intro-copy">
+              Los cambios se aplican al instante y no convierten el listado en ranking contextual.
+            </p>
+          </div>
+
           <section className="filter-drawer__section">
             <h4 className="filter-drawer__section-title">Tipo de centro</h4>
             <RadioGroup

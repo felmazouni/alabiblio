@@ -4,10 +4,13 @@ import type {
 } from "@alabiblio/contracts/centers";
 import {
   ArrowRight,
+  Accessibility,
   Clock3,
   MapPin,
   Navigation,
+  Plug,
   Shield,
+  Wifi,
 } from "lucide-react";
 import { buildBaseCardPresentation } from "../cardPresentation";
 
@@ -29,9 +32,16 @@ function getHighlightIcon(label: string) {
 export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
   const presentation = buildBaseCardPresentation(center, scope);
   const area = [center.neighborhood, center.district].filter(Boolean).join(" - ");
+  const locationLine = center.address_line ?? area;
+  const secondaryArea = center.address_line && area ? area : null;
+  const servicePills = [
+    center.services.wifi ? { key: "wifi", label: "WiFi", icon: <Wifi size={11} /> } : null,
+    center.services.accessible ? { key: "accessible", label: "Accesible", icon: <Accessibility size={11} /> } : null,
+    center.services.sockets ? { key: "sockets", label: "Enchufes", icon: <Plug size={11} /> } : null,
+  ].filter((value): value is NonNullable<typeof value> => value !== null).slice(0, 2);
 
   return (
-    <article className="center-row-item">
+    <article className="center-row-item center-row-item--catalog">
       <div className="center-row-item__left">
         <div className="center-row-item__name-row">
           <span
@@ -41,12 +51,14 @@ export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
           <span className="center-row-item__kind">{center.kind_label}</span>
         </div>
 
-        {area ? (
+        {locationLine ? (
           <span className="center-row-item__area">
             <MapPin size={11} />
-            {area}
+            {locationLine}
           </span>
         ) : null}
+
+        {secondaryArea ? <span className="center-row-item__subarea">{secondaryArea}</span> : null}
 
         <div className="center-row-item__meta">
           <span className={center.is_open_now ? "center-row-item__open" : "center-row-item__closed"}>
@@ -58,6 +70,12 @@ export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
               {center.today_human_schedule}
             </span>
           ) : null}
+          {servicePills.map((service) => (
+            <span key={service.key} className="center-row-item__service">
+              {service.icon}
+              {service.label}
+            </span>
+          ))}
         </div>
       </div>
 

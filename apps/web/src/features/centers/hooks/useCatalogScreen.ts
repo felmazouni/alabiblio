@@ -32,7 +32,7 @@ export function useCatalogScreen() {
     buildRequestQuery,
   } = useCatalogFilters();
   const deferredSearch = useDeferredValue(filters.searchText.trim());
-  const [viewMode, setViewMode] = useState<CatalogViewMode>("cards");
+  const [viewMode, setViewMode] = useState<CatalogViewMode>("rows");
   const [items, setItems] = useState<CenterListBaseItemV1[]>([]);
   const [catalogScope, setCatalogScope] = useState<ListCentersResponse["meta"]["scope"] | null>(null);
   const [total, setTotal] = useState(0);
