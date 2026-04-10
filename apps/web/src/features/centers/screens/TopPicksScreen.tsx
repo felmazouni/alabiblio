@@ -141,7 +141,7 @@ export function TopPicksScreen() {
 
             <section className="top-picks-summary">
               <span className="list-topbar__pill"><strong>{topPicks.length}</strong> opciones resueltas</span>
-              <span className="list-topbar__pill"><strong>{getTopMobilityScopeSignal(topScope)}</strong> scope</span>
+              <span className="list-topbar__pill"><strong>{getTopMobilityScopeSignal(topScope)}</strong> desde origen</span>
               <span className="list-topbar__pill list-topbar__pill--open"><strong>{serverOpenCount}</strong> abiertas ahora</span>
               {originSearch.presetsError ? <span className="screen__inline-error">{originSearch.presetsError}</span> : null}
             </section>
@@ -162,7 +162,6 @@ export function TopPicksScreen() {
                     center={entry.center}
                     mobility={entry.mobility}
                     rank={entry.rank}
-                    scope={topScope}
                     serverOpenCount={serverOpenCount}
                     onSelect={(slug) => navigate(`/centers/${slug}`)}
                   />

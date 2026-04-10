@@ -27,6 +27,11 @@ function assertPresentString(value: string | null | undefined, field: string): v
   assert.notEqual(value?.trim(), "", `Expected ${field} to be non-empty`);
 }
 
+function normalizeNextChange(nextChangeAt: string | null | undefined): string | null {
+  if (!nextChangeAt) return null;
+  return nextChangeAt.slice(11);
+}
+
 function normalizeListContract(payload: ListCentersResponse) {
   return {
     meta: payload.meta,
@@ -41,7 +46,7 @@ function normalizeListContract(payload: ListCentersResponse) {
       kind: item.kind,
       name: item.name,
       is_open_now: item.is_open_now,
-      next_change_at: item.next_change_at,
+      next_change_at: normalizeNextChange(item.next_change_at),
       ser_zone: item.ser?.zone_name ?? null,
       keys: Object.keys(item).sort(),
     })),
@@ -60,7 +65,7 @@ function normalizeDetailContract(payload: GetCenterDetailResponse) {
       municipality: payload.item.municipality,
       ser_zone: payload.item.ser.zone_name,
       is_open_now: payload.item.schedule.is_open_now,
-      next_change_at: payload.item.schedule.next_change_at,
+      next_change_at: normalizeNextChange(payload.item.schedule.next_change_at),
       source_codes: payload.item.sources.map((source) => source.code),
       feature_codes: payload.item.features.map((feature) => feature.code),
     },

@@ -22,9 +22,9 @@ body {
   line-height: var(--leading-normal);
   color: var(--color-text);
   background:
-    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-primary-glow) 78%, transparent) 0, transparent 28%),
-    radial-gradient(circle at 88% 6%, color-mix(in srgb, var(--color-info-surface) 78%, transparent) 0, transparent 24%),
-    linear-gradient(180deg, var(--color-bg) 0%, color-mix(in srgb, var(--color-bg-raised) 68%, var(--color-bg)) 100%);
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-primary-glow) 68%, transparent) 0, transparent 30%),
+    radial-gradient(circle at 82% 8%, color-mix(in srgb, var(--color-info-surface) 58%, transparent) 0, transparent 24%),
+    linear-gradient(180deg, var(--color-bg) 0%, color-mix(in srgb, var(--color-bg-raised) 54%, var(--color-bg)) 100%);
   background-attachment: fixed;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -41,10 +41,24 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-base) 10%, transparent), transparent 26%),
-    radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--color-primary-glow) 40%, transparent), transparent 44%);
-  opacity: 0.8;
+    linear-gradient(180deg, color-mix(in srgb, var(--color-base) 12%, transparent), transparent 24%),
+    radial-gradient(circle at 50% -8%, color-mix(in srgb, var(--color-primary-glow) 34%, transparent), transparent 40%);
+  opacity: 0.62;
   z-index: -1;
+}
+
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(131, 210, 255, 0.16) 0, transparent 24%),
+    radial-gradient(circle at 84% 8%, rgba(0, 158, 223, 0.09) 0, transparent 22%),
+    linear-gradient(180deg, #edf5fb 0%, #f7fbff 100%);
+}
+
+:root[data-theme="light"] body::before {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), transparent 24%),
+    radial-gradient(circle at 50% -8%, rgba(0, 158, 223, 0.08), transparent 36%);
+  opacity: 0.82;
 }
 
 #root {

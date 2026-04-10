@@ -102,12 +102,6 @@ export function CatalogScreen() {
             <span className="list-topbar__pill list-topbar__pill--open">
               <strong>{serverOpenCount}</strong> {filters.openNowOnly ? "abiertos en este filtro" : "abiertos ahora"}
             </span>
-            <span className="list-topbar__pill">
-              <strong>{items.length}</strong> cargados
-            </span>
-            <span className="list-topbar__pill">
-              <strong>{catalogScope === "base_exploration" ? "base_exploration" : "pendiente"}</strong> scope
-            </span>
             <button
               type="button"
               className={`list-topbar__origin list-topbar__origin--${getOriginTone(origin, geolocationStatus)}`}

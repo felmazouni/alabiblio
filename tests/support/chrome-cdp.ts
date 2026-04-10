@@ -4,14 +4,16 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 
 type ChromeSession = {
+  setViewport: (options: { width: number; height: number; deviceScaleFactor?: number }) => Promise<void>;
   navigate: (url: string, options?: { waitFor?: string; timeoutMs?: number }) => Promise<void>;
   evaluate: <T>(expression: string) => Promise<T>;
   waitForFunction: (expression: string, timeoutMs?: number) => Promise<void>;
   click: (selector: string) => Promise<void>;
   type: (selector: string, value: string) => Promise<void>;
+  screenshot: (filePath: string) => Promise<void>;
   close: () => Promise<void>;
 };
 
@@ -178,6 +180,12 @@ export async function openChromeSession(): Promise<ChromeSession> {
   const { socket, send } = await createProtocolConnection(debuggingPort);
   await send("Page.enable");
   await send("Runtime.enable");
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 1440,
+    height: 1024,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
 
   async function evaluate<T>(expression: string): Promise<T> {
     const result = await send("Runtime.evaluate", {
@@ -213,6 +221,15 @@ export async function openChromeSession(): Promise<ChromeSession> {
     await waitForFunction(waitFor, options?.timeoutMs);
   }
 
+  async function setViewport(options: { width: number; height: number; deviceScaleFactor?: number }): Promise<void> {
+    await send("Emulation.setDeviceMetricsOverride", {
+      width: options.width,
+      height: options.height,
+      deviceScaleFactor: options.deviceScaleFactor ?? 1,
+      mobile: false,
+    });
+  }
+
   async function click(selector: string): Promise<void> {
     const escaped = escapeForTemplate(selector);
     const clicked = await evaluate<boolean>(`(() => {
@@ -241,6 +258,16 @@ export async function openChromeSession(): Promise<ChromeSession> {
     assert.equal(typed, true, `Input not found for type: ${selector}`);
   }
 
+  async function screenshot(filePath: string): Promise<void> {
+    const result = await send("Page.captureScreenshot", {
+      format: "png",
+      captureBeyondViewport: true,
+    });
+    const data = typeof result.data === "string" ? result.data : null;
+    assert.ok(data, "Missing screenshot payload");
+    await writeFile(filePath, Buffer.from(data, "base64"));
+  }
+
   async function close(): Promise<void> {
     socket.close();
     chrome.kill("SIGTERM");
@@ -254,11 +281,13 @@ export async function openChromeSession(): Promise<ChromeSession> {
   }
 
   return {
+    setViewport,
     navigate,
     evaluate,
     waitForFunction,
     click,
     type,
+    screenshot,
     close,
   };
 }

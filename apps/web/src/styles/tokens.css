@@ -71,23 +71,23 @@
   --bottom-nav-h: 74px;
   --bottom-nav-safe: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 16px);
 
-  --color-base: #0f1822;
-  --color-bg: #131e27;
-  --color-bg-raised: #182532;
-  --color-surface: rgba(21, 33, 44, 0.9);
-  --color-surface-2: rgba(25, 40, 53, 0.92);
-  --color-surface-3: rgba(30, 47, 63, 0.88);
-  --color-surface-raised: rgba(36, 55, 72, 0.94);
-  --color-overlay: rgba(7, 13, 19, 0.7);
+  --color-base: #10202a;
+  --color-bg: #14232d;
+  --color-bg-raised: #1b2d39;
+  --color-surface: rgba(24, 38, 49, 0.84);
+  --color-surface-2: rgba(29, 45, 58, 0.88);
+  --color-surface-3: rgba(35, 54, 69, 0.84);
+  --color-surface-raised: rgba(40, 61, 77, 0.9);
+  --color-overlay: rgba(10, 18, 24, 0.56);
 
-  --color-border: rgba(153, 185, 209, 0.14);
-  --color-border-mid: rgba(153, 185, 209, 0.22);
+  --color-border: rgba(162, 194, 217, 0.11);
+  --color-border-mid: rgba(162, 194, 217, 0.18);
   --color-border-strong: rgba(0, 158, 223, 0.32);
   --color-border-focus: rgba(67, 197, 255, 0.52);
 
   --color-text: #eef5fa;
-  --color-text-2: #bfd0dc;
-  --color-text-3: #88a0b0;
+  --color-text-2: #c7d8e4;
+  --color-text-3: #8fa6b7;
   --color-text-inv: #0f1822;
 
   --color-primary: #009edf;
@@ -145,34 +145,38 @@
   --color-transport-walk-surface: rgba(159, 202, 244, 0.14);
   --color-transport-walk-border: rgba(159, 202, 244, 0.24);
 
-  --shadow-xs: 0 2px 4px rgba(7, 16, 24, 0.08);
-  --shadow-sm: 0 8px 18px rgba(7, 16, 24, 0.14);
-  --shadow-md: 0 16px 36px rgba(6, 16, 24, 0.2);
-  --shadow-lg: 0 28px 60px rgba(6, 16, 24, 0.24);
-  --shadow-panel: 0 24px 50px rgba(4, 14, 20, 0.26);
-  --shadow-card: 0 18px 40px rgba(4, 14, 20, 0.2);
-  --shadow-float: 0 30px 80px rgba(4, 14, 20, 0.32);
+  --shadow-xs: 0 2px 4px rgba(6, 15, 22, 0.05);
+  --shadow-sm: 0 10px 20px rgba(6, 15, 22, 0.1);
+  --shadow-md: 0 18px 36px rgba(6, 15, 22, 0.14);
+  --shadow-lg: 0 26px 56px rgba(6, 15, 22, 0.18);
+  --shadow-panel: 0 22px 48px rgba(6, 15, 22, 0.16);
+  --shadow-card: 0 14px 32px rgba(6, 15, 22, 0.13);
+  --shadow-float: 0 24px 70px rgba(6, 15, 22, 0.24);
 }
 
 :root[data-theme="light"] {
-  --color-base: #eef4f8;
-  --color-bg: #f6fbff;
-  --color-bg-raised: #ffffff;
-  --color-surface: rgba(255, 255, 255, 0.92);
-  --color-surface-2: rgba(246, 251, 255, 0.92);
-  --color-surface-3: rgba(236, 244, 250, 0.94);
-  --color-surface-raised: rgba(255, 255, 255, 0.98);
-  --color-overlay: rgba(214, 227, 236, 0.54);
+  --color-base: #eef4f9;
+  --color-bg: #edf5fb;
+  --color-bg-raised: #f7fbff;
+  --color-surface: rgba(255, 255, 255, 0.86);
+  --color-surface-2: rgba(248, 251, 255, 0.92);
+  --color-surface-3: rgba(236, 245, 252, 0.94);
+  --color-surface-raised: rgba(255, 255, 255, 0.94);
+  --color-overlay: rgba(205, 220, 232, 0.46);
 
-  --color-border: rgba(18, 53, 79, 0.08);
-  --color-border-mid: rgba(18, 53, 79, 0.14);
-  --color-border-strong: rgba(0, 158, 223, 0.22);
+  --color-border: rgba(29, 63, 89, 0.1);
+  --color-border-mid: rgba(29, 63, 89, 0.17);
+  --color-border-strong: rgba(0, 158, 223, 0.24);
   --color-border-focus: rgba(0, 134, 188, 0.44);
 
-  --color-text: #152331;
-  --color-text-2: #476073;
-  --color-text-3: #6f8798;
+  --color-text: #1b2c3d;
+  --color-text-2: #4b6579;
+  --color-text-3: #718a9d;
   --color-text-inv: #f6fbff;
+
+  --color-primary-surface: rgba(0, 158, 223, 0.1);
+  --color-primary-border: rgba(0, 158, 223, 0.24);
+  --color-primary-glow: rgba(0, 158, 223, 0.14);
 
   --color-open-surface: rgba(103, 227, 172, 0.14);
   --color-open-text: #116343;
@@ -185,11 +189,11 @@
 
   --color-warning-surface: rgba(255, 218, 117, 0.18);
 
-  --shadow-xs: 0 2px 6px rgba(23, 49, 68, 0.06);
-  --shadow-sm: 0 8px 18px rgba(23, 49, 68, 0.08);
-  --shadow-md: 0 16px 34px rgba(23, 49, 68, 0.1);
-  --shadow-lg: 0 24px 54px rgba(23, 49, 68, 0.14);
-  --shadow-panel: 0 18px 44px rgba(23, 49, 68, 0.12);
-  --shadow-card: 0 16px 36px rgba(23, 49, 68, 0.1);
-  --shadow-float: 0 28px 70px rgba(23, 49, 68, 0.14);
+  --shadow-xs: 0 1px 3px rgba(29, 63, 89, 0.04);
+  --shadow-sm: 0 8px 18px rgba(29, 63, 89, 0.06);
+  --shadow-md: 0 16px 30px rgba(29, 63, 89, 0.08);
+  --shadow-lg: 0 24px 46px rgba(29, 63, 89, 0.1);
+  --shadow-panel: 0 20px 42px rgba(29, 63, 89, 0.08);
+  --shadow-card: 0 12px 28px rgba(29, 63, 89, 0.07);
+  --shadow-float: 0 24px 54px rgba(29, 63, 89, 0.12);
 }

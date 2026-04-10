@@ -169,8 +169,7 @@ export function CenterDetailScreen({
         <div className="detail-screen__hero-header">
           <div className="detail-screen__hero-copy">
             <span className="detail-screen__eyebrow">
-              {item.kind_label}
-              {detailScope === "base_exploration" ? " / detalle base" : ""}
+              {detailScope === "base_exploration" ? `${item.kind_label} / ficha base` : item.kind_label}
             </span>
             <h1>{item.name}</h1>
             <p>{[item.address_line, item.neighborhood, item.district].filter(Boolean).join(" / ") || "Madrid"}</p>

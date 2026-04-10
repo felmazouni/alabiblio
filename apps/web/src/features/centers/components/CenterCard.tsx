@@ -47,7 +47,7 @@ export function CenterCard({
 }: CenterCardProps) {
   const area = buildArea(center);
   const nextChange = buildNextChange(center);
-  const services = serviceItems(center).slice(0, 4);
+  const services = serviceItems(center).slice(0, 2);
   const presentation = buildBaseCardPresentation(center, scope);
 
   return (

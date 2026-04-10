@@ -130,6 +130,7 @@ test("createApiJsonResponse anota headers operativos y meta observable", async (
 });
 
 test("classifyMobilityDataState y buildMobilityUpstreamStatus distinguen realtime y fallback", () => {
+  const freshDataVersion = new Date().toISOString();
   const realtimeMobility = buildMobilityFixture({
     realtime: {
       emt_next_arrivals: [],
@@ -159,11 +160,11 @@ test("classifyMobilityDataState y buildMobilityUpstreamStatus distinguen realtim
   });
 
   assert.equal(
-    classifyMobilityDataState(realtimeMobility, "2026-04-08T10:00:00.000Z"),
+    classifyMobilityDataState(realtimeMobility, freshDataVersion),
     "realtime",
   );
   assert.equal(
-    classifyMobilityDataState(fallbackMobility, "2026-04-08T10:00:00.000Z"),
+    classifyMobilityDataState(fallbackMobility, freshDataVersion),
     "fallback",
   );
   assert.equal(
