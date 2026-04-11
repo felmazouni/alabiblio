@@ -152,6 +152,8 @@
   - Evidencia:
     - referencia ZIP: `tmp/v0-import/extracted/app/page.tsx`, `tmp/v0-import/extracted/components/library-card.tsx`, `tmp/v0-import/extracted/components/background-illustration.tsx`
     - archivos tocados: `apps/web/src/features/centers/screens/TopPicksScreen.tsx`, `apps/web/src/features/centers/components/TopMobilityCard.tsx`, `apps/web/src/features/centers/components/TopMobilityCard.css`, `apps/web/src/styles/product.css`
-    - evidencia visual local: `.tmp-visual/top-local-check-2/top-dark.png`, `.tmp-visual/top-local-check-2/top-light.png`
-    - estado actual: hero y cards rehechos; la card ya replica mucho mejor la estructura del demo, pero Top sigue abierto hasta contrastar esta pasada en producción
+    - evidencias visuales: `.tmp-visual/top-local-check-2/top-dark.png`, `.tmp-visual/top-local-check-2/top-light.png`, `.tmp-visual/top-production-final-pass/top-dark.png`, `.tmp-visual/top-production-final-pass/top-light.png`
+    - commit actual: `9e43565`
+    - producción actual: `https://alabiblio.org/` · versión `b9efca96-d59a-49ab-999c-e6b828d5eebc`
+    - estado actual: hero y cards rehechos; la card ya replica mucho mejor la estructura del demo y elimina la mezcla rota anterior, pero Top sigue abierto hasta decidir si esta fidelidad ya es suficiente dentro del alcance real
     - limitaciones previsibles: no se clonan ratings, reviews ni occupancy fake del demo porque el dominio real de `top-mobility` no los soporta
