@@ -146,10 +146,12 @@
   - [x] Mapear referencia visual del ZIP para Top contra `TopPicksScreen` y `TopMobilityCard`.
   - [x] Rehacer `TopMobilityCard.tsx` desde la estructura visual de `components/library-card.tsx` para eliminar mezcla con estilos heredados.
   - [x] Ejecutar una segunda iteración visual de Top sobre `TopPicksScreen.tsx`, `TopMobilityCard.tsx`, `TopMobilityCard.css` y `product.css`.
+  - [x] Corregir anchura, densidad y superficies de la card de Top para acercarla al bloque visual del demo y eliminar el look sobredimensionado de producción.
   - [x] Validar y desplegar la reescritura de Top sin romper listado ya cerrado.
   - [ ] Cerrar Top dentro del alcance real de la pantalla.
   - Evidencia:
     - referencia ZIP: `tmp/v0-import/extracted/app/page.tsx`, `tmp/v0-import/extracted/components/library-card.tsx`, `tmp/v0-import/extracted/components/background-illustration.tsx`
     - archivos tocados: `apps/web/src/features/centers/screens/TopPicksScreen.tsx`, `apps/web/src/features/centers/components/TopMobilityCard.tsx`, `apps/web/src/features/centers/components/TopMobilityCard.css`, `apps/web/src/styles/product.css`
-    - estado actual: hero y cards rehechos; Top sigue abierto hasta contrastar ZIP vs producción y decidir si la fidelidad ya es suficiente dentro del alcance real
+    - evidencia visual local: `.tmp-visual/top-local-check-2/top-dark.png`, `.tmp-visual/top-local-check-2/top-light.png`
+    - estado actual: hero y cards rehechos; la card ya replica mucho mejor la estructura del demo, pero Top sigue abierto hasta contrastar esta pasada en producción
     - limitaciones previsibles: no se clonan ratings, reviews ni occupancy fake del demo porque el dominio real de `top-mobility` no los soporta
