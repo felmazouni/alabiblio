@@ -22,6 +22,7 @@ import {
   MapPin,
   Navigation,
   Sparkles,
+  Star,
   TrainFront,
 } from "lucide-react";
 import { buildTopMobilityCardPresentation } from "../cardPresentation";
@@ -92,7 +93,7 @@ function buildSignalMetrics(
       label: "Mejor llegada",
       value:
         center.decision.best_time_minutes !== null && center.decision.best_mode
-          ? `${center.decision.best_time_minutes} min en ${modeLabel(center.decision.best_mode)}`
+          ? `${center.decision.best_time_minutes} min`
           : "Sin ETA cerrada",
       percent: getConfidencePercent(
         center.decision.confidence,
@@ -106,7 +107,7 @@ function buildSignalMetrics(
       value:
         mobility.modules.bus.estimated_total_min !== null
           ? `${mobility.modules.bus.estimated_total_min} min`
-          : confidenceSourceLabel(mobility.modules.bus.confidence_source),
+          : "s/d",
       percent: getConfidencePercent("medium", mobility.modules.bus.confidence_source),
       icon: "bus",
     },
@@ -116,7 +117,7 @@ function buildSignalMetrics(
       value:
         mobility.modules.metro.eta_min !== null
           ? `${mobility.modules.metro.eta_min} min`
-          : confidenceSourceLabel(mobility.modules.metro.confidence_source),
+          : "s/d",
       percent: getConfidencePercent("medium", mobility.modules.metro.confidence_source),
       icon: "metro",
     },
@@ -126,7 +127,9 @@ function buildSignalMetrics(
       value:
         mobility.modules.bike.eta_min !== null
           ? `${mobility.modules.bike.eta_min} min`
-          : confidenceSourceLabel(mobility.modules.bike.confidence_source),
+          : mobility.modules.bike.confidence_source === "realtime"
+            ? "realtime"
+            : "s/d",
       percent: getConfidencePercent("medium", mobility.modules.bike.confidence_source),
       icon: "bike",
     },
@@ -146,7 +149,7 @@ function buildSignalMetrics(
       value:
         mobility.origin_dependent.walking_eta_min !== null
           ? `${mobility.origin_dependent.walking_eta_min} min`
-          : "Fallback",
+          : "s/d",
       percent: 24,
       icon: "walk",
     },
@@ -480,10 +483,11 @@ export function TopMobilityCard({
         <div className="top-mobility-card__metrics-head">
           <div className="top-mobility-card__metrics-summary">
             <div className="top-mobility-card__metrics-stars" aria-hidden="true">
-              <Sparkles size={16} />
-              <Sparkles size={16} />
-              <Sparkles size={16} />
-              <Sparkles size={16} />
+              <Star size={15} fill="currentColor" />
+              <Star size={15} fill="currentColor" />
+              <Star size={15} fill="currentColor" />
+              <Star size={15} fill="currentColor" />
+              <Star size={15} />
             </div>
             <strong>{summaryTitle}</strong>
             <span>{getPrimarySummary(center)}</span>
@@ -554,7 +558,7 @@ export function TopMobilityCard({
           onClick={() => onSelect(center.slug)}
         >
           <Navigation size={16} />
-          Ver movilidad
+          Ir ahora
         </button>
       </div>
     </article>

@@ -163,10 +163,10 @@ export function TopPicksScreen() {
         <section className="top-screen__section-head">
           <div className="top-screen__section-copy">
             <span className="top-screen__section-kicker">Top 3 opciones para ti</span>
-            <h2>{originActive ? "Bibliotecas priorizadas para salir ahora" : "Activa un origen para resolver el Top"}</h2>
+            <h2>{originActive ? "Top 3 opciones para ti" : "Activa un origen para resolver el Top"}</h2>
             <p>
               {originActive
-                ? "Mantenemos solo tres opciones y dejamos el listado completo aparte para explorar el resto."
+                ? "Basado en tu ubicacion y preferencias."
                 : "Cuando fijes un origen mostramos las tres mejores opciones con contexto real de movilidad y apertura."}
             </p>
           </div>
@@ -175,7 +175,7 @@ export function TopPicksScreen() {
             className="top-screen__section-link"
             onClick={() => navigate("/listado")}
           >
-            Ver listado base
+            Ver mas
             <ArrowRight size={14} />
           </button>
         </section>
