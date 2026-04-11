@@ -147,13 +147,14 @@
   - [x] Rehacer `TopMobilityCard.tsx` desde la estructura visual de `components/library-card.tsx` para eliminar mezcla con estilos heredados.
   - [x] Ejecutar una segunda iteración visual de Top sobre `TopPicksScreen.tsx`, `TopMobilityCard.tsx`, `TopMobilityCard.css` y `product.css`.
   - [x] Corregir anchura, densidad y superficies de la card de Top para acercarla al bloque visual del demo y eliminar el look sobredimensionado de producción.
+  - [x] Simplificar la cabecera de Top para acercarla al hero limpio del demo y quitar el bloque superior demasiado pesado.
   - [x] Validar y desplegar la reescritura de Top sin romper listado ya cerrado.
   - [ ] Cerrar Top dentro del alcance real de la pantalla.
   - Evidencia:
     - referencia ZIP: `tmp/v0-import/extracted/app/page.tsx`, `tmp/v0-import/extracted/components/library-card.tsx`, `tmp/v0-import/extracted/components/background-illustration.tsx`
     - archivos tocados: `apps/web/src/features/centers/screens/TopPicksScreen.tsx`, `apps/web/src/features/centers/components/TopMobilityCard.tsx`, `apps/web/src/features/centers/components/TopMobilityCard.css`, `apps/web/src/styles/product.css`
-    - evidencias visuales: `.tmp-visual/top-local-check-2/top-dark.png`, `.tmp-visual/top-local-check-2/top-light.png`, `.tmp-visual/top-production-final-pass/top-dark.png`, `.tmp-visual/top-production-final-pass/top-light.png`
-    - commit actual: `9e43565`
-    - producción actual: `https://alabiblio.org/` · versión `b9efca96-d59a-49ab-999c-e6b828d5eebc`
-    - estado actual: hero y cards rehechos; la card ya replica mucho mejor la estructura del demo y elimina la mezcla rota anterior, pero Top sigue abierto hasta decidir si esta fidelidad ya es suficiente dentro del alcance real
+    - evidencias visuales: `.tmp-visual/top-local-check-3/top-light.png`, `.tmp-visual/top-production-pass-4/top-light.png`, `.tmp-visual/top-production-pass-4/top-dark.png`
+    - commits actuales: `9e43565`, `9324ffd`
+    - producción actual: `https://alabiblio.org/` · versión `48a617df-6294-48c8-91e7-3d84fe29670a`
+    - estado actual: hero y cards ya se acercan mucho más a la referencia; Top sigue abierto solo para decisión final de cierre dentro del alcance real
     - limitaciones previsibles: no se clonan ratings, reviews ni occupancy fake del demo porque el dominio real de `top-mobility` no los soporta
