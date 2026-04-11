@@ -2145,7 +2145,7 @@
 }
 
 .top-screen__background-illustration .background-illustration__svg {
-  opacity: 0.42;
+  opacity: 0.22;
 }
 
 .top-screen__background-illustration .background-illustration__gradient {
@@ -2157,30 +2157,25 @@
 
 .top-screen__content {
   display: grid;
-  gap: 1rem;
-  width: min(100%, 1040px);
+  gap: 1.3rem;
+  width: min(100%, 980px);
 }
 
 .top-screen__hero,
 .top-screen__section-head,
 .top-screen__state {
-  border: 1px solid color-mix(in srgb, var(--color-border) 92%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised) 96%, transparent), color-mix(in srgb, var(--color-surface) 98%, transparent));
-  box-shadow: var(--shadow-card);
-  border-radius: 1.6rem;
   width: min(100%, 860px);
   margin-inline: auto;
 }
 
 .top-screen__hero,
 .top-screen__section-head {
-  padding: 1.15rem 1.2rem;
+  padding: 0;
 }
 
 .top-screen__hero {
   display: grid;
-  gap: 1rem;
+  gap: 1.05rem;
 }
 
 .top-screen__hero-copy {
@@ -2200,13 +2195,13 @@
 .top-screen__hero h1,
 .top-screen__section-copy h2 {
   margin: 0;
-  font-size: clamp(1.42rem, 2.4vw, 2rem);
-  line-height: 1.04;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  line-height: 1.06;
   color: var(--color-text);
 }
 
 .top-screen__hero h1 {
-  max-width: 12ch;
+  max-width: 13ch;
 }
 
 .top-screen__hero p,
@@ -2214,25 +2209,26 @@
 .top-screen__footer p {
   margin: 0;
   max-width: 60ch;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   color: var(--color-text-2);
 }
 
 .top-screen__hero-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
 }
 
 .top-screen__stat-card {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.75rem;
-  min-height: 3.45rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: 1.1rem;
+  min-height: 3rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
-  background: color-mix(in srgb, var(--color-surface-2) 95%, transparent);
+  background: color-mix(in srgb, var(--color-surface-raised) 98%, transparent);
+  box-shadow: var(--shadow-xs);
 }
 
 .top-screen__stat-icon {
@@ -2285,6 +2281,8 @@
   justify-content: space-between;
   align-items: end;
   gap: 1rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
 }
 
 .top-screen__section-copy {
@@ -2492,11 +2490,11 @@
 }
 
 :root[data-theme="light"] .top-screen .screen__background {
-  opacity: 0.18;
+  opacity: 0.08;
 }
 
 :root[data-theme="light"] .top-screen__background-illustration .background-illustration__svg {
-  opacity: 0.1;
+  opacity: 0.04;
 }
 
 :root[data-theme="light"] .top-screen__background-illustration .background-illustration__gradient {
@@ -2509,7 +2507,7 @@
 :root[data-theme="light"] .top-screen__hero,
 :root[data-theme="light"] .top-screen__section-head,
 :root[data-theme="light"] .top-pick-card__surface {
-  background: rgba(255, 255, 255, 0.99);
+  background: transparent;
 }
 
 :root[data-theme="light"] .top-screen__stat-card,
@@ -2521,8 +2519,8 @@
 
 :root[data-theme="light"] .top-screen__hero,
 :root[data-theme="light"] .top-screen__section-head {
-  border-color: rgba(134, 171, 197, 0.4);
-  box-shadow: 0 20px 46px rgba(58, 96, 122, 0.12);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 :root[data-theme="light"] .top-screen__hero h1,
@@ -2552,6 +2550,7 @@
 
 @media (max-width: 900px) {
   .top-screen__hero-stats {
+    display: grid;
     grid-template-columns: 1fr;
   }
 
