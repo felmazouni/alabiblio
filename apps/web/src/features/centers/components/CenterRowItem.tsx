@@ -23,6 +23,36 @@ type CenterRowItemProps = {
   onSelect: (slug: string) => void;
 };
 
+type CommunityReviewSummary = {
+  review_count: number;
+  average_overall: number | null;
+};
+
+type CommunityNotice = {
+  severity: string;
+  title: string;
+};
+
+function getCommunityReviewSummary(
+  center: CenterListBaseItemV1,
+): CommunityReviewSummary | null {
+  const candidate = (center as CenterListBaseItemV1 & {
+    review_summary?: CommunityReviewSummary | null;
+  }).review_summary;
+
+  return candidate ?? null;
+}
+
+function getActiveNotice(
+  center: CenterListBaseItemV1,
+): CommunityNotice | null {
+  const candidate = (center as CenterListBaseItemV1 & {
+    active_notice?: CommunityNotice | null;
+  }).active_notice;
+
+  return candidate ?? null;
+}
+
 function getHighlightIcon(label: string) {
   switch (label) {
     case "SER":
@@ -42,11 +72,12 @@ export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
     center.services.accessible ? { key: "accessible", label: "Accesible", icon: <Accessibility size={11} /> } : null,
     center.services.sockets ? { key: "sockets", label: "Enchufes", icon: <Plug size={11} /> } : null,
   ].filter((value): value is NonNullable<typeof value> => value !== null).slice(0, 2);
+  const review = getCommunityReviewSummary(center);
   const reviewSummary =
-    center.review_summary && center.review_summary.review_count > 0 && center.review_summary.average_overall !== null
-      ? `${center.review_summary.average_overall.toFixed(1)} (${center.review_summary.review_count})`
+    review && review.review_count > 0 && review.average_overall !== null
+      ? `${review.average_overall.toFixed(1)} (${review.review_count})`
       : null;
-  const activeNotice = center.active_notice;
+  const activeNotice = getActiveNotice(center);
 
   return (
     <article className="center-row-item center-row-item--catalog">

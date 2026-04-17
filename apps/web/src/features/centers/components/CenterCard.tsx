@@ -25,6 +25,36 @@ type CenterCardProps = {
   onSelect: (slug: string) => void;
 };
 
+type CommunityReviewSummary = {
+  review_count: number;
+  average_overall: number | null;
+};
+
+type CommunityNotice = {
+  severity: string;
+  title: string;
+};
+
+function getCommunityReviewSummary(
+  center: CenterListBaseItemV1,
+): CommunityReviewSummary | null {
+  const candidate = (center as CenterListBaseItemV1 & {
+    review_summary?: CommunityReviewSummary | null;
+  }).review_summary;
+
+  return candidate ?? null;
+}
+
+function getActiveNotice(
+  center: CenterListBaseItemV1,
+): CommunityNotice | null {
+  const candidate = (center as CenterListBaseItemV1 & {
+    active_notice?: CommunityNotice | null;
+  }).active_notice;
+
+  return candidate ?? null;
+}
+
 function buildArea(center: CenterListBaseItemV1): string {
   return [center.district, center.neighborhood].filter(Boolean).join(" - ");
 }
@@ -44,7 +74,7 @@ function serviceItems(center: CenterListBaseItemV1) {
 }
 
 function getReviewSummary(center: CenterListBaseItemV1): string | null {
-  const summary = center.review_summary;
+  const summary = getCommunityReviewSummary(center);
 
   if (!summary || summary.review_count <= 0 || summary.average_overall === null) {
     return null;
@@ -65,7 +95,7 @@ export function CenterCard({
   const services = serviceItems(center).slice(0, 2);
   const presentation = buildBaseCardPresentation(center, scope);
   const reviewSummary = getReviewSummary(center);
-  const activeNotice = center.active_notice;
+  const activeNotice = getActiveNotice(center);
 
   return (
     <article className="decision-card decision-card--catalog">

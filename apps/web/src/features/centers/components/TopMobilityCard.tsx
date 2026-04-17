@@ -41,6 +41,37 @@ type TopMobilityCardProps = {
   onSelect: (slug: string) => void;
 };
 
+type CommunityReviewSummary = {
+  review_count: number;
+  average_overall: number | null;
+};
+
+type CommunityNotice = {
+  severity: string;
+  title: string;
+  message: string;
+};
+
+function getCommunityReviewSummary(
+  center: CenterTopMobilityCardV1,
+): CommunityReviewSummary | null {
+  const candidate = (center as CenterTopMobilityCardV1 & {
+    review_summary?: CommunityReviewSummary | null;
+  }).review_summary;
+
+  return candidate ?? null;
+}
+
+function getActiveNotice(
+  center: CenterTopMobilityCardV1,
+): CommunityNotice | null {
+  const candidate = (center as CenterTopMobilityCardV1 & {
+    active_notice?: CommunityNotice | null;
+  }).active_notice;
+
+  return candidate ?? null;
+}
+
 type SignalMetric = {
   key: string;
   label: string;
@@ -169,7 +200,7 @@ function buildReviewHeadline(center: CenterTopMobilityCardV1): {
   average: string;
   count: string;
 } | null {
-  const summary = center.review_summary;
+  const summary = getCommunityReviewSummary(center);
 
   if (!summary || summary.review_count <= 0 || summary.average_overall === null) {
     return null;
@@ -407,7 +438,7 @@ export function TopMobilityCard({
     ? `Llegada ${modeLabel(center.decision.best_mode)}`
     : "Movilidad resuelta";
   const reviewHeadline = buildReviewHeadline(center);
-  const activeNotice = center.active_notice;
+  const activeNotice = getActiveNotice(center);
   const contextReason = presentation.reason;
 
   return (
