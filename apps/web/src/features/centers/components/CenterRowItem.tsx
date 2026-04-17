@@ -5,13 +5,17 @@ import type {
 import {
   ArrowRight,
   Accessibility,
+  AlertTriangle,
   Clock3,
   MapPin,
+  MessageSquare,
   Navigation,
   Plug,
+  Star,
   Wifi,
 } from "lucide-react";
 import { buildBaseCardPresentation } from "../cardPresentation";
+import "./CenterRowItem.css";
 
 type CenterRowItemProps = {
   center: CenterListBaseItemV1;
@@ -38,6 +42,11 @@ export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
     center.services.accessible ? { key: "accessible", label: "Accesible", icon: <Accessibility size={11} /> } : null,
     center.services.sockets ? { key: "sockets", label: "Enchufes", icon: <Plug size={11} /> } : null,
   ].filter((value): value is NonNullable<typeof value> => value !== null).slice(0, 2);
+  const reviewSummary =
+    center.review_summary && center.review_summary.review_count > 0 && center.review_summary.average_overall !== null
+      ? `${center.review_summary.average_overall.toFixed(1)} (${center.review_summary.review_count})`
+      : null;
+  const activeNotice = center.active_notice;
 
   return (
     <article className="center-row-item center-row-item--catalog">
@@ -74,6 +83,20 @@ export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
               {service.label}
             </span>
           ))}
+          {reviewSummary ? (
+            <span className="center-row-item__service center-row-item__service--review">
+              <Star size={11} fill="currentColor" />
+              {reviewSummary}
+            </span>
+          ) : null}
+          {activeNotice ? (
+            <span
+              className={`center-row-item__service center-row-item__service--notice center-row-item__service--${activeNotice.severity}`}
+            >
+              <AlertTriangle size={11} />
+              {activeNotice.title}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -91,6 +114,12 @@ export function CenterRowItem({ center, scope, onSelect }: CenterRowItemProps) {
 
       <div className="center-row-item__right">
         <span className="center-row-item__catalog-chip center-row-item__catalog-chip--scope">BASE</span>
+        {reviewSummary ? (
+          <span className="center-row-item__catalog-chip">
+            <MessageSquare size={11} />
+            Opiniones
+          </span>
+        ) : null}
         <span className="center-row-item__eta-value">{presentation.footerLabel}</span>
         {center.ser?.enabled ? (
           <span className="center-row-item__dist">

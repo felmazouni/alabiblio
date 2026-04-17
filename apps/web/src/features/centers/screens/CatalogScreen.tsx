@@ -216,6 +216,27 @@ export function CatalogScreen() {
         {originSearch.presetsError ? <p className="screen__inline-error">{originSearch.presetsError}</p> : null}
 
         <section className="center-list">
+          {!loading ? (
+            <div className="catalog-screen__results-head">
+              <div className="catalog-screen__results-copy">
+                <span className="catalog-screen__results-kicker">Listado base</span>
+                <h2>{total} resultados</h2>
+                <p>
+                  {origin
+                    ? "Exploracion base con origen activo, sin ranking contextual de llegada."
+                    : "Ordenados por apertura, filtros reales y datos oficiales del catalogo."}
+                </p>
+              </div>
+              <div className="catalog-screen__results-meta">
+                <span className="catalog-screen__results-chip">
+                  {filters.openNowOnly ? "Abiertos ahora" : "Todos los estados"}
+                </span>
+                <span className="catalog-screen__results-chip">
+                  {viewMode === "rows" ? "Vista lista" : "Vista tarjetas"}
+                </span>
+              </div>
+            </div>
+          ) : null}
           {loading ? (
             <div className="center-list__grid">
               <LoadingCard count={6} />
@@ -310,6 +331,7 @@ export function CatalogScreen() {
       <FilterDrawer
         open={filterDrawerOpen}
         onClose={closeFilterDrawer}
+        resultCount={total}
         kindFilter={filters.kindFilter}
         onKindChange={handleKindFilterChange}
         sortBy={filters.sortBy}

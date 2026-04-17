@@ -4,16 +4,18 @@ import type {
 } from "@alabiblio/contracts/centers";
 import {
   Accessibility,
+  AlertTriangle,
   ArrowRight,
   Clock3,
   MapPin,
+  MessageSquare,
   Navigation,
   Plug,
+  Star,
   Trees,
   Users,
   Wifi,
 } from "lucide-react";
-import SpotlightCard from "../../../components/reactbits/SpotlightCard";
 import { buildBaseCardPresentation } from "../cardPresentation";
 import "./CenterCard.css";
 
@@ -41,6 +43,16 @@ function serviceItems(center: CenterListBaseItemV1) {
   ].filter((value): value is NonNullable<typeof value> => value !== null);
 }
 
+function getReviewSummary(center: CenterListBaseItemV1): string | null {
+  const summary = center.review_summary;
+
+  if (!summary || summary.review_count <= 0 || summary.average_overall === null) {
+    return null;
+  }
+
+  return `${summary.average_overall.toFixed(1)} (${summary.review_count} opiniones)`;
+}
+
 export function CenterCard({
   center,
   scope,
@@ -52,11 +64,13 @@ export function CenterCard({
   const nextChange = buildNextChange(center);
   const services = serviceItems(center).slice(0, 2);
   const presentation = buildBaseCardPresentation(center, scope);
+  const reviewSummary = getReviewSummary(center);
+  const activeNotice = center.active_notice;
 
   return (
     <article className="decision-card decision-card--catalog">
       <button type="button" className="decision-card__main" onClick={() => onSelect(center.slug)}>
-        <SpotlightCard className="decision-card__surface">
+        <div className="decision-card__surface">
           <div className="decision-card__header">
             <span className="decision-card__kind">{center.kind_label}</span>
             <span
@@ -95,6 +109,25 @@ export function CenterCard({
             ) : null}
           </p>
 
+          {reviewSummary || activeNotice ? (
+            <div className="decision-card__community">
+              {reviewSummary ? (
+                <span className="decision-card__community-pill decision-card__community-pill--review">
+                  <Star size={12} fill="currentColor" />
+                  {reviewSummary}
+                </span>
+              ) : null}
+              {activeNotice ? (
+                <span
+                  className={`decision-card__community-pill decision-card__community-pill--notice decision-card__community-pill--${activeNotice.severity}`}
+                >
+                  <AlertTriangle size={12} />
+                  {activeNotice.title}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
           {services.length > 0 ? (
             <div className="decision-card__support-row">
               {services.map((service) => (
@@ -125,12 +158,18 @@ export function CenterCard({
               <Navigation size={12} />
               {presentation.footerLabel}
             </span>
+            {reviewSummary ? (
+              <span className="decision-card__footer-tag decision-card__footer-tag--reviews">
+                <MessageSquare size={12} />
+                Opiniones reales
+              </span>
+            ) : null}
             <span className="decision-card__footer-link">
               Ver detalle
               <ArrowRight size={13} />
             </span>
           </div>
-        </SpotlightCard>
+        </div>
       </button>
     </article>
   );

@@ -2,6 +2,7 @@ import type { CenterKind } from "@alabiblio/contracts/centers";
 import { Check, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useId } from "react";
 import type { CatalogBaseSortBy } from "../centers/catalogFilters";
+import "./FilterDrawer.css";
 
 type KindFilter = "all" | CenterKind;
 
@@ -32,6 +33,7 @@ const MADRID_DISTRICTS = [
 export type FilterDrawerProps = {
   open: boolean;
   onClose: () => void;
+  resultCount: number;
   kindFilter: KindFilter;
   onKindChange: (v: KindFilter) => void;
   sortBy: CatalogBaseSortBy;
@@ -110,6 +112,7 @@ function RadioGroup<T extends string>({
 export function FilterDrawer({
   open,
   onClose,
+  resultCount,
   kindFilter,
   onKindChange,
   sortBy,
@@ -262,7 +265,7 @@ export function FilterDrawer({
 
         <div className="filter-drawer__footer">
           <span className="filter-drawer__footer-note">
-            Los cambios se aplican al instante.
+            {resultCount} resultados encontrados
           </span>
           <button type="button" className="filter-drawer__apply" onClick={onClose}>
             Cerrar filtros

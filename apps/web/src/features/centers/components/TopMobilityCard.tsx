@@ -20,9 +20,9 @@ import {
   ExternalLink,
   Gauge,
   MapPin,
+  MessageSquare,
   Navigation,
   Sparkles,
-  Star,
   TrainFront,
 } from "lucide-react";
 import { buildTopMobilityCardPresentation } from "../cardPresentation";
@@ -102,16 +102,6 @@ function buildSignalMetrics(
       icon: "best",
     },
     {
-      key: "bus",
-      label: "Bus",
-      value:
-        mobility.modules.bus.estimated_total_min !== null
-          ? `${mobility.modules.bus.estimated_total_min} min`
-          : "s/d",
-      percent: getConfidencePercent("medium", mobility.modules.bus.confidence_source),
-      icon: "bus",
-    },
-    {
       key: "metro",
       label: "Metro",
       value:
@@ -120,6 +110,16 @@ function buildSignalMetrics(
           : "s/d",
       percent: getConfidencePercent("medium", mobility.modules.metro.confidence_source),
       icon: "metro",
+    },
+    {
+      key: "bus",
+      label: "Bus",
+      value:
+        mobility.modules.bus.estimated_total_min !== null
+          ? `${mobility.modules.bus.estimated_total_min} min`
+          : "s/d",
+      percent: getConfidencePercent("medium", mobility.modules.bus.confidence_source),
+      icon: "bus",
     },
     {
       key: "bike",
@@ -132,26 +132,6 @@ function buildSignalMetrics(
             : "s/d",
       percent: getConfidencePercent("medium", mobility.modules.bike.confidence_source),
       icon: "bike",
-    },
-    {
-      key: "car",
-      label: "Coche",
-      value:
-        mobility.modules.car.eta_min !== null
-          ? `${mobility.modules.car.eta_min} min`
-          : "Sin ETA",
-      percent: getConfidencePercent("medium", mobility.modules.car.confidence_source),
-      icon: "car",
-    },
-    {
-      key: "walk",
-      label: "A pie",
-      value:
-        mobility.origin_dependent.walking_eta_min !== null
-          ? `${mobility.origin_dependent.walking_eta_min} min`
-          : "s/d",
-      percent: 24,
-      icon: "walk",
     },
   ];
 }
@@ -183,6 +163,22 @@ function getPrimarySummary(center: CenterTopMobilityCardV1): string {
   }
 
   return "Sin ETA cerrada";
+}
+
+function buildReviewHeadline(center: CenterTopMobilityCardV1): {
+  average: string;
+  count: string;
+} | null {
+  const summary = center.review_summary;
+
+  if (!summary || summary.review_count <= 0 || summary.average_overall === null) {
+    return null;
+  }
+
+  return {
+    average: summary.average_overall.toFixed(1),
+    count: `${summary.review_count} opiniones`,
+  };
 }
 
 function renderMetroSection(module: MetroModuleV1) {
@@ -391,7 +387,7 @@ export function TopMobilityCard({
   onSelect,
 }: TopMobilityCardProps) {
   const accordionId = useId();
-  const [expanded, setExpanded] = useState(rank === 1);
+  const [expanded, setExpanded] = useState(false);
   const presentation = buildTopMobilityCardPresentation({
     center,
     mobility,
@@ -409,7 +405,10 @@ export function TopMobilityCard({
   const bestSourceLabel = confidenceSourceLabel(center.decision.confidence_source);
   const summaryTitle = center.decision.best_mode
     ? `Llegada ${modeLabel(center.decision.best_mode)}`
-    : "Mejor llegada";
+    : "Movilidad resuelta";
+  const reviewHeadline = buildReviewHeadline(center);
+  const activeNotice = center.active_notice;
+  const contextReason = presentation.reason;
 
   return (
     <article className="top-mobility-card">
@@ -482,17 +481,19 @@ export function TopMobilityCard({
       <section className="top-mobility-card__metrics">
         <div className="top-mobility-card__metrics-head">
           <div className="top-mobility-card__metrics-summary">
-            <div className="top-mobility-card__metrics-stars" aria-hidden="true">
-              <Star size={15} fill="currentColor" />
-              <Star size={15} fill="currentColor" />
-              <Star size={15} fill="currentColor" />
-              <Star size={15} fill="currentColor" />
-              <Star size={15} />
+            <div className="top-mobility-card__metrics-icon">
+              {reviewHeadline ? <MessageSquare size={15} /> : <Gauge size={15} />}
             </div>
-            <strong>{summaryTitle}</strong>
-            <span>{getPrimarySummary(center)}</span>
+            <strong>{reviewHeadline ? `${reviewHeadline.average}/5` : summaryTitle}</strong>
+            <span>
+              {reviewHeadline
+                ? `${reviewHeadline.count} reales registradas`
+                : getPrimarySummary(center)}
+            </span>
           </div>
-          <span className="top-mobility-card__review-chip">{bestSourceLabel}</span>
+          <span className="top-mobility-card__review-chip">
+            {reviewHeadline ? "Opiniones reales" : bestSourceLabel}
+          </span>
         </div>
 
         <div className="top-mobility-card__signals-grid">
@@ -514,10 +515,17 @@ export function TopMobilityCard({
         </div>
       </section>
 
-      <section className="top-mobility-card__notice">
-        <AlertTriangle size={16} />
-        <p>{presentation.reason}</p>
-      </section>
+      {activeNotice ? (
+        <section className={`top-mobility-card__notice top-mobility-card__notice--${activeNotice.severity}`}>
+          <AlertTriangle size={16} />
+          <div className="top-mobility-card__notice-copy">
+            <strong>{activeNotice.title}</strong>
+            <p>{activeNotice.message}</p>
+          </div>
+        </section>
+      ) : contextReason ? (
+        <p className="top-mobility-card__reason">{contextReason}</p>
+      ) : null}
 
       <section className="top-mobility-card__accordion">
         <button

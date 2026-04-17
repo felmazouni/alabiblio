@@ -1,75 +1,89 @@
 /* CenterCard
-   Base listing card adapted to the ZIP visual hierarchy without inventing enriched data. */
+   Catalog card owns its visual grammar locally to avoid product.css overlap. */
+
+.decision-card {
+  position: relative;
+}
+
+.decision-card__main {
+  width: 100%;
+  text-align: left;
+}
+
+.decision-card__surface {
+  display: grid;
+  gap: 0.72rem;
+  min-height: 100%;
+  padding: 1.05rem;
+  border-radius: 1.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised) 98%, transparent), color-mix(in srgb, var(--color-surface) 96%, transparent));
+  box-shadow: var(--shadow-card);
+}
+
+.decision-card__header,
+.decision-card__zone,
+.decision-card__footer,
+.decision-card__support-row,
+.decision-card__community {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.decision-card__kind,
+.decision-card__status,
+.decision-card__service-pill,
+.decision-card__footer-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 1.8rem;
+  padding: 0 0.72rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.decision-card__kind,
+.decision-card__footer-tag,
+.decision-card__service-pill {
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 95%, transparent);
+  color: var(--color-text-2);
+}
+
+.decision-card__status--open {
+  border: 1px solid var(--color-open-border);
+  background: var(--color-open-surface);
+  color: var(--color-open-text);
+}
+
+.decision-card__status--closed {
+  border: 1px solid var(--color-closed-border);
+  background: var(--color-closed-surface);
+  color: var(--color-closed-text);
+}
 
 .decision-card__name {
   margin: 0;
-  font-size: var(--text-lg);
+  font-size: clamp(1.15rem, 2vw, 1.52rem);
   font-weight: var(--weight-bold);
-  line-height: var(--leading-snug);
+  line-height: 1.14;
   letter-spacing: var(--tracking-snug);
   color: var(--color-text);
 }
 
-.decision-card__decision {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.decision-card__eta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  color: #fff4e5;
-}
-
-.decision-card__eta strong {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-snug);
-  color: #fff4e5;
-}
-
-.decision-card__mode-label {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--color-text-3);
-  text-transform: lowercase;
-}
-
-.decision-card__distance {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  margin-left: auto;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  color: var(--color-text-3);
-}
-
+.decision-card__zone,
 .decision-card__schedule {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
   margin: 0;
-  color: var(--color-text-3);
+  color: var(--color-text-2);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
-}
-
-.decision-card__schedule span {
-  color: var(--color-text-2);
-}
-
-.decision-card__next-change {
-  color: var(--color-text-3) !important;
-  font-size: var(--text-xs);
 }
 
 .decision-card__catalog-area {
@@ -78,9 +92,44 @@
   color: var(--color-text-3);
 }
 
+.decision-card__next-change {
+  color: var(--color-text-3) !important;
+  font-size: var(--text-xs);
+}
+
+.decision-card__community-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 1.65rem;
+  max-width: 100%;
+  padding: 0 var(--sp-3);
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 94%, transparent);
+  color: var(--color-text-2);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+}
+
+.decision-card__community-pill--review,
+.decision-card__footer-tag--reviews {
+  color: #d97706;
+}
+
+.decision-card__community-pill--warning {
+  border-color: color-mix(in srgb, #f59e0b 46%, var(--color-border));
+  background: color-mix(in srgb, #f59e0b 10%, var(--color-surface-2));
+}
+
+.decision-card__community-pill--critical {
+  border-color: color-mix(in srgb, #ef4444 46%, var(--color-border));
+  background: color-mix(in srgb, #ef4444 10%, var(--color-surface-2));
+}
+
 .decision-card__catalog-highlights {
   display: grid;
-  gap: var(--sp-2);
+  gap: 0.55rem;
 }
 
 .decision-card__catalog-highlight {
@@ -88,8 +137,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-  padding: var(--sp-3);
-  border-radius: var(--radius-lg);
+  padding: 0.8rem 0.9rem;
+  border-radius: 1.08rem;
   border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
   background: color-mix(in srgb, var(--color-surface-2) 96%, transparent);
 }
@@ -107,7 +156,7 @@
 }
 
 .decision-card__catalog-highlight-body {
-  font-size: var(--text-sm);
+  font-size: 0.86rem;
   font-weight: var(--weight-semibold);
   line-height: 1.35;
   text-align: right;
@@ -115,20 +164,52 @@
 }
 
 .decision-card__footer--catalog {
-  align-items: center;
   justify-content: space-between;
-}
-
-.decision-card__footer-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
+  padding-top: 0.1rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
 }
 
 .decision-card__footer-link {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   font-weight: var(--weight-semibold);
-  color: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
+:root[data-theme="light"] .decision-card__surface {
+  border-color: rgba(145, 178, 201, 0.34);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 251, 255, 0.96));
+  box-shadow: 0 18px 42px rgba(58, 96, 122, 0.1);
+}
+
+:root[data-theme="light"] .decision-card__name {
+  color: #203247;
+}
+
+:root[data-theme="light"] .decision-card__schedule,
+:root[data-theme="light"] .decision-card__catalog-area,
+:root[data-theme="light"] .decision-card__zone,
+:root[data-theme="light"] .decision-card__footer-tag {
+  color: #5f7b91;
+}
+
+:root[data-theme="light"] .decision-card__kind,
+:root[data-theme="light"] .decision-card__footer-tag {
+  border-color: rgba(134, 171, 197, 0.4);
+  background: rgba(241, 248, 253, 0.96);
+}
+
+:root[data-theme="light"] .decision-card__catalog-highlight {
+  background: rgba(248, 252, 255, 0.98);
+}
+
+:root[data-theme="light"] .decision-card__footer-link {
+  box-shadow: none;
 }

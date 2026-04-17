@@ -14,7 +14,6 @@ import { TopMobilityCard } from "../components/TopMobilityCard";
 import { useTopPicksScreen } from "../hooks/useTopPicksScreen";
 import { OriginSheet } from "../../origin/components/OriginSheet";
 import { getOriginStatusText, getOriginTone } from "../../origin/originPresentation";
-import { EmptyStateCard } from "../../ui/EmptyStateCard";
 import { LoadingCard } from "../../ui/LoadingCard";
 import { BackgroundIllustration } from "../../ui/BackgroundIllustration";
 
@@ -100,6 +99,17 @@ export function TopPicksScreen() {
             </div>
           </div>
 
+          {originActive ? (
+            <div className="top-screen__origin-current">
+              <span
+                className={`top-screen__origin-pill top-screen__origin-pill--${getOriginTone(origin, geolocationStatus)}`}
+              >
+                <Navigation size={15} />
+                <span>{originStatusText}</span>
+              </span>
+            </div>
+          ) : null}
+
           <div className="top-screen__hero-actions">
             {!originActive ? (
               <>
@@ -124,12 +134,11 @@ export function TopPicksScreen() {
               <>
                 <button
                   type="button"
-                  className={`list-topbar__origin list-topbar__origin--${getOriginTone(origin, geolocationStatus)}`}
+                  className="entry-screen__secondary"
                   onClick={openOriginSheet}
                 >
-                  <span className="list-topbar__origin-dot" />
-                  <Navigation size={15} />
-                  <span>{originStatusText}</span>
+                  <MapPin size={16} />
+                  Cambiar origen
                 </button>
                 <button
                   type="button"
@@ -160,58 +169,110 @@ export function TopPicksScreen() {
           </div>
         </section>
 
-        <section className="top-screen__section-head">
-          <div className="top-screen__section-copy">
-            <span className="top-screen__section-kicker">Top 3 opciones para ti</span>
-            <h2>{originActive ? "Top 3 opciones para ti" : "Activa un origen para resolver el Top"}</h2>
-            <p>
-              {originActive
-                ? "Basado en tu ubicacion y preferencias."
-                : "Cuando fijes un origen mostramos las tres mejores opciones con contexto real de movilidad y apertura."}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="top-screen__section-link"
-            onClick={() => navigate("/listado")}
-          >
-            Ver mas
-            <ArrowRight size={14} />
-          </button>
-        </section>
+        {originActive ? (
+          <section className="top-screen__section-head">
+            <div className="top-screen__section-copy">
+              <span className="top-screen__section-kicker">Top 3 opciones para ti</span>
+              <h2>Top 3 opciones para ti</h2>
+              <p>Basado en tu ubicacion y preferencias.</p>
+            </div>
+            <button
+              type="button"
+              className="top-screen__section-link"
+              onClick={() => navigate("/listado")}
+            >
+              Ver mas
+              <ArrowRight size={14} />
+            </button>
+          </section>
+        ) : null}
 
         {!originActive ? (
-          <section className="top-screen__state">
-            <EmptyStateCard
-              title="Activa un origen para resolver el Top 3"
-              body="Usa tu ubicacion o introduce una direccion para comparar solo las tres opciones mas utiles. El listado base sigue disponible aparte."
-            />
+          <section className="top-screen__state top-screen__state--origin">
+            <article className="top-screen__origin-panel">
+              <div className="top-screen__origin-copy">
+                <span className="top-screen__section-kicker">Desde donde buscas</span>
+                <h2>Activa un origen para resolver solo las tres opciones mas utiles</h2>
+                <p>
+                  El Top solo aparece con contexto real de llegada. Si prefieres explorar todo el catalogo,
+                  puedes continuar sin fijar una ubicacion.
+                </p>
+              </div>
+              <div className="top-screen__origin-actions">
+                <button
+                  type="button"
+                  className="entry-screen__secondary"
+                  onClick={openOriginSheet}
+                >
+                  <MapPin size={16} />
+                  Introducir direccion
+                </button>
+                <button
+                  type="button"
+                  className="entry-screen__ghost"
+                  onClick={continueWithoutOrigin}
+                >
+                  Continuar sin ubicacion
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </article>
+          </section>
+        ) : loading ? (
+          <div className="center-list__grid">
+            <LoadingCard count={3} />
+          </div>
+        ) : error ? (
+          <section className="top-screen__state top-screen__state--empty">
+            <article className="top-screen__empty-panel">
+              <div className="top-screen__empty-copy">
+                <span className="top-screen__section-kicker">Top 3 no disponible</span>
+                <h3>No se pudo cargar el Top 3</h3>
+                <p>{error}</p>
+              </div>
+            </article>
+          </section>
+        ) : topScope !== "origin_enriched" || topPicks.length === 0 ? (
+          <section className="top-screen__state top-screen__state--empty">
+            <article className="top-screen__empty-panel">
+              <div className="top-screen__empty-copy">
+                <span className="top-screen__section-kicker">Top 3 sin resultados</span>
+                <h3>Sin opciones cercanas</h3>
+                <p>Activa otro origen o abre el listado base para explorar todos los centros.</p>
+              </div>
+              <div className="top-screen__empty-actions">
+                <button
+                  type="button"
+                  className="entry-screen__secondary"
+                  onClick={openOriginSheet}
+                >
+                  <MapPin size={16} />
+                  Cambiar origen
+                </button>
+                <button
+                  type="button"
+                  className="entry-screen__ghost"
+                  onClick={() => navigate("/listado")}
+                >
+                  Ver listado base
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </article>
           </section>
         ) : (
-          <>
-            {loading ? (
-              <div className="center-list__grid">
-                <LoadingCard count={3} />
-              </div>
-            ) : error ? (
-              <EmptyStateCard title="No se pudo cargar el Top 3" body={error} />
-            ) : topScope !== "origin_enriched" || topPicks.length === 0 ? (
-              <EmptyStateCard title="Sin opciones cercanas" body="Activa otro origen o abre el listado base para explorar todos los centros." />
-            ) : (
-              <section className="top-picks-list">
-                {topPicks.map((entry) => (
-                  <TopMobilityCard
-                    key={entry.center.id}
-                    center={entry.center}
-                    mobility={entry.mobility}
-                    rank={entry.rank}
-                    serverOpenCount={serverOpenCount}
-                    onSelect={(slug) => navigate(`/centers/${slug}`)}
-                  />
-                ))}
-              </section>
-            )}
-          </>
+          <section className="top-picks-list">
+            {topPicks.map((entry) => (
+              <TopMobilityCard
+                key={entry.center.id}
+                center={entry.center}
+                mobility={entry.mobility}
+                rank={entry.rank}
+                serverOpenCount={serverOpenCount}
+                onSelect={(slug) => navigate(`/centers/${slug}`)}
+              />
+            ))}
+          </section>
         )}
 
         <footer className="top-screen__footer">
