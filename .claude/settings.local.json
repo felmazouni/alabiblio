@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(powershell -Command \"[Environment]::GetEnvironmentVariable\\('Path','Machine'\\) -split ';' | Select-String 'node|pnpm|nvm|fnm|volta'\")",
-      "mcp__claude_ai_Cloudflare_Developer_Platform__workers_get_worker",
-      "Bash(powershell -Command \"dir 'C:\\\\nvm4w\\\\nodejs' -ErrorAction SilentlyContinue | Select-Object Name -First 5; dir 'C:\\\\Users\\\\ttefm\\\\AppData\\\\Local\\\\nvm' -ErrorAction SilentlyContinue | Select-Object Name -First 5\")"
-    ]
-  }
-}

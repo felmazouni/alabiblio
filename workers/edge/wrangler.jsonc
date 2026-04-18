@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "alabiblio-preview",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-17",
+  "assets": {
+    "directory": "../../apps/web/dist",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "alabiblio-preview",
+      "database_id": "23bff2f0-eeca-44d5-850b-2386afc8d31f"
+    }
+  ],
+  "vars": {
+    "APP_ENV": "preview",
+    "APP_BASE_URL": "https://alabiblio-preview.ttefmb.workers.dev"
+  }
+}

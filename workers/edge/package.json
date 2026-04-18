@@ -1,0 +1,21 @@
+{
+  "name": "@alabiblio/edge",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --port 8787",
+    "build": "wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@alabiblio/application": "workspace:*",
+    "@alabiblio/contracts": "workspace:*",
+    "@alabiblio/domain": "workspace:*",
+    "@alabiblio/infrastructure": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "wrangler": "^4.78.0"
+  }
+}

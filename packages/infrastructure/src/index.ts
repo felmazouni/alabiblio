@@ -1,0 +1,1 @@
+export { getCatalogFromStore } from "./catalogStore";

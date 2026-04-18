@@ -1,0 +1,16 @@
+{
+  "name": "@alabiblio/application",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@alabiblio/contracts": "workspace:*",
+    "@alabiblio/infrastructure": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}
