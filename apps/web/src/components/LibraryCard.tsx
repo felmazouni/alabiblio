@@ -1,5 +1,6 @@
 import type { DataOrigin, TransportOption } from "@alabiblio/contracts";
 import {
+  Building2,
   Bike,
   Bus,
   Car,
@@ -10,6 +11,7 @@ import {
   Lightbulb,
   MapPin,
   Navigation,
+  PersonStanding,
   Plug,
   ShieldCheck,
   Star,
@@ -462,29 +464,95 @@ function sortTransportOptions(left: TransportOption, right: TransportOption) {
   return right.relevanceScore - left.relevanceScore;
 }
 
-function compactTokenList(values: string[]): string {
-  if (values.length === 0) {
-    return "N/D";
+function walkToCenterText(option: TransportOption): string {
+  const walkMeters = option.metrics.walkDistanceMeters;
+  const walkMinutes = option.metrics.walkMinutes;
+
+  if (walkMeters !== null && walkMeters > 0) {
+    return `A ${Math.round(walkMeters)} m andando del centro`;
   }
 
-  if (values.length <= 3) {
-    return values.join(" · ");
+  if (walkMinutes !== null && walkMinutes > 0) {
+    return `A ${walkMinutes} min andando del centro`;
   }
 
-  const remaining = values.length - 3;
-  return `${values.slice(0, 3).join(" · ")} +${remaining}`;
+  return "Distancia andando no disponible";
 }
 
-function uniqueTransportTokens(options: TransportOption[], selector: (option: TransportOption) => string | null): string[] {
+function destinationNodeLabel(option: TransportOption): string {
+  return (
+    option.destinationNodeName ??
+    option.stationName ??
+    option.stopName ??
+    option.destinationLabel ??
+    option.title
+  );
+}
+
+function uniqueLineCodes(options: TransportOption[]): string[] {
   const values = new Set<string>();
   for (const option of options) {
-    const value = selector(option)?.trim();
-    if (value) {
-      values.add(value);
+    for (const line of option.lines) {
+      const normalized = line.trim();
+      if (normalized) {
+        values.add(normalized);
+      }
     }
   }
 
   return [...values.values()];
+}
+
+function walkMetricValue(option: TransportOption): string {
+  const walkMeters = option.metrics.walkDistanceMeters;
+  const walkMinutes = option.metrics.walkMinutes;
+
+  const metersStr = walkMeters !== null && walkMeters > 0 ? `${Math.round(walkMeters)} m` : null;
+  const minutesStr = walkMinutes !== null && walkMinutes > 0 ? `${walkMinutes}'` : null;
+
+  if (metersStr && minutesStr) {
+    return `${metersStr} - ${minutesStr}`;
+  }
+  if (metersStr) {
+    return metersStr;
+  }
+  if (minutesStr) {
+    return minutesStr;
+  }
+
+  return "N/D";
+}
+
+function lineChipTone(mode: TransportOption["mode"]) {
+  switch (mode) {
+    case "metro":
+    case "metro_ligero":
+      return "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-600/40 dark:bg-rose-950/35 dark:text-rose-200";
+    case "cercanias":
+      return "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-600/40 dark:bg-blue-950/35 dark:text-blue-200";
+    case "emt_bus":
+      return "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-600/40 dark:bg-emerald-950/35 dark:text-emerald-200";
+    case "interurban_bus":
+      return "border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-600/40 dark:bg-orange-950/35 dark:text-orange-200";
+    default:
+      return "border-border bg-muted/45 text-foreground";
+  }
+}
+
+function availabilityCountTone(value: number | null): string {
+  if (value === null) {
+    return "text-muted-foreground";
+  }
+
+  if (value === 0) {
+    return "text-rose-600 dark:text-rose-300";
+  }
+
+  if (value < 5) {
+    return "text-amber-600 dark:text-amber-300";
+  }
+
+  return "text-emerald-600 dark:text-emerald-300";
 }
 
 function extractBicimadStationId(option: TransportOption): string | null {
@@ -510,17 +578,17 @@ type BicimadAvailabilityUiState =
 function bicimadStatusMessage(note: string | null): string {
   switch (note) {
     case "bicimad_realtime_not_configured":
-      return "Realtime BiciMAD no configurado en este entorno.";
+      return "Sin disponibilidad en este momento.";
     case "bicimad_station_not_found":
-      return "No se pudo resolver la estacion BiciMAD de destino.";
+      return "No se encontro disponibilidad para esta estacion.";
     case "bicimad_realtime_unavailable":
       return "Sin disponibilidad en este momento para esta estacion.";
     case "bicimad_realtime_error":
-      return "Error consultando BiciMAD en tiempo real.";
+      return "No se pudo consultar ahora mismo.";
     case "station_id_required":
-      return "Falta el identificador de estacion BiciMAD.";
+      return "Estacion no disponible.";
     default:
-      return "Disponibilidad BiciMAD no disponible ahora.";
+      return "Sin disponibilidad en este momento.";
   }
 }
 
@@ -909,21 +977,24 @@ export function LibraryCard({
               </button>
             </div>
 
+            <p className="border-b border-border px-4 py-2 text-[11px] text-muted-foreground">
+              Paradas y estaciones cercanas al centro
+            </p>
+
             <div className="max-h-[60vh] overflow-y-auto">
               {groupedTransportModes.length > 0 ? (
                 <div className="divide-y divide-border">
                   {groupedTransportModes.map((group) => {
                     const Icon = modeIcon(group.mode);
                     const styles = modeClasses(group.mode);
-                    const lineTokens = uniqueTransportTokens(group.options, (option) =>
-                      option.lines.length > 0 ? option.lines.join(" · ") : null,
-                    );
-                    const stopTokens = uniqueTransportTokens(group.options, (option) =>
-                      option.destinationNodeName ??
-                      option.stationName ??
-                      option.stopName ??
-                      option.destinationLabel,
-                    );
+                    const primaryOption = group.options[0];
+                    const lineCodes = uniqueLineCodes(group.options);
+                    const stationOrStop = primaryOption
+                      ? destinationNodeLabel(primaryOption)
+                      : "Parada o estacion";
+                    const walkLabel = primaryOption
+                      ? walkMetricValue(primaryOption)
+                      : "N/D";
                     const originBadge =
                       group.options[0]?.dataOrigin === "official_structured" ? "OFICIAL" : "TEXTO";
 
@@ -944,15 +1015,17 @@ export function LibraryCard({
                       bicimadOption?.stationName ??
                       bicimadOption?.destinationLabel ??
                       null;
+                    const bicimadWalkLabel = bicimadOption
+                      ? walkMetricValue(bicimadOption)
+                      : "N/D";
 
                     return (
                       <div
                         className="flex items-start gap-3 px-4 py-3"
                         key={group.mode}
                       >
-                        {/* Left: mode icon + label */}
-                        <div className="flex w-[76px] shrink-0 flex-col items-start gap-1">
-                          <div className={cn("flex size-6 items-center justify-center rounded-lg border", styles.card)}>
+                        <div className="flex w-[84px] shrink-0 flex-col items-start gap-1">
+                          <div className={cn("flex size-7 items-center justify-center rounded-lg border", styles.card)}>
                             <Icon className={cn("size-3.5", styles.text)} />
                           </div>
                           <span className={cn("text-[11px] font-medium leading-tight", styles.text)}>
@@ -963,17 +1036,16 @@ export function LibraryCard({
                           </span>
                         </div>
 
-                        {/* Right: content */}
                         <div className="min-w-0 flex-1 space-y-1 pt-0.5">
                           {group.mode === "bicimad" ? (
                             <div className="space-y-1.5">
-                              <p className="text-[12px] text-foreground">
-                                {bicimadStationName ?? compactTokenList(stopTokens)}
+                              <p className="text-[12px] font-medium text-foreground">
+                                {bicimadStationName ?? stationOrStop}
                               </p>
                               <div className="flex items-center gap-2">
                                 <button
                                   className={cn(
-                                    "inline-flex items-center rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-foreground transition hover:bg-muted/60",
+                                    "inline-flex items-center rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-600/40 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/40",
                                     bicimadState?.status === "loading" && "cursor-not-allowed opacity-60",
                                   )}
                                   disabled={bicimadState?.status === "loading"}
@@ -989,9 +1061,13 @@ export function LibraryCard({
                                 </button>
                                 {bicimadState?.status === "success" ? (
                                   <span className="text-[11px] text-foreground">
-                                    <span className="font-semibold">{bicimadState.payload.bikesAvailable ?? 0}</span>
+                                    <span className={cn("font-semibold", availabilityCountTone(bicimadState.payload.bikesAvailable))}>
+                                      {bicimadState.payload.bikesAvailable ?? 0}
+                                    </span>
                                     <span className="text-muted-foreground"> bicis disponibles · </span>
-                                    <span className="font-semibold">{bicimadState.payload.docksAvailable ?? 0}</span>
+                                    <span className={cn("font-semibold", availabilityCountTone(bicimadState.payload.docksAvailable))}>
+                                      {bicimadState.payload.docksAvailable ?? 0}
+                                    </span>
                                     <span className="text-muted-foreground"> anclajes disponibles</span>
                                   </span>
                                 ) : null}
@@ -1002,16 +1078,41 @@ export function LibraryCard({
                             </div>
                           ) : (
                             <>
-                              <p className="text-[12px] text-foreground">
-                                {compactTokenList(stopTokens)}
+                              <p className="text-[12px] font-medium text-foreground">
+                                {stationOrStop}
                               </p>
-                              {lineTokens.length > 0 ? (
-                                <p className="text-[10px] text-muted-foreground">
-                                  {compactTokenList(lineTokens)}
-                                </p>
+                              {lineCodes.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {lineCodes.map((line) => (
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold",
+                                        lineChipTone(group.mode),
+                                      )}
+                                      key={`${group.mode}:${line}`}
+                                    >
+                                      {(group.mode === "metro" || group.mode === "cercanias" || group.mode === "metro_ligero") ? (
+                                        <Train className="size-3" />
+                                      ) : (
+                                        <Bus className="size-3" />
+                                      )}
+                                      {line}
+                                    </span>
+                                  ))}
+                                </div>
                               ) : null}
                             </>
                           )}
+                        </div>
+
+                        <div className="w-[138px] shrink-0 self-center text-right">
+                          <div className="inline-flex items-center gap-1 text-muted-foreground">
+                            <PersonStanding className="size-3.5" />
+                            <Building2 className="size-3.5" />
+                          </div>
+                          <p className="mt-1 text-[11px] font-semibold leading-snug text-foreground">
+                            {group.mode === "bicimad" ? bicimadWalkLabel : walkLabel}
+                          </p>
                         </div>
                       </div>
                     );
