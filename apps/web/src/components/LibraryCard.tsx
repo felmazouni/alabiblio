@@ -20,10 +20,14 @@ import {
   Volume2,
   Wifi,
 } from "lucide-react";
-import { useState, type ElementType } from "react";
+import { useEffect, useState, type ElementType } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/cn";
-import type { PublicCenterPresentation } from "../lib/publicCatalog";
+import {
+  fetchBicimadAvailability,
+  type BicimadAvailabilityResponse,
+  type PublicCenterPresentation,
+} from "../lib/publicCatalog";
 
 const aspectItems = [
   { key: "silencio", label: "Silencio", icon: Volume2 },
@@ -457,6 +461,92 @@ function listTransportSummary(options: TransportOption[]) {
   );
 }
 
+const transportDialogModeOrder: Array<TransportOption["mode"]> = [
+  "bicimad",
+  "metro",
+  "cercanias",
+  "emt_bus",
+  "interurban_bus",
+];
+
+function modeDialogLabel(mode: TransportOption["mode"]) {
+  switch (mode) {
+    case "bicimad":
+      return "Bici";
+    case "metro":
+    case "metro_ligero":
+      return "Metro";
+    case "cercanias":
+      return "Cercanias";
+    case "emt_bus":
+      return "Autobus EMT";
+    case "interurban_bus":
+      return "Autobus interurbano";
+    case "car":
+      return "Coche";
+  }
+}
+
+function sortTransportOptions(left: TransportOption, right: TransportOption) {
+  const leftStructured = left.dataOrigin === "official_structured" ? 1 : 0;
+  const rightStructured = right.dataOrigin === "official_structured" ? 1 : 0;
+
+  if (leftStructured !== rightStructured) {
+    return rightStructured - leftStructured;
+  }
+
+  if (left.displayPriority !== right.displayPriority) {
+    return left.displayPriority - right.displayPriority;
+  }
+
+  return right.relevanceScore - left.relevanceScore;
+}
+
+function compactTokenList(values: string[]): string {
+  if (values.length === 0) {
+    return "N/D";
+  }
+
+  if (values.length <= 3) {
+    return values.join(" · ");
+  }
+
+  const remaining = values.length - 3;
+  return `${values.slice(0, 3).join(" · ")} +${remaining}`;
+}
+
+function uniqueTransportTokens(options: TransportOption[], selector: (option: TransportOption) => string | null): string[] {
+  const values = new Set<string>();
+  for (const option of options) {
+    const value = selector(option)?.trim();
+    if (value) {
+      values.add(value);
+    }
+  }
+
+  return [...values.values()];
+}
+
+function extractBicimadStationId(option: TransportOption): string | null {
+  if (option.destinationNodeId && /^\d+$/.test(option.destinationNodeId)) {
+    return option.destinationNodeId;
+  }
+
+  const candidate = option.destinationNodeId ?? option.id;
+  const matched = candidate.match(/bicimad[:_-](\d+)$/i);
+  if (matched?.[1]) {
+    return matched[1];
+  }
+
+  return null;
+}
+
+type BicimadAvailabilityUiState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; payload: BicimadAvailabilityResponse }
+  | { status: "error"; message: string };
+
 function MetaLine({ center }: { center: PublicCenterPresentation }) {
   return (
     <>
@@ -542,6 +632,75 @@ export function LibraryCard({
   const [isTransportExpanded, setIsTransportExpanded] = useState(
     viewMode === "card",
   );
+  const [isTransportDialogOpen, setIsTransportDialogOpen] = useState(false);
+  const [bicimadAvailability, setBicimadAvailability] = useState<
+    Record<string, BicimadAvailabilityUiState>
+  >({});
+
+  useEffect(() => {
+    if (!isTransportDialogOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsTransportDialogOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isTransportDialogOpen]);
+
+  const filteredTransportOptions = center.transportOptions
+    .filter((option) => option.mode !== "car")
+    .filter(
+      (option) =>
+        option.metrics.walkDistanceMeters === null || option.metrics.walkDistanceMeters <= 500,
+    )
+    .sort(sortTransportOptions);
+
+  const groupedTransportModes = transportDialogModeOrder
+    .map((mode) => {
+      const options = filteredTransportOptions.filter((option) =>
+        mode === "metro"
+          ? option.mode === "metro" || option.mode === "metro_ligero"
+          : option.mode === mode,
+      );
+
+      if (options.length === 0) {
+        return null;
+      }
+
+      return {
+        mode,
+        options,
+      };
+    })
+    .filter((entry): entry is { mode: TransportOption["mode"]; options: TransportOption[] } => entry !== null);
+
+  const loadBicimadOnDemand = async (stationId: string) => {
+    setBicimadAvailability((current) => ({
+      ...current,
+      [stationId]: { status: "loading" },
+    }));
+
+    try {
+      const payload = await fetchBicimadAvailability(stationId);
+      setBicimadAvailability((current) => ({
+        ...current,
+        [stationId]: { status: "success", payload },
+      }));
+    } catch (error) {
+      setBicimadAvailability((current) => ({
+        ...current,
+        [stationId]: {
+          status: "error",
+          message: error instanceof Error ? error.message : "bicimad_unavailable",
+        },
+      }));
+    }
+  };
 
   if (viewMode === "list") {
     return (
@@ -712,37 +871,145 @@ export function LibraryCard({
       <div className="px-4 pb-3">
         <button
           className="flex w-full items-center justify-between rounded-[14px] border border-border bg-muted/35 px-3 py-2.5"
-          onClick={() => setIsTransportExpanded((current) => !current)}
+          onClick={() => setIsTransportDialogOpen(true)}
           type="button"
         >
           <div className="flex items-center gap-2">
             <Train className="size-3.5 text-muted-foreground" />
-            <span className="text-[12px] font-medium text-foreground">Como llegar</span>
+            <span className="text-[12px] font-medium text-foreground">Transporte</span>
             <span className="text-[10px] text-muted-foreground">
               ({center.transportOptions.length} opciones)
             </span>
           </div>
-          {isTransportExpanded ? (
-            <ChevronUp className="size-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="size-4 text-muted-foreground" />
-          )}
+          <span className="rounded-md border border-border bg-card px-2 py-1 text-[10px] font-medium text-foreground">
+            Abrir
+          </span>
         </button>
-
-        {isTransportExpanded ? (
-          <div className="mt-2.5 space-y-2">
-            {center.transportOptions.length > 0 ? (
-              center.transportOptions.map((option) => (
-                <TransportOptionCard key={option.id} option={option} />
-              ))
-            ) : (
-              <div className="rounded-[16px] border border-border bg-muted/35 px-3 py-3 text-[12px] text-muted-foreground">
-                No hay opciones de transporte publicadas para este centro.
-              </div>
-            )}
-          </div>
-        ) : null}
       </div>
+
+      {isTransportDialogOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+          <button
+            aria-label="Cerrar dialogo de transporte"
+            className="absolute inset-0 bg-slate-950/55"
+            onClick={() => setIsTransportDialogOpen(false)}
+            type="button"
+          />
+          <div className="relative z-[91] w-full max-w-[520px] rounded-2xl border border-border bg-card shadow-[0_24px_60px_rgba(2,6,23,0.45)]">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Train className="size-4 text-muted-foreground" />
+                <h4 className="text-[14px] font-semibold text-foreground">Transporte</h4>
+                <span className="text-[11px] text-muted-foreground">
+                  {filteredTransportOptions.length} opciones
+                </span>
+              </div>
+              <button
+                className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground"
+                onClick={() => setIsTransportDialogOpen(false)}
+                type="button"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] space-y-2 overflow-y-auto p-4">
+              {groupedTransportModes.length > 0 ? (
+                groupedTransportModes.map((group) => {
+                  const Icon = modeIcon(group.mode);
+                  const styles = modeClasses(group.mode);
+                  const lineTokens = uniqueTransportTokens(group.options, (option) =>
+                    option.lines.length > 0 ? option.lines.join(" · ") : null,
+                  );
+                  const stopTokens = uniqueTransportTokens(group.options, (option) =>
+                    option.destinationNodeName ??
+                    option.stationName ??
+                    option.stopName ??
+                    option.destinationLabel,
+                  );
+
+                  const bicimadOption =
+                    group.mode === "bicimad"
+                      ? group.options.find((option) => extractBicimadStationId(option) !== null) ??
+                        group.options[0] ??
+                        null
+                      : null;
+                  const bicimadStationId =
+                    bicimadOption !== null ? extractBicimadStationId(bicimadOption) : null;
+                  const bicimadState =
+                    bicimadStationId !== null
+                      ? bicimadAvailability[bicimadStationId] ?? { status: "idle" }
+                      : null;
+
+                  return (
+                    <section
+                      className={cn("rounded-xl border px-3 py-2.5", styles.card)}
+                      key={group.mode}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-[11px] border border-white/55 bg-white/75 dark:border-white/10 dark:bg-white/5">
+                          <Icon className={cn("size-4", styles.text)} />
+                        </div>
+
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className={cn("text-[13px] font-semibold", styles.text)}>
+                              {modeDialogLabel(group.mode)}
+                            </p>
+                            <span className="rounded-full border border-border bg-card px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                              {group.options[0]?.dataOrigin === "official_structured"
+                                ? "OFICIAL"
+                                : "TEXTO OFICIAL"}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-foreground">
+                            {compactTokenList(stopTokens)}
+                          </p>
+
+                          {lineTokens.length > 0 ? (
+                            <p className="text-[10px] text-muted-foreground">
+                              Lineas: {compactTokenList(lineTokens)}
+                            </p>
+                          ) : null}
+
+                          {bicimadStationId && bicimadState ? (
+                            <div className="pt-1">
+                              <button
+                                className="rounded-md border border-border bg-card px-2 py-1 text-[10px] font-medium text-foreground"
+                                onClick={() => loadBicimadOnDemand(bicimadStationId)}
+                                type="button"
+                              >
+                                {bicimadState.status === "loading"
+                                  ? "Consultando..."
+                                  : "Ver disponibilidad"}
+                              </button>
+                              {bicimadState.status === "success" ? (
+                                <p className="mt-1 text-[10px] text-muted-foreground">
+                                  Bicis: {bicimadState.payload.bikesAvailable ?? "N/D"} · Anclajes: {bicimadState.payload.docksAvailable ?? "N/D"}
+                                </p>
+                              ) : null}
+                              {bicimadState.status === "error" ? (
+                                <p className="mt-1 text-[10px] text-muted-foreground">
+                                  Disponibilidad no disponible ahora.
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </section>
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-border bg-muted/40 px-3 py-3 text-[12px] text-muted-foreground">
+                  No hay opciones de transporte publicadas dentro de 500 m para este centro.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex gap-2.5 px-4 pb-4">
         <Link

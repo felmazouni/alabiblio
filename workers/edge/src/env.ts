@@ -5,6 +5,8 @@ export interface AssetBinding {
 export interface EdgeEnv {
   APP_BASE_URL: string;
   APP_ENV: string;
+  EMT_CLIENT_ID?: string;
+  EMT_PASSKEY?: string;
   ASSETS?: AssetBinding;
   DB?: unknown;
 }

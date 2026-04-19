@@ -1,6 +1,7 @@
 import type {
   CenterCatalogItem,
   CenterKind,
+  DataOrigin,
   PublicCatalogResponse,
   PublicCenterDetailResponse,
   PublicFiltersResponse,
@@ -256,3 +257,24 @@ export function usePublicCenterDetail(
 export type PublicCenterPresentation = CenterCatalogItem & {
   rankingPosition?: number;
 };
+
+export interface BicimadAvailabilityResponse {
+  stationId: string;
+  bikesAvailable: number | null;
+  docksAvailable: number | null;
+  dataOrigin: DataOrigin;
+  sourceLabel: string;
+  fetchedAt: string | null;
+  note: string | null;
+}
+
+export async function fetchBicimadAvailability(
+  stationId: string,
+  signal?: AbortSignal,
+): Promise<BicimadAvailabilityResponse> {
+  const encodedStationId = encodeURIComponent(stationId);
+  return fetchJson<BicimadAvailabilityResponse>(
+    `/api/public/transport/bicimad/availability?station_id=${encodedStationId}`,
+    signal ?? new AbortController().signal,
+  );
+}

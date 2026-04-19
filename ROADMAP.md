@@ -6,7 +6,7 @@
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-- Version desplegada: `c6afa409`
+- Version desplegada: `c77eaa1e`
 
 # Lo que funciona ya de verdad
 
@@ -32,6 +32,8 @@
 - Normalizacion de centros validada sin slugs duplicados y sin espacios al aire libre retenidos.
 - Parser de horarios mejorado para conservar contexto de dias y horas separados y extraer notas especiales basicas en preview.
 - Home, listado, detalle basico y modal de filtros visibles en preview.
+- Bloque de card `Transporte` compactado: trigger en tarjeta y dialog centrado con detalle por modo dentro de 500 m, sin acordeon vertical en la card.
+- Disponibilidad BiciMAD preparada bajo demanda con endpoint publico dedicado (`/api/public/transport/bicimad/availability`) y degradacion honesta cuando realtime no esta configurado.
 - Dark mode base operativo con persistencia de preferencia.
 - Logging estructurado basico en Worker e ingesta.
 
