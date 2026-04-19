@@ -35,6 +35,7 @@ export interface CrtmStop {
   name: string;
   lat: number;
   lon: number;
+  lines: string[];
 }
 
 const EMT_STOPS_URL =
@@ -175,12 +176,21 @@ async function buildCrtmStops(mode: CrtmStopMode, sourceUrl: string): Promise<Cr
         return null;
       }
 
+      const linesRaw = properties.LINEAS ?? [];
+      const lines = Array.isArray(linesRaw)
+        ? linesRaw.map((line) => String(line).trim()).filter(Boolean)
+        : String(linesRaw)
+            .split(/[,;|]/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+
       return {
         stopId: `${mode}:${stopIdRaw}`,
         mode,
         name: nameRaw,
         lat,
         lon,
+        lines,
       } satisfies CrtmStop;
     })
     .filter((stop): stop is CrtmStop => stop !== null);
@@ -533,25 +543,3 @@ export function findNearestCrtmStop(
   return nearest;
 }
 
-export function findNearestCrtmStopByName(
-  centerLat: number | null,
-  centerLon: number | null,
-  stops: CrtmStop[],
-  nameHints: string[],
-): (CrtmStop & { distanceMeters: number }) | null {
-  const normalizedHints = nameHints
-    .map((hint) => normalizeStationSearch(hint))
-    .filter(Boolean);
-
-  const scopedStops =
-    normalizedHints.length > 0
-      ? stops.filter((stop) => {
-          const normalizedStop = normalizeStationSearch(stop.name);
-          return normalizedHints.some(
-            (hint) => normalizedStop.includes(hint) || hint.includes(normalizedStop),
-          );
-        })
-      : stops;
-
-  return findNearestCrtmStop(centerLat, centerLon, scopedStops);
-}

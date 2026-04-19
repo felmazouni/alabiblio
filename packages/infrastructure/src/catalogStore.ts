@@ -33,9 +33,8 @@ import {
   type SerZone,
   findNearestBicimadStation,
   findNearestBicimadStationToUser,
-  findNearestCrtmStopByName,
+  findNearestCrtmStop,
   findNearestEmtStop,
-  findNearestEmtStopByLines,
   findSerZone,
   loadBicimadStations,
   loadCrtmCercaniasStops,
@@ -1150,39 +1149,24 @@ function buildParsedTransportSnapshotOptions(
     });
 }
 
-function stationHintsForMode(
-  parsedOptions: StoredTransportOption[],
-  mode: Extract<TransportMode, "metro" | "cercanias" | "interurban_bus">,
-): string[] {
-  return parsedOptions
-    .filter((option) => option.mode === mode)
-    .map((option) => option.destinationNodeName ?? option.stationName ?? option.stopName ?? "")
-    .filter(Boolean);
-}
-
 function buildCrtmStructuredOption(args: {
   item: BaseCenterRecord;
   fetchedAt: string;
   mode: Extract<TransportMode, "metro" | "cercanias" | "interurban_bus">;
   title: string;
   sourceLabel: string;
-  parsedOptions: StoredTransportOption[];
   stops: CrtmStop[];
   maxDistanceMeters: number;
   scoreBase: number;
 }): StoredTransportOption | null {
-  const { item, fetchedAt, mode, title, sourceLabel, parsedOptions, stops, maxDistanceMeters, scoreBase } = args;
-  const nameHints = stationHintsForMode(parsedOptions, mode);
-  const nearestStop = findNearestCrtmStopByName(item.latitude, item.longitude, stops, nameHints);
+  const { item, fetchedAt, mode, title, sourceLabel, stops, maxDistanceMeters, scoreBase } = args;
+  const nearestStop = findNearestCrtmStop(item.latitude, item.longitude, stops);
 
   if (!nearestStop || nearestStop.distanceMeters > maxDistanceMeters) {
     return null;
   }
 
-  const parsedLines = parsedOptions
-    .filter((option) => option.mode === mode)
-    .flatMap((option) => option.lines);
-  const lines = [...new Set(parsedLines)];
+  const lines = nearestStop.lines;
 
   return {
     centerId: item.id,
@@ -1249,7 +1233,6 @@ function buildPrecomputedTransportSnapshot(
     mode: "metro",
     title: "Metro",
     sourceLabel: "CRTM GTFS Metro",
-    parsedOptions,
     stops: datasets.crtmMetroStops,
     maxDistanceMeters: 1400,
     scoreBase: 92,
@@ -1260,7 +1243,6 @@ function buildPrecomputedTransportSnapshot(
     mode: "cercanias",
     title: "Cercanias",
     sourceLabel: "CRTM GTFS Cercanias",
-    parsedOptions,
     stops: datasets.crtmCercaniasStops,
     maxDistanceMeters: 1800,
     scoreBase: 88,
@@ -1271,7 +1253,6 @@ function buildPrecomputedTransportSnapshot(
     mode: "interurban_bus",
     title: "Interurbano CRTM",
     sourceLabel: "CRTM GTFS Interurbanos",
-    parsedOptions,
     stops: datasets.crtmInterurbanStops,
     maxDistanceMeters: 1800,
     scoreBase: 78,
@@ -1290,8 +1271,7 @@ function buildPrecomputedTransportSnapshot(
   }
 
   if (nearestStop && nearestStop.distanceMeters <= 850) {
-    const parsedBus = parsedOptions.find((option) => option.mode === "emt_bus");
-    const lines = parsedBus?.lines.length ? parsedBus.lines : nearestStop.lines.slice(0, 6);
+    const lines = nearestStop.lines.slice(0, 6);
     options.push({
       centerId: item.id,
       optionId: `${item.id}:emt:${nearestStop.stopId}`,
@@ -1830,7 +1810,7 @@ async function resolveTransportOptionsForUser(
 
     const resolvedOptions = snapshot.options.map((option) => {
       if (option.mode === "emt_bus" && option.dataOrigin !== "official_text_parsed") {
-        const originStop = findNearestEmtStopByLines(query.lat, query.lon, emtStops, option.lines);
+          const originStop = findNearestEmtStop(query.lat, query.lon, emtStops);
         const walkToOriginMinutes =
           originStop ? walkingMinutesFromDistance(originStop.distanceMeters) : null;
 
