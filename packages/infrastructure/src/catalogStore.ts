@@ -1259,10 +1259,22 @@ function buildPrecomputedTransportSnapshot(
   });
 
   if (metroStructured) {
+    for (let index = options.length - 1; index >= 0; index -= 1) {
+      const option = options[index];
+      if (option?.mode === "metro") {
+        options.splice(index, 1);
+      }
+    }
     options.push(metroStructured);
   }
 
   if (cercaniasStructured) {
+    for (let index = options.length - 1; index >= 0; index -= 1) {
+      const option = options[index];
+      if (option?.mode === "cercanias") {
+        options.splice(index, 1);
+      }
+    }
     options.push(cercaniasStructured);
   }
 
@@ -1271,6 +1283,12 @@ function buildPrecomputedTransportSnapshot(
   }
 
   if (nearestStop && nearestStop.distanceMeters <= 850) {
+    for (let index = options.length - 1; index >= 0; index -= 1) {
+      const option = options[index];
+      if (option?.mode === "emt_bus") {
+        options.splice(index, 1);
+      }
+    }
     const lines = nearestStop.lines.slice(0, 6);
     options.push({
       centerId: item.id,
