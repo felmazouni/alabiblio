@@ -77,7 +77,8 @@ export async function handleRequest(
       response = await buildPublicCatalogResponse(env, catalogQuery);
     } else if (request.method === "GET" && url.pathname === "/api/public/transport/bicimad/availability") {
       const stationId = url.searchParams.get("station_id") ?? "";
-      response = await buildPublicBicimadAvailabilityResponse(env, stationId);
+      const stationName = url.searchParams.get("station_name") ?? "";
+      response = await buildPublicBicimadAvailabilityResponse(env, stationId, stationName);
     } else if (request.method === "GET" && url.pathname === "/api/public/callejero/autocomplete") {
       const q = url.searchParams.get("q") ?? "";
       response = await buildCallejeroAutocompleteResponse(q);

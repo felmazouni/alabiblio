@@ -270,11 +270,15 @@ export interface BicimadAvailabilityResponse {
 
 export async function fetchBicimadAvailability(
   stationId: string,
+  stationName?: string | null,
   signal?: AbortSignal,
 ): Promise<BicimadAvailabilityResponse> {
-  const encodedStationId = encodeURIComponent(stationId);
+  const params = new URLSearchParams({ station_id: stationId });
+  if (stationName && stationName.trim() !== "") {
+    params.set("station_name", stationName.trim());
+  }
   return fetchJson<BicimadAvailabilityResponse>(
-    `/api/public/transport/bicimad/availability?station_id=${encodedStationId}`,
+    `/api/public/transport/bicimad/availability?${params.toString()}`,
     signal ?? new AbortController().signal,
   );
 }

@@ -507,6 +507,23 @@ type BicimadAvailabilityUiState =
   | { status: "success"; payload: BicimadAvailabilityResponse }
   | { status: "error"; message: string };
 
+function bicimadStatusMessage(note: string | null): string {
+  switch (note) {
+    case "bicimad_realtime_not_configured":
+      return "Realtime BiciMAD no configurado en este entorno.";
+    case "bicimad_station_not_found":
+      return "No se pudo resolver la estacion BiciMAD de destino.";
+    case "bicimad_realtime_unavailable":
+      return "Sin disponibilidad en este momento para esta estacion.";
+    case "bicimad_realtime_error":
+      return "Error consultando BiciMAD en tiempo real.";
+    case "station_id_required":
+      return "Falta el identificador de estacion BiciMAD.";
+    default:
+      return "Disponibilidad BiciMAD no disponible ahora.";
+  }
+}
+
 function MetaLine({ center }: { center: PublicCenterPresentation }) {
   return (
     <>
@@ -638,6 +655,7 @@ export function LibraryCard({
       };
     })
     .filter((entry): entry is { mode: TransportOption["mode"]; options: TransportOption[] } => entry !== null);
+  const visibleTransportCount = groupedTransportModes.length;
 
   const loadBicimadOnDemand = async (stationId: string) => {
     setBicimadAvailability((current) => ({
@@ -646,10 +664,28 @@ export function LibraryCard({
     }));
 
     try {
-      const payload = await fetchBicimadAvailability(stationId);
+      const currentStationName = groupedTransportModes
+        .flatMap((group) => group.options)
+        .find((option) => extractBicimadStationId(option) === stationId)?.destinationNodeName ?? null;
+      const payload = await fetchBicimadAvailability(stationId, currentStationName);
+
+      if (
+        payload.dataOrigin === "realtime" &&
+        (payload.bikesAvailable !== null || payload.docksAvailable !== null)
+      ) {
+        setBicimadAvailability((current) => ({
+          ...current,
+          [stationId]: { status: "success", payload },
+        }));
+        return;
+      }
+
       setBicimadAvailability((current) => ({
         ...current,
-        [stationId]: { status: "success", payload },
+        [stationId]: {
+          status: "error",
+          message: bicimadStatusMessage(payload.note),
+        },
       }));
     } catch (error) {
       setBicimadAvailability((current) => ({
@@ -838,7 +874,7 @@ export function LibraryCard({
             <Train className="size-3.5 text-muted-foreground" />
             <span className="text-[12px] font-medium text-foreground">Transporte</span>
             <span className="text-[10px] text-muted-foreground">
-              ({center.transportOptions.length} opciones)
+              ({visibleTransportCount} opciones)
             </span>
           </div>
           <span className="rounded-md border border-border bg-card px-2 py-1 text-[10px] font-medium text-foreground">
@@ -861,7 +897,7 @@ export function LibraryCard({
                 <Train className="size-4 text-muted-foreground" />
                 <h4 className="text-[14px] font-semibold text-foreground">Transporte</h4>
                 <span className="text-[11px] text-muted-foreground">
-                  {filteredTransportOptions.length} opciones · ≤500 m
+                  {visibleTransportCount} opciones · ≤500 m
                 </span>
               </div>
               <button
@@ -953,14 +989,14 @@ export function LibraryCard({
                                 </button>
                                 {bicimadState?.status === "success" ? (
                                   <span className="text-[11px] text-foreground">
-                                    <span className="font-semibold">{bicimadState.payload.bikesAvailable ?? "N/D"}</span>
-                                    <span className="text-muted-foreground"> bicis · </span>
-                                    <span className="font-semibold">{bicimadState.payload.docksAvailable ?? "N/D"}</span>
-                                    <span className="text-muted-foreground"> anclajes</span>
+                                    <span className="font-semibold">{bicimadState.payload.bikesAvailable ?? 0}</span>
+                                    <span className="text-muted-foreground"> bicis disponibles · </span>
+                                    <span className="font-semibold">{bicimadState.payload.docksAvailable ?? 0}</span>
+                                    <span className="text-muted-foreground"> anclajes disponibles</span>
                                   </span>
                                 ) : null}
                                 {bicimadState?.status === "error" ? (
-                                  <span className="text-[11px] text-muted-foreground">No disponible</span>
+                                  <span className="text-[11px] text-muted-foreground">{bicimadState.message}</span>
                                 ) : null}
                               </div>
                             </div>
