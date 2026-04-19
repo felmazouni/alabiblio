@@ -25,6 +25,7 @@ export type TransportMode =
   | "cercanias"
   | "metro_ligero"
   | "emt_bus"
+  | "interurban_bus"
   | "bicimad"
   | "car";
 

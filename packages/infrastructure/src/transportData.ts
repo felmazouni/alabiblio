@@ -27,17 +27,36 @@ export interface SerZone {
   geometry: GeoJsonPolygon | GeoJsonMultiPolygon;
 }
 
+export type CrtmStopMode = "metro" | "cercanias" | "interurban_bus";
+
+export interface CrtmStop {
+  stopId: string;
+  mode: CrtmStopMode;
+  name: string;
+  lat: number;
+  lon: number;
+}
+
 const EMT_STOPS_URL =
   "https://datos.madrid.es/dataset/900023-0-emt-paradas-autobus/resource/900023-0-emt-paradas-autobus/download/900023-0-emt-paradas-autobus.csv";
 const BICIMAD_GEOJSON_URL =
   "https://datos.emtmadrid.es/dataset/5fcc0945-2cbd-46c3-801a-6a83f4167c11/resource/105ce5df-793f-4e0a-a88e-5d3b3f024a5d/download/bikestationbicimad_geojson.json";
 const SER_GEOJSON_URL =
   "https://sigma.madrid.es/hosted/rest/services/GEOPORTAL/SERVICIO_DE_ESTACIONAMIENTO_REGULADO/MapServer/3/query?where=1%3D1&outFields=OBJECTID%2CNOMBAR%2CNOMDIS&returnGeometry=true&f=geojson";
+const CRTM_METRO_STOPS_URL =
+  "https://services5.arcgis.com/UxADft6QPcvFyDU1/arcgis/rest/services/M4_Red/FeatureServer/0/query?where=1%3D1&outFields=IDESTACION%2CDENOMINACION%2CLINEAS&returnGeometry=true&f=geojson";
+const CRTM_CERCANIAS_STOPS_URL =
+  "https://services5.arcgis.com/UxADft6QPcvFyDU1/arcgis/rest/services/M5_Red/FeatureServer/0/query?where=1%3D1&outFields=IDESTACION%2CDENOMINACION%2CLINEAS&returnGeometry=true&f=geojson";
+const CRTM_INTERURBAN_STOPS_URL =
+  "https://services5.arcgis.com/UxADft6QPcvFyDU1/arcgis/rest/services/M8_Red/FeatureServer/0/query?where=1%3D1&outFields=IDESTACION%2CDENOMINACION%2CLINEAS&returnGeometry=true&f=geojson";
 
 const runtimeCache: {
   emtStops?: Promise<EmtStop[]>;
   bicimadStations?: Promise<BicimadStation[]>;
   serZones?: Promise<SerZone[]>;
+  crtmMetroStops?: Promise<CrtmStop[]>;
+  crtmCercaniasStops?: Promise<CrtmStop[]>;
+  crtmInterurbanStops?: Promise<CrtmStop[]>;
 } = {};
 
 function parseCsvRows(input: string): string[][] {
@@ -118,6 +137,53 @@ async function fetchJson<T>(url: string): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+function normalizeStationSearch(value: string): string {
+  return (repairSourceText(value) ?? value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+async function buildCrtmStops(mode: CrtmStopMode, sourceUrl: string): Promise<CrtmStop[]> {
+  const payload = await fetchJson<{
+    features?: Array<{
+      geometry?: { type?: string; coordinates?: [number, number] };
+      properties?: Record<string, unknown>;
+    }>;
+  }>(sourceUrl);
+
+  return (payload.features ?? [])
+    .map((feature): CrtmStop | null => {
+      if (feature.geometry?.type !== "Point" || !feature.geometry.coordinates) {
+        return null;
+      }
+
+      const [lon, lat] = feature.geometry.coordinates;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return null;
+      }
+
+      const properties = feature.properties ?? {};
+      const stopIdRaw = String(properties.IDESTACION ?? properties.OBJECTID ?? "").trim();
+      const nameRaw = repairSourceText(String(properties.DENOMINACION ?? ""))?.trim() ?? "";
+
+      if (!stopIdRaw || !nameRaw) {
+        return null;
+      }
+
+      return {
+        stopId: `${mode}:${stopIdRaw}`,
+        mode,
+        name: nameRaw,
+        lat,
+        lon,
+      } satisfies CrtmStop;
+    })
+    .filter((stop): stop is CrtmStop => stop !== null);
 }
 
 async function buildEmtStops(): Promise<EmtStop[]> {
@@ -304,6 +370,51 @@ export function loadSerZones(): Promise<SerZone[]> {
   return runtimeCache.serZones;
 }
 
+export function loadCrtmMetroStops(): Promise<CrtmStop[]> {
+  runtimeCache.crtmMetroStops ??= buildCrtmStops("metro", CRTM_METRO_STOPS_URL).catch((error) => {
+    console.warn(
+      JSON.stringify({
+        event: "transport_source_unavailable",
+        source: "crtm_metro_gtfs",
+        message: error instanceof Error ? error.message : "unknown_error",
+      }),
+    );
+    return [];
+  });
+
+  return runtimeCache.crtmMetroStops;
+}
+
+export function loadCrtmCercaniasStops(): Promise<CrtmStop[]> {
+  runtimeCache.crtmCercaniasStops ??= buildCrtmStops("cercanias", CRTM_CERCANIAS_STOPS_URL).catch((error) => {
+    console.warn(
+      JSON.stringify({
+        event: "transport_source_unavailable",
+        source: "crtm_cercanias_gtfs",
+        message: error instanceof Error ? error.message : "unknown_error",
+      }),
+    );
+    return [];
+  });
+
+  return runtimeCache.crtmCercaniasStops;
+}
+
+export function loadCrtmInterurbanStops(): Promise<CrtmStop[]> {
+  runtimeCache.crtmInterurbanStops ??= buildCrtmStops("interurban_bus", CRTM_INTERURBAN_STOPS_URL).catch((error) => {
+    console.warn(
+      JSON.stringify({
+        event: "transport_source_unavailable",
+        source: "crtm_interurban_gtfs",
+        message: error instanceof Error ? error.message : "unknown_error",
+      }),
+    );
+    return [];
+  });
+
+  return runtimeCache.crtmInterurbanStops;
+}
+
 export function findNearestEmtStop(
   centerLat: number | null,
   centerLon: number | null,
@@ -395,4 +506,52 @@ export function findSerZone(
   }
 
   return null;
+}
+
+export function findNearestCrtmStop(
+  centerLat: number | null,
+  centerLon: number | null,
+  stops: CrtmStop[],
+): (CrtmStop & { distanceMeters: number }) | null {
+  if (centerLat === null || centerLon === null) {
+    return null;
+  }
+
+  let nearest: (CrtmStop & { distanceMeters: number }) | null = null;
+
+  for (const stop of stops) {
+    const distanceMeters = haversineDistanceMeters(centerLat, centerLon, stop.lat, stop.lon);
+
+    if (!nearest || distanceMeters < nearest.distanceMeters) {
+      nearest = {
+        ...stop,
+        distanceMeters,
+      };
+    }
+  }
+
+  return nearest;
+}
+
+export function findNearestCrtmStopByName(
+  centerLat: number | null,
+  centerLon: number | null,
+  stops: CrtmStop[],
+  nameHints: string[],
+): (CrtmStop & { distanceMeters: number }) | null {
+  const normalizedHints = nameHints
+    .map((hint) => normalizeStationSearch(hint))
+    .filter(Boolean);
+
+  const scopedStops =
+    normalizedHints.length > 0
+      ? stops.filter((stop) => {
+          const normalizedStop = normalizeStationSearch(stop.name);
+          return normalizedHints.some(
+            (hint) => normalizedStop.includes(hint) || hint.includes(normalizedStop),
+          );
+        })
+      : stops;
+
+  return findNearestCrtmStop(centerLat, centerLon, scopedStops);
 }

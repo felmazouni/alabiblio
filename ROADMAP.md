@@ -1,12 +1,12 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-19`
-- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5, 2.6 y 3` completados, `Bloque 4` pendiente, no produccion.
+- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5, 2.6, 3 y 4` completados, `Bloque 5` en curso, no produccion.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-- Version desplegada: `2efc9bc8`
+- Version desplegada: `c6afa409`
 
 # Lo que funciona ya de verdad
 
@@ -23,6 +23,9 @@
 - Overrides estructurados de horarios: verano, examenes, festivos, cierres temporales, jornadas reducidas.
 - Cola de revision manual para centros con `needs_manual_review` o confianza baja.
 - Distribucion de confidence post-Bloque 3: `medium`=87, `low`=18, `high`=2, `needs_manual_review`=8 (bajado de 43).
+- Snapshot de movilidad de destino persistido por centro para `metro`, `cercanias`, `interurbanos CRTM`, `emt_bus`, `bicimad` y `car/SER`.
+- Fuentes estructuradas activas: EMT paradas oficiales, CRTM Red Metro/Cercanias/Interurbanos (FeatureServer), BiciMAD oficial y cobertura SER oficial.
+- Trazabilidad de ingesta de movilidad persistida en `transport_source_runs` por fuente, URL, conteo y fecha.
 - Esquema runtime de D1 alineado con migraciones versionadas para transporte persistido y cobertura SER.
 - Reclasificacion inicial de procedencia ya aplicada para `wifi`, `aforo`, flags de detalle y payloads visibles.
 - Reingesta real de centros ejecutada sobre preview con 7 descartes persistidos y auditables.
@@ -113,23 +116,23 @@
   * [x] Riesgos o dependencias si aplica
   * [x] Depende del Bloque 2 y afecta ranking, filtros, detalle y home.
 
-* [ ] Bloque 4. Movilidad estructurada de destino y snapshots persistidos
+* [x] Bloque 4. Movilidad estructurada de destino y snapshots persistidos
 
-  * [ ] Objetivo del bloque
-  * [ ] Dejar precalculado por centro el grafo mínimo útil de movilidad sin consultas absurdas por request.
-  * [ ] Ingerir y normalizar paradas y líneas EMT oficiales.
-  * [ ] Ingerir y normalizar movilidad estructurada útil de interurbanos y CRTM para metro, cercanías e interurbanos.
-  * [ ] Ingerir y normalizar BiciMAD oficial con soporte para enlazar estado y disponibilidad.
-  * [ ] Ingerir y normalizar SER oficial con cobertura geográfica y resultado binario útil para producto.
-  * [ ] Persistir por centro nodos, opciones y relevancia para EMT, interurbano, metro, cercanías, bici y coche/SER.
-  * [ ] Calcular walking distance aproximada entre centro y nodos relevantes del destino.
-  * [ ] Etiquetar cada opción con `source_kind`, prioridad de visualización, TTL y estado activo.
-  * [ ] Dejar explícito que EMT, interurbanos/CRTM, metro y cercanías entran como movilidad estructurada útil, no como clon de Google Maps.
-  * [ ] Dejar explícito que el único realtime abierto en esta fase es BiciMAD oficial para bicis disponibles en origen y anclajes disponibles en destino, solo si la fuente es robusta.
-  * [ ] Criterio de cierre del bloque
-  * [ ] Todos los centros publicados tienen snapshot de movilidad de destino persistido y trazable, sin recomputación completa por request y sin motor falso tipo Google.
-  * [ ] Riesgos o dependencias si aplica
-  * [ ] Depende del Bloque 2 y puede exigir trabajo adicional de licencias, formatos o limpieza de nodos CRTM.
+  * [x] Objetivo del bloque
+  * [x] Dejar precalculado por centro el grafo mínimo útil de movilidad sin consultas absurdas por request.
+  * [x] Ingerir y normalizar paradas y líneas EMT oficiales.
+  * [x] Ingerir y normalizar movilidad estructurada útil de interurbanos y CRTM para metro, cercanías e interurbanos.
+  * [x] Ingerir y normalizar BiciMAD oficial con soporte para enlazar estado y disponibilidad.
+  * [x] Ingerir y normalizar SER oficial con cobertura geográfica y resultado binario útil para producto.
+  * [x] Persistir por centro nodos, opciones y relevancia para EMT, interurbano, metro, cercanías, bici y coche/SER.
+  * [x] Calcular walking distance aproximada entre centro y nodos relevantes del destino.
+  * [x] Etiquetar cada opción con `source_kind`, prioridad de visualización, TTL y estado activo.
+  * [x] Dejar explícito que EMT, interurbanos/CRTM, metro y cercanías entran como movilidad estructurada útil, no como clon de Google Maps.
+  * [x] Dejar explícito que el único realtime abierto en esta fase es BiciMAD oficial para bicis disponibles en origen y anclajes disponibles en destino, solo si la fuente es robusta.
+  * [x] Criterio de cierre del bloque
+  * [x] Todos los centros publicados tienen snapshot de movilidad de destino persistido y trazable, sin recomputación completa por request y sin motor falso tipo Google.
+  * [x] Riesgos o dependencias si aplica
+  * [x] Depende del Bloque 2 y puede exigir trabajo adicional de licencias, formatos o limpieza de nodos CRTM.
 
 * [ ] Bloque 5. Resolución por usuario, caché y política de movilidad visible
 

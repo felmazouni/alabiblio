@@ -28,14 +28,19 @@ import {
 } from "@alabiblio/domain";
 import {
   type BicimadStation,
+  type CrtmStop,
   type EmtStop,
   type SerZone,
   findNearestBicimadStation,
   findNearestBicimadStationToUser,
+  findNearestCrtmStopByName,
   findNearestEmtStop,
   findNearestEmtStopByLines,
   findSerZone,
   loadBicimadStations,
+  loadCrtmCercaniasStops,
+  loadCrtmInterurbanStops,
+  loadCrtmMetroStops,
   loadEmtStops,
   loadSerZones,
 } from "./transportData";
@@ -429,6 +434,14 @@ const SCHEMA_STATEMENTS = [
     is_active INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY(center_id) REFERENCES centers(id) ON DELETE CASCADE
   )`,
+  `CREATE TABLE IF NOT EXISTS transport_source_runs (
+    id TEXT PRIMARY KEY,
+    source_code TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    item_count INTEGER NOT NULL DEFAULT 0,
+    fetched_at TEXT NOT NULL,
+    source_kind TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS audit_log (
     id TEXT PRIMARY KEY,
     actor_type TEXT NOT NULL,
@@ -447,6 +460,8 @@ const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_transport_options_center ON center_transport_options(center_id)`,
   `CREATE INDEX IF NOT EXISTS idx_transport_nodes_center ON center_transport_nodes(center_id)`,
   `CREATE INDEX IF NOT EXISTS idx_transport_relevance_center ON center_transport_relevance(center_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_transport_source_runs_code ON transport_source_runs(source_code)`,
+  `CREATE INDEX IF NOT EXISTS idx_transport_source_runs_fetched ON transport_source_runs(fetched_at)`,
   `CREATE TABLE IF NOT EXISTS center_schedule_overrides (
     id TEXT PRIMARY KEY,
     center_id TEXT NOT NULL,
@@ -497,11 +512,20 @@ const TRANSPORT_ORDER: Record<TransportMode, number> = {
   cercanias: 2,
   metro_ligero: 3,
   emt_bus: 4,
-  bicimad: 5,
-  car: 6,
+  interurban_bus: 5,
+  bicimad: 6,
+  car: 7,
 };
 
-const TRANSPORT_SNAPSHOT_VERSION = "2026-04-19.v1";
+const TRANSPORT_SNAPSHOT_VERSION = "2026-04-19.v2";
+const TRANSPORT_SOURCE_URLS = {
+  emt: "https://datos.madrid.es/dataset/900023-0-emt-paradas-autobus/resource/900023-0-emt-paradas-autobus/download/900023-0-emt-paradas-autobus.csv",
+  crtmMetro: "https://crtm.maps.arcgis.com/sharing/rest/content/items/5c7f2951962540d69ffe8f640d94c246/data",
+  crtmCercanias: "https://crtm.maps.arcgis.com/sharing/rest/content/items/1a25440bf66f499bae2657ec7fb40144/data",
+  crtmInterurban: "https://crtm.maps.arcgis.com/sharing/rest/content/items/885399f83408473c8d815e40c5e702b7/data",
+  bicimad: "https://datos.emtmadrid.es/dataset/5fcc0945-2cbd-46c3-801a-6a83f4167c11/resource/105ce5df-793f-4e0a-a88e-5d3b3f024a5d/download/bikestationbicimad_geojson.json",
+  ser: "https://sigma.madrid.es/hosted/rest/services/GEOPORTAL/SERVICIO_DE_ESTACIONAMIENTO_REGULADO/MapServer/3/query?where=1%3D1&outFields=OBJECTID%2CNOMBAR%2CNOMDIS&returnGeometry=true&f=geojson",
+} as const;
 
 const transportResolutionCache = new Map<string, UserResolvedTransportCacheEntry>();
 const inflightTransportResolutions = new Map<string, Promise<UserResolvedTransportCacheEntry>>();
@@ -1126,10 +1150,83 @@ function buildParsedTransportSnapshotOptions(
     });
 }
 
+function stationHintsForMode(
+  parsedOptions: StoredTransportOption[],
+  mode: Extract<TransportMode, "metro" | "cercanias" | "interurban_bus">,
+): string[] {
+  return parsedOptions
+    .filter((option) => option.mode === mode)
+    .map((option) => option.destinationNodeName ?? option.stationName ?? option.stopName ?? "")
+    .filter(Boolean);
+}
+
+function buildCrtmStructuredOption(args: {
+  item: BaseCenterRecord;
+  fetchedAt: string;
+  mode: Extract<TransportMode, "metro" | "cercanias" | "interurban_bus">;
+  title: string;
+  sourceLabel: string;
+  parsedOptions: StoredTransportOption[];
+  stops: CrtmStop[];
+  maxDistanceMeters: number;
+  scoreBase: number;
+}): StoredTransportOption | null {
+  const { item, fetchedAt, mode, title, sourceLabel, parsedOptions, stops, maxDistanceMeters, scoreBase } = args;
+  const nameHints = stationHintsForMode(parsedOptions, mode);
+  const nearestStop = findNearestCrtmStopByName(item.latitude, item.longitude, stops, nameHints);
+
+  if (!nearestStop || nearestStop.distanceMeters > maxDistanceMeters) {
+    return null;
+  }
+
+  const parsedLines = parsedOptions
+    .filter((option) => option.mode === mode)
+    .flatMap((option) => option.lines);
+  const lines = [...new Set(parsedLines)];
+
+  return {
+    centerId: item.id,
+    optionId: `${item.id}:${mode}:${nearestStop.stopId}`,
+    mode,
+    title,
+    sourceLabel,
+    dataOrigin: "official_structured",
+    destinationNodeId: nearestStop.stopId,
+    destinationNodeName: nearestStop.name,
+    summary: buildTransportSummary(mode, nearestStop.name, lines, nearestStop.distanceMeters),
+    lines,
+    originLabel: null,
+    destinationLabel: item.addressLine,
+    metrics: {
+      walkDistanceMeters: Math.round(nearestStop.distanceMeters),
+      walkMinutes: walkingMinutesFromDistance(nearestStop.distanceMeters),
+      waitMinutes: null,
+      totalMinutes: null,
+    },
+    stationName: nearestStop.name,
+    stopName: nearestStop.name,
+    serZoneLabel: null,
+    availabilityText: null,
+    note: "Nodo oficial CRTM del destino. Solo se publica movilidad estructurada y distancia peatonal aproximada al centro, sin simular tiempos puerta a puerta.",
+    externalUrl: null,
+    displayPriority: TRANSPORT_ORDER[mode],
+    relevanceScore: Math.max(52, scoreBase - Math.round(nearestStop.distanceMeters / 28)),
+    fetchedAt,
+    cacheTtlSeconds: ttlSecondsForOrigin("official_structured", mode),
+    isActive: true,
+    destinationLatitude: nearestStop.lat,
+    destinationLongitude: nearestStop.lon,
+    destinationNodeLabel: nearestStop.name,
+  } satisfies StoredTransportOption;
+}
+
 function buildPrecomputedTransportSnapshot(
   item: BaseCenterRecord,
   datasets: {
     emtStops: EmtStop[];
+    crtmMetroStops: CrtmStop[];
+    crtmCercaniasStops: CrtmStop[];
+    crtmInterurbanStops: CrtmStop[];
     bicimadStations: BicimadStation[];
     serZones: SerZone[];
   },
@@ -1145,6 +1242,52 @@ function buildPrecomputedTransportSnapshot(
   );
   const serZone = findSerZone(item.latitude, item.longitude, datasets.serZones);
   const mapsUrl = buildMapsUrl(item);
+
+  const metroStructured = buildCrtmStructuredOption({
+    item,
+    fetchedAt,
+    mode: "metro",
+    title: "Metro",
+    sourceLabel: "CRTM GTFS Metro",
+    parsedOptions,
+    stops: datasets.crtmMetroStops,
+    maxDistanceMeters: 1400,
+    scoreBase: 92,
+  });
+  const cercaniasStructured = buildCrtmStructuredOption({
+    item,
+    fetchedAt,
+    mode: "cercanias",
+    title: "Cercanias",
+    sourceLabel: "CRTM GTFS Cercanias",
+    parsedOptions,
+    stops: datasets.crtmCercaniasStops,
+    maxDistanceMeters: 1800,
+    scoreBase: 88,
+  });
+  const interurbanStructured = buildCrtmStructuredOption({
+    item,
+    fetchedAt,
+    mode: "interurban_bus",
+    title: "Interurbano CRTM",
+    sourceLabel: "CRTM GTFS Interurbanos",
+    parsedOptions,
+    stops: datasets.crtmInterurbanStops,
+    maxDistanceMeters: 1800,
+    scoreBase: 78,
+  });
+
+  if (metroStructured) {
+    options.push(metroStructured);
+  }
+
+  if (cercaniasStructured) {
+    options.push(cercaniasStructured);
+  }
+
+  if (interurbanStructured) {
+    options.push(interurbanStructured);
+  }
 
   if (nearestStop && nearestStop.distanceMeters <= 850) {
     const parsedBus = parsedOptions.find((option) => option.mode === "emt_bus");
@@ -1468,18 +1611,63 @@ async function replaceTransportSnapshots(
     await database.prepare("DELETE FROM center_ser_coverage").run();
 
     const fetchedAt = new Date().toISOString();
-    const [emtStops, bicimadStations, serZones] = await Promise.all([
+    const [emtStops, crtmMetroStops, crtmCercaniasStops, crtmInterurbanStops, bicimadStations, serZones] = await Promise.all([
       loadEmtStops(),
+      loadCrtmMetroStops(),
+      loadCrtmCercaniasStops(),
+      loadCrtmInterurbanStops(),
       loadBicimadStations(),
       loadSerZones(),
     ]);
     const statements: D1Statement[] = [];
+
+    statements.push(
+      database
+        .prepare(
+          `INSERT INTO transport_source_runs (id, source_code, source_url, item_count, fetched_at, source_kind)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(`${fetchedAt}:emt`, "emt", TRANSPORT_SOURCE_URLS.emt, emtStops.length, fetchedAt, "official_structured"),
+      database
+        .prepare(
+          `INSERT INTO transport_source_runs (id, source_code, source_url, item_count, fetched_at, source_kind)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(`${fetchedAt}:crtm_metro`, "crtm_metro", TRANSPORT_SOURCE_URLS.crtmMetro, crtmMetroStops.length, fetchedAt, "official_structured"),
+      database
+        .prepare(
+          `INSERT INTO transport_source_runs (id, source_code, source_url, item_count, fetched_at, source_kind)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(`${fetchedAt}:crtm_cercanias`, "crtm_cercanias", TRANSPORT_SOURCE_URLS.crtmCercanias, crtmCercaniasStops.length, fetchedAt, "official_structured"),
+      database
+        .prepare(
+          `INSERT INTO transport_source_runs (id, source_code, source_url, item_count, fetched_at, source_kind)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(`${fetchedAt}:crtm_interurbanos`, "crtm_interurbanos", TRANSPORT_SOURCE_URLS.crtmInterurban, crtmInterurbanStops.length, fetchedAt, "official_structured"),
+      database
+        .prepare(
+          `INSERT INTO transport_source_runs (id, source_code, source_url, item_count, fetched_at, source_kind)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(`${fetchedAt}:bicimad`, "bicimad", TRANSPORT_SOURCE_URLS.bicimad, bicimadStations.length, fetchedAt, "official_structured"),
+      database
+        .prepare(
+          `INSERT INTO transport_source_runs (id, source_code, source_url, item_count, fetched_at, source_kind)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(`${fetchedAt}:ser`, "ser", TRANSPORT_SOURCE_URLS.ser, serZones.length, fetchedAt, "official_structured"),
+    );
 
     console.log(
       JSON.stringify({
         event: "transport_snapshot_build_start",
         centers: centers.length,
         emt_stops: emtStops.length,
+        crtm_metro_stops: crtmMetroStops.length,
+        crtm_cercanias_stops: crtmCercaniasStops.length,
+        crtm_interurban_stops: crtmInterurbanStops.length,
         bicimad_stations: bicimadStations.length,
         ser_zones: serZones.length,
       }),
@@ -1488,7 +1676,14 @@ async function replaceTransportSnapshots(
     for (const center of centers) {
       const snapshot = buildPrecomputedTransportSnapshot(
         center,
-        { emtStops, bicimadStations, serZones },
+        {
+          emtStops,
+          crtmMetroStops,
+          crtmCercaniasStops,
+          crtmInterurbanStops,
+          bicimadStations,
+          serZones,
+        },
         fetchedAt,
       );
 
@@ -1571,14 +1766,24 @@ function buildParsedTransportOptions(item: BaseCenterRecord): { options: Transpo
 }
 
 async function buildDetailTransportOptions(item: BaseCenterRecord): Promise<{ options: TransportOption[]; serZoneLabel: string | null }> {
-  const [emtStops, bicimadStations, serZones] = await Promise.all([
+  const [emtStops, crtmMetroStops, crtmCercaniasStops, crtmInterurbanStops, bicimadStations, serZones] = await Promise.all([
     loadEmtStops(),
+    loadCrtmMetroStops(),
+    loadCrtmCercaniasStops(),
+    loadCrtmInterurbanStops(),
     loadBicimadStations(),
     loadSerZones(),
   ]);
   const snapshot = buildPrecomputedTransportSnapshot(
     item,
-    { emtStops, bicimadStations, serZones },
+    {
+      emtStops,
+      crtmMetroStops,
+      crtmCercaniasStops,
+      crtmInterurbanStops,
+      bicimadStations,
+      serZones,
+    },
     new Date().toISOString(),
   );
 
@@ -1891,13 +2096,10 @@ async function enrichCenterForPublic(
   let transportPayload: { options: TransportOption[]; serZoneLabel: string | null };
 
   if (transportSnapshot) {
-    transportPayload =
-      transportMode === "detail"
-        ? await resolveTransportOptionsForUser(base, transportSnapshot, query)
-        : {
-            options: transportSnapshot.options.map((option) => toTransportOption(option)),
-            serZoneLabel: transportSnapshot.serZoneLabel,
-          };
+    transportPayload = {
+      options: transportSnapshot.options.map((option) => toTransportOption(option)),
+      serZoneLabel: transportSnapshot.serZoneLabel,
+    };
   } else {
     transportPayload =
       transportMode === "detail"
@@ -2106,12 +2308,17 @@ async function loadBaseCenters(options: CatalogStoreOptions): Promise<{ sourceMo
 
   const items = await readBaseCentersFromDatabase(database);
 
-  const [transportOptionCount, transportSnapshotCount] = await Promise.all([
+  const [transportOptionCount, transportSnapshotCount, outdatedSnapshotCount] = await Promise.all([
     countTransportOptions(database),
     countTransportSnapshots(database),
+    countOutdatedTransportSnapshots(database),
   ]);
 
-  if (transportOptionCount === 0 || transportSnapshotCount < items.length) {
+  if (
+    transportOptionCount === 0 ||
+    transportSnapshotCount < items.length ||
+    outdatedSnapshotCount > 0
+  ) {
     console.log(
       JSON.stringify({
         event: "transport_snapshot_backfill_required",
@@ -2119,6 +2326,7 @@ async function loadBaseCenters(options: CatalogStoreOptions): Promise<{ sourceMo
         total_centers: items.length,
         option_count: transportOptionCount,
         snapshot_count: transportSnapshotCount,
+        outdated_snapshot_count: outdatedSnapshotCount,
       }),
     );
     await replaceTransportSnapshots(database, items);
@@ -2267,6 +2475,8 @@ function labelForTransportMode(mode: TransportMode): string {
       return "Metro Ligero";
     case "emt_bus":
       return "Bus EMT";
+    case "interurban_bus":
+      return "Interurbano CRTM";
     case "bicimad":
       return "BiciMAD";
     case "car":
@@ -2340,6 +2550,7 @@ export async function getFiltersFromStore(
       "cercanias",
       "metro_ligero",
       "emt_bus",
+      "interurban_bus",
       "bicimad",
       "car",
     ] as TransportMode[]).map((mode) => ({
