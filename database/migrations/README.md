@@ -1,4 +1,8 @@
 # Migrations
 
-Las migraciones D1 se recrearan desde cero en esta carpeta.
+- `0001_initial.sql`: esquema base inicial de centros, horarios, ratings y auditoria.
+- `0002_runtime_schema_convergence.sql`: convergencia entre el esquema usado por runtime y el esquema versionado, incluyendo transporte persistido y cobertura SER.
 
+Regla operativa:
+
+- Cualquier tabla o indice que el runtime necesite debe existir tambien como migracion versionada en esta carpeta.

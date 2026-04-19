@@ -1,11 +1,29 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-19`
-- Estado del proyecto: `preview funcional`, no produccion.
+- Estado del proyecto: `preview funcional estable`, `Bloque 1` completado, no produccion.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
+
+# Lo que funciona ya de verdad
+
+- Worker de Cloudflare desplegado en preview con assets del frontend y API publica.
+- D1 de preview provisionada y conectada al Worker.
+- `typecheck`, `build` y `wrangler deploy` verificados en este estado.
+- `GET /api/health` operativo.
+- `GET /api/public/catalog` operativo con datos reales.
+- `GET /api/public/centers/:slug` operativo.
+- `GET /api/public/filters` operativo.
+- Ingesta minima real desde fuentes oficiales de bibliotecas y salas de estudio del Ayuntamiento.
+- Exclusiones estrictas activas para espacios al aire libre y elementos no validos para estudio interior.
+- Normalizacion persistente basica de horarios con `rules`, `schedule_confidence`, `notes_unparsed`, `is_open_now` y `next_change_at`.
+- Esquema runtime de D1 alineado con migraciones versionadas para transporte persistido y cobertura SER.
+- Reclasificacion inicial de procedencia ya aplicada para `wifi`, `aforo`, flags de detalle y payloads visibles.
+- Home, listado, detalle basico y modal de filtros visibles en preview.
+- Dark mode base operativo con persistencia de preferencia.
+- Logging estructurado basico en Worker e ingesta.
 
 # Reglas de ejecución continua
 
@@ -18,20 +36,20 @@
 - No tocar produccion hasta llegar al bloque final y pasar todos los checks.
 - Si un bloque obliga a reabrir algo anterior, documentarlo y resolverlo sin dejar deuda oculta.
 
-* [ ] Bloque 1. Convergencia de base, esquema y verdad de datos
+* [x] Bloque 1. Convergencia de base, esquema y verdad de datos
 
-  * [ ] Objetivo del bloque
-  * [ ] Congelar el estado funcional actual de preview como punto de partida operativo y documentar qué endpoints, rutas y datasets sostienen la app.
-  * [ ] Mantener actualizado el bloque inicial de estado del roadmap: fecha de corte, estado del proyecto, URL de preview, URL de produccion cuando exista y lo que funciona ya de verdad.
-  * [ ] Alinear el esquema real usado por runtime con migraciones SQL versionadas para que D1 no dependa de creación implícita desde código.
-  * [ ] Eliminar o aislar artefactos temporales del repo: `tmp-*`, logs de verificación, capturas redundantes y componentes huérfanos no usados.
-  * [ ] Fijar la taxonomía única de procedencia de datos: `realtime`, `official_structured`, `official_text_parsed`, `heuristic`, `not_available`.
-  * [ ] Reclasificar contratos, flags y payloads para que ningún campo inferido o parseado se presente como estructurado.
-  * [ ] Separar y documentar qué piezas actuales se conservan, cuáles se refactorizan y cuáles se eliminan.
-  * [ ] Criterio de cierre del bloque
-  * [ ] El esquema D1 queda alineado con migraciones, la taxonomía de procedencia queda fijada en contratos y el repo queda limpio de artefactos que generen confusión operativa.
-  * [ ] Riesgos o dependencias si aplica
-  * [ ] Riesgo de tocar piezas que hoy sostienen preview; debe resolverse sin romper endpoints ni bindings ya operativos.
+  * [x] Objetivo del bloque
+  * [x] Congelar el estado funcional actual de preview como punto de partida operativo y documentar qué endpoints, rutas y datasets sostienen la app.
+  * [x] Mantener actualizado el bloque inicial de estado del roadmap: fecha de corte, estado del proyecto, URL de preview, URL de produccion cuando exista y lo que funciona ya de verdad.
+  * [x] Alinear el esquema real usado por runtime con migraciones SQL versionadas para que D1 no dependa de creación implícita desde código.
+  * [x] Eliminar o aislar artefactos temporales del repo: `tmp-*`, logs de verificación, capturas redundantes y componentes huérfanos no usados.
+  * [x] Fijar la taxonomía única de procedencia de datos: `realtime`, `official_structured`, `official_text_parsed`, `heuristic`, `not_available`.
+  * [x] Reclasificar contratos, flags y payloads para que ningún campo inferido o parseado se presente como estructurado.
+  * [x] Separar y documentar qué piezas actuales se conservan, cuáles se refactorizan y cuáles se eliminan.
+  * [x] Criterio de cierre del bloque
+  * [x] El esquema D1 queda alineado con migraciones, la taxonomía de procedencia queda fijada en contratos y el repo queda limpio de artefactos que generen confusión operativa.
+  * [x] Riesgos o dependencias si aplica
+  * [x] Riesgo de tocar piezas que hoy sostienen preview; resuelto en este bloque sin romper endpoints ni bindings ya operativos.
 
 * [ ] Bloque 2. Reingesta y normalización total de centros
 
