@@ -66,6 +66,7 @@ function modeIcon(mode: TransportOption["mode"]) {
     case "metro_ligero":
       return Train;
     case "emt_bus":
+    case "interurban_bus":
       return Bus;
     case "bicimad":
       return Bike;
@@ -85,6 +86,7 @@ function modeClasses(mode: TransportOption["mode"]) {
         text: "text-[var(--transport-metro-text)]",
       };
     case "emt_bus":
+    case "interurban_bus":
       return {
         card:
           "border-[var(--transport-bus-border)] bg-[var(--transport-bus-bg)]",
