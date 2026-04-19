@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@alabiblio/contracts": "workspace:*",
+    "embla-carousel": "^8.6.0",
+    "embla-carousel-react": "^8.6.0",
     "lucide-react": "^0.542.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

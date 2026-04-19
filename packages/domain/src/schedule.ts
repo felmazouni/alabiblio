@@ -338,9 +338,25 @@ function buildOverrideLabel(clause: string): string {
 }
 
 function extractOverrideRules(clause: string, inheritedWeekdays: number[]): ScheduleRule[] {
-  const stripped = clause
-    .replace(/^[^:(]*\([^)]*\)\s*:\s*/, "")
-    .replace(/^[^:]+:\s*/, "");
+  let stripped = clause.replace(/^[^:(]*\([^)]*\)\s*:\s*/, "");
+
+  // Only treat ':' as a label separator when it is not the ':' inside a time like 8:30.
+  for (let index = 0; index < stripped.length; index += 1) {
+    if (stripped[index] !== ":") {
+      continue;
+    }
+
+    const previous = stripped[index - 1] ?? "";
+    const next = stripped[index + 1] ?? "";
+    const isTimeColon = /\d/.test(previous) && /\d/.test(next);
+
+    if (isTimeColon) {
+      continue;
+    }
+
+    stripped = stripped.slice(index + 1).trim();
+    break;
+  }
 
   const weekdays = parseWeekdays(stripped);
   const timeRanges = parseTimeRanges(stripped);
@@ -512,7 +528,25 @@ function buildTodaySummary(rules: ScheduleRule[], weekday: number): string | nul
   return `${formatWeekday(weekday)}: ${ranges.join(" / ")}`;
 }
 
-function computeOpenState(rules: ScheduleRule[], activeOverride: ScheduleOverride | null): Pick<ScheduleSummary, "isOpenNow" | "nextChangeAt" | "nextOpening" | "todaySummary"> {
+function mergeRecurringOverrides(baseRules: ScheduleRule[], overrides: ScheduleOverride[]): ScheduleRule[] {
+  const recurringRules = overrides
+    .filter((override) => !override.closed && !override.fromDate && !override.toDate && override.rules.length > 0)
+    .flatMap((override) => override.rules);
+
+  if (recurringRules.length === 0) {
+    return baseRules;
+  }
+
+  const recurringWeekdays = new Set(recurringRules.map((rule) => rule.weekday));
+  const preservedBaseRules = baseRules.filter((rule) => !recurringWeekdays.has(rule.weekday));
+  return uniqueRules([...preservedBaseRules, ...recurringRules]);
+}
+
+function computeOpenState(
+  rules: ScheduleRule[],
+  overrides: ScheduleOverride[],
+  activeOverride: ScheduleOverride | null,
+): Pick<ScheduleSummary, "isOpenNow" | "nextChangeAt" | "nextOpening" | "todaySummary"> {
   if (activeOverride?.closed) {
     return {
       isOpenNow: false,
@@ -522,7 +556,8 @@ function computeOpenState(rules: ScheduleRule[], activeOverride: ScheduleOverrid
     };
   }
 
-  const effectiveRules = activeOverride?.rules.length ? activeOverride.rules : rules;
+  const baselineRules = mergeRecurringOverrides(rules, overrides);
+  const effectiveRules = activeOverride?.rules.length ? activeOverride.rules : baselineRules;
 
   if (effectiveRules.length === 0) {
     return {
@@ -635,7 +670,7 @@ export function parseSchedule(rawValue: string | null | undefined): ScheduleSumm
         : specialClauses.length > 0
           ? "medium"
           : "high";
-  const openState = computeOpenState(rules, activeOverride);
+  const openState = computeOpenState(rules, overrides, activeOverride);
   const needsManualReview = confidence === "needs_manual_review" || confidence === "low";
 
   return {

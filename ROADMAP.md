@@ -6,7 +6,7 @@
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-- Version desplegada: `a2f5f2f8`
+- Version desplegada: `77a070f2`
 
 # Lo que funciona ya de verdad
 
@@ -41,6 +41,9 @@
 - BiciMAD en dialog: nombre de estación fija + botón "Ver disponibilidad" + resultado inline en la misma fila.
 - Selector de ubicación en home: modo auto (GPS) y manual (autocompletado callejero Madrid), pill con label + Cambiar + X cuando hay ubicación activa.
 - Endpoint `GET /api/public/callejero/autocomplete?q=` operativo: proxy Nominatim con bbox Madrid, caché 1h, UTF-8 correcto.
+- Motor operativo de horarios corregido para overrides recurrentes (incluido `fines de semana y festivos`) con timezone Madrid coherente en `is_open_now`, `today_summary` y `next_change_at`.
+- Caso real validado en preview: Sala de estudio Sanchinarro (Hortaleza) pasa de `Cerrada` a `Abierta` en fin de semana cuando aplica `8:30-22:00`, sin divergencia entre listado y detalle.
+- Home: bloque `Top 3 opciones para ti` migrado a carrusel real (Embla) alimentado por Top 3 real de API, con cards compactas, CTA y soporte responsive/dark mode.
 
 # Reglas de ejecución continua
 

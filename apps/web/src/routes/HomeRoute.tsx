@@ -1,10 +1,17 @@
-import { ArrowRight, BookOpen, Check, Clock, LayoutGrid, List, Loader2, MapPin, Moon, Navigation, Sun, Users, X } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Clock, Loader2, MapPin, Moon, Navigation, Sun, Users, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { BackgroundIllustration } from "../components/BackgroundIllustration";
-import { LibraryCard } from "../components/LibraryCard";
+import { MotionCarousel } from "../components/animate-ui/components/community/motion-carousel";
 import { cn } from "../lib/cn";
-import { type CallejeroSuggestion, defaultPublicFilters, fetchCallejeroSuggestions, usePublicCatalog } from "../lib/publicCatalog";
+import { type EmblaOptionsType } from "embla-carousel";
+import {
+  type CallejeroSuggestion,
+  type PublicCenterPresentation,
+  defaultPublicFilters,
+  fetchCallejeroSuggestions,
+  usePublicCatalog,
+} from "../lib/publicCatalog";
 import { useTheme } from "../lib/theme";
 import { useUserLocation } from "../lib/userLocation";
 
@@ -255,7 +262,6 @@ function LocationDialog({
 }
 
 export function HomeRoute() {
-  const [viewMode, setViewMode] = useState<"card" | "list">("card");
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const { location, requestLocation, requesting, error: locationError, clearLocation, setManualLocation } = useUserLocation();
   const { theme, toggleTheme } = useTheme();
@@ -270,6 +276,7 @@ export function HomeRoute() {
     () => topItems.map((item, index) => ({ ...item, rankingPosition: index + 1 })),
     [topItems],
   );
+  const carouselOptions = useMemo<EmblaOptionsType>(() => ({ loop: true, align: "start" }), []);
 
   const locationLabel = location?.label
     ? location.label.split(",").slice(0, 2).join(",").trim()
@@ -294,32 +301,6 @@ export function HomeRoute() {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center rounded-2xl border border-border bg-card p-1 shadow-sm">
-                <button
-                  className={cn(
-                    "rounded-xl px-2.5 py-2 transition",
-                    viewMode === "card"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground",
-                  )}
-                  onClick={() => setViewMode("card")}
-                  type="button"
-                >
-                  <LayoutGrid className="size-3.5" />
-                </button>
-                <button
-                  className={cn(
-                    "rounded-xl px-2.5 py-2 transition",
-                    viewMode === "list"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground",
-                  )}
-                  onClick={() => setViewMode("list")}
-                  type="button"
-                >
-                  <List className="size-3.5" />
-                </button>
-              </div>
               <button
                 className="rounded-2xl border border-border bg-card p-2.5 text-muted-foreground shadow-sm transition hover:text-foreground"
                 onClick={toggleTheme}
@@ -455,14 +436,70 @@ export function HomeRoute() {
               {error}
             </div>
           ) : (
-            <div className="space-y-3.5">
-              {topRanked.map((center) => (
-                <LibraryCard center={center} key={center.id} viewMode={viewMode} />
-              ))}
-            </div>
+            <MotionCarousel
+              options={carouselOptions}
+              renderSlide={(center) => <TopOptionSlide center={center} />}
+              slides={topRanked}
+            />
           )}
         </section>
       </div>
     </div>
+  );
+}
+
+function TopOptionSlide({ center }: { center: PublicCenterPresentation }) {
+  const mainTransport = center.transportOptions[0];
+
+  return (
+    <article className="h-full rounded-[22px] border border-border bg-card p-4 shadow-[0_18px_36px_rgba(15,23,42,0.08)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            Top {center.rankingPosition}
+          </p>
+          <h3 className="mt-1 line-clamp-2 text-[15px] font-semibold leading-tight text-foreground">
+            {center.name}
+          </h3>
+        </div>
+        <span
+          className={cn(
+            "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.06em]",
+            center.headlineStatus === "Abierta"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-600/40 dark:bg-emerald-950/45 dark:text-emerald-200"
+              : center.headlineStatus === "Cerrada"
+                ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-600/40 dark:bg-rose-950/45 dark:text-rose-200"
+                : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-600/40 dark:bg-amber-950/45 dark:text-amber-200",
+          )}
+        >
+          {center.headlineStatus}
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-2 text-[12px] text-muted-foreground">
+        <p className="line-clamp-1">{center.addressLine}</p>
+        <p className="line-clamp-1">{center.scheduleLabel}</p>
+        <p className="line-clamp-1">
+          {mainTransport
+            ? `${mainTransport.title}: ${mainTransport.destinationNodeName ?? "Conexion cercana"}`
+            : "Sin transporte destacado"}
+        </p>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2">
+        <Link
+          className="inline-flex h-9 items-center justify-center rounded-xl bg-primary px-3 text-[12px] font-medium text-primary-foreground transition hover:opacity-90"
+          to={`/centros/${center.slug}`}
+        >
+          Ver detalle
+        </Link>
+        <Link
+          className="inline-flex h-9 items-center justify-center rounded-xl border border-border px-3 text-[12px] font-medium text-foreground transition hover:bg-muted/55"
+          to="/listado"
+        >
+          Ir al listado
+        </Link>
+      </div>
+    </article>
   );
 }
