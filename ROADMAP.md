@@ -1,7 +1,7 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-19`
-- Estado del proyecto: `preview funcional estable`, `Bloques 1 y 2` completados, no produccion.
+- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2 y 2.5` completados, `Bloque 3` en curso, no produccion.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
@@ -23,6 +23,7 @@
 - Reclasificacion inicial de procedencia ya aplicada para `wifi`, `aforo`, flags de detalle y payloads visibles.
 - Reingesta real de centros ejecutada sobre preview con 7 descartes persistidos y auditables.
 - Normalizacion de centros validada sin slugs duplicados y sin espacios al aire libre retenidos.
+- Parser de horarios mejorado para conservar contexto de dias y horas separados y extraer notas especiales basicas en preview.
 - Home, listado, detalle basico y modal de filtros visibles en preview.
 - Dark mode base operativo con persistencia de preferencia.
 - Logging estructurado basico en Worker e ingesta.
@@ -67,6 +68,19 @@
   * [x] Todos los centros publicados en preview salen de una normalización consistente, sin espacios al aire libre, con slugs estables y con campos visibles clasificados honestamente.
   * [x] Riesgos o dependencias si aplica
   * [x] Dependencia del Bloque 1 resuelta; este bloque ha actualizado conteos y reingesta sin romper preview.
+
+* [x] Bloque 2.5. Corrección estructural inmediata
+
+  * [x] Objetivo del bloque
+  * [x] Corregir el modelo persistido de transporte para evitar colisiones en `center_transport_nodes`.
+  * [x] Corregir `GET /api/public/filters` para que los conteos se calculen del conjunto real de resultados, no de `payload.items` limitado.
+  * [x] Alinear la UI de filtros con los filtros realmente soportados por la API.
+  * [x] Eliminar o desactivar visualmente cualquier filtro decorativo o no funcional.
+  * [x] Verificar que preview sigue estable tras estas correcciones.
+  * [x] Criterio de cierre del bloque
+  * [x] El modelo de transporte persistido no produce colisiones de nodos entre centros, los filtros devuelven conteos reales y la UI solo muestra controles funcionales.
+  * [x] Riesgos o dependencias si aplica
+  * [x] Depende de los Bloques 1 y 2; obliga a limpiar la base de datos y la UI antes de continuar con Horarios y Movilidad.
 
 * [ ] Bloque 3. Horarios robustos y revisión manual
 

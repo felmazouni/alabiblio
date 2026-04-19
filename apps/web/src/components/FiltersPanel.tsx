@@ -1,78 +1,151 @@
-import { useEffect, useState } from "react";
-import { Bike, Bus, Calendar, Car, Check, Clock, MapPin, RotateCcw, SlidersHorizontal, Star, Volume2, Plug, Wifi, Thermometer, Sparkles, Lightbulb, Train, X } from "lucide-react";
+import type { PublicFiltersResponse, TransportMode } from "@alabiblio/contracts";
+import {
+  Bike,
+  Bus,
+  Calendar,
+  Car,
+  ChevronDown,
+  Clock,
+  MapPin,
+  RotateCcw,
+  SlidersHorizontal,
+  Train,
+  Wifi,
+  X,
+} from "lucide-react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ElementType,
+  type ReactNode,
+} from "react";
 import { cn } from "../lib/cn";
+import {
+  defaultPublicFilters,
+  type PublicFiltersState,
+} from "../lib/publicCatalog";
 
-export interface PublicFilters {
-  query: string;
-  openNow: boolean;
-  onlyLibraries: boolean;
-  onlyStudyRooms: boolean;
-  withWifi: boolean;
-  accessible: boolean;
+type TabId = "general" | "horarios";
+
+function transportIcon(mode: TransportMode) {
+  switch (mode) {
+    case "metro":
+    case "cercanias":
+    case "metro_ligero":
+      return Train;
+    case "emt_bus":
+      return Bus;
+    case "bicimad":
+      return Bike;
+    case "car":
+      return Car;
+  }
 }
 
-export const defaultPublicFilters: PublicFilters = {
-  query: "",
-  openNow: false,
-  onlyLibraries: false,
-  onlyStudyRooms: false,
-  withWifi: false,
-  accessible: false,
-};
+function transportLabel(mode: TransportMode) {
+  switch (mode) {
+    case "metro":
+      return "Metro";
+    case "cercanias":
+      return "Cercanias";
+    case "metro_ligero":
+      return "Metro ligero";
+    case "emt_bus":
+      return "Bus";
+    case "bicimad":
+      return "Bici";
+    case "car":
+      return "Coche";
+  }
+}
 
-type TabId = "general" | "horarios" | "calidad";
-
-function ToggleChip({
-  selected,
-  onClick,
+function TabButton({
+  active,
   children,
   icon: Icon,
-  size = "default",
+  onClick,
+  disabled = false,
 }: {
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  icon?: React.ElementType;
-  size?: "default" | "sm";
+  active: boolean;
+  children: ReactNode;
+  icon: ElementType;
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       className={cn(
-        "inline-flex items-center gap-2 rounded-full font-medium transition-all border",
-        size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm",
-        selected
-          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-          : "bg-card text-foreground border-border hover:border-primary/50 hover:bg-muted/50",
+        "inline-flex h-9 items-center justify-center gap-2 rounded-2xl px-4 text-[14px] font-medium transition",
+        active
+          ? "bg-card text-foreground shadow-sm"
+          : "text-foreground/80 hover:bg-card/50",
+        disabled && "cursor-not-allowed text-muted-foreground/60 hover:bg-transparent",
+      )}
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
+      <Icon className="size-4" />
+      {children}
+    </button>
+  );
+}
+
+function ToggleChip({
+  active,
+  children,
+  icon: Icon,
+  onClick,
+}: {
+  active: boolean;
+  children: ReactNode;
+  icon?: ElementType;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={cn(
+        "inline-flex h-10 items-center gap-2 rounded-full border px-4 text-[13px] font-medium transition",
+        active
+          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+          : "border-border bg-card text-foreground hover:border-primary/35 hover:bg-muted/35",
       )}
       onClick={onClick}
       type="button"
     >
-      {Icon ? <Icon className={size === "sm" ? "size-3" : "size-4"} /> : null}
+      {Icon ? <Icon className="size-4" /> : null}
       {children}
-      {selected ? <Check className={size === "sm" ? "size-3" : "size-3.5"} /> : null}
     </button>
   );
 }
 
 function Switch({
   checked,
+  disabled,
   onCheckedChange,
 }: {
   checked: boolean;
+  disabled?: boolean;
   onCheckedChange: (value: boolean) => void;
 }) {
   return (
     <button
       className={cn(
         "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-        checked ? "bg-primary" : "bg-input",
+        disabled
+          ? "cursor-not-allowed bg-input opacity-60"
+          : checked
+            ? "bg-primary"
+            : "bg-input",
       )}
+      disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       type="button"
     >
       <span
         className={cn(
-          "pointer-events-none inline-block size-5 rounded-full bg-card shadow-sm transition-transform",
+          "inline-block size-5 rounded-full bg-card shadow-sm transition-transform",
           checked ? "translate-x-5" : "translate-x-0.5",
         )}
       />
@@ -80,33 +153,72 @@ function Switch({
   );
 }
 
-function FilterSection({
+function SettingCard({
+  icon: Icon,
   title,
-  description,
-  children,
+  subtitle,
+  checked,
+  disabled = false,
+  onCheckedChange,
 }: {
+  icon: ElementType;
   title: string;
-  description?: string;
-  children: React.ReactNode;
+  subtitle: string;
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange: (value: boolean) => void;
 }) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h4 className="text-sm font-semibold text-foreground">{title}</h4>
-        {description ? <p className="text-xs text-muted-foreground mt-0.5">{description}</p> : null}
+    <div className="flex items-center justify-between rounded-[18px] border border-border bg-card px-4 py-4">
+      <div className="flex items-center gap-3">
+        <div className="flex size-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+          <Icon className="size-5" />
+        </div>
+        <div>
+          <p className="text-[14px] font-medium text-foreground">{title}</p>
+          <p className="text-[12px] text-muted-foreground">{subtitle}</p>
+        </div>
       </div>
-      {children}
+      <Switch checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
     </div>
+  );
+}
+
+function SelectLike({
+  value,
+  disabled = false,
+}: {
+  value: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      className={cn(
+        "flex h-11 w-full items-center justify-between rounded-xl border border-border bg-card px-4 text-[14px] text-foreground",
+        disabled && "cursor-not-allowed opacity-70",
+      )}
+      disabled={disabled}
+      type="button"
+    >
+      <span>{value}</span>
+      <ChevronDown className="size-4 text-muted-foreground" />
+    </button>
   );
 }
 
 export function FiltersPanel({
   filters,
+  forceOpen = false,
+  metadata,
+  loading,
   onChange,
   resultCount,
 }: {
-  filters: PublicFilters;
-  onChange: (filters: PublicFilters) => void;
+  filters: PublicFiltersState;
+  forceOpen?: boolean;
+  metadata: PublicFiltersResponse | null;
+  loading: boolean;
+  onChange: (filters: PublicFiltersState) => void;
   resultCount: number;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -119,16 +231,29 @@ export function FiltersPanel({
     }
   }, [filters, isOpen]);
 
-  const activeFiltersCount = [
-    filters.openNow,
-    filters.onlyLibraries,
-    filters.onlyStudyRooms,
-    filters.withWifi,
-    filters.accessible,
-  ].filter(Boolean).length;
+  useEffect(() => {
+    if (forceOpen) {
+      setIsOpen(true);
+    }
+  }, [forceOpen]);
 
-  const updateLocal = (updates: Partial<PublicFilters>) => {
-    setLocalFilters((current) => ({ ...current, ...updates }));
+  const activeFiltersCount = useMemo(
+    () =>
+      [
+        filters.kinds.length > 0,
+        filters.transportModes.length > 0,
+        filters.openNow,
+        filters.accessible,
+        filters.withWifi,
+        filters.withCapacity,
+        metadata?.canUseDistanceFilter &&
+          filters.radiusMeters !== defaultPublicFilters.radiusMeters,
+      ].filter(Boolean).length,
+    [filters, metadata?.canUseDistanceFilter],
+  );
+
+  const handleClear = () => {
+    setLocalFilters(defaultPublicFilters);
   };
 
   const handleApply = () => {
@@ -136,321 +261,228 @@ export function FiltersPanel({
     setIsOpen(false);
   };
 
-  const handleReset = () => {
-    setLocalFilters(defaultPublicFilters);
+  const toggleKind = (kind: "library" | "study_room") => {
+    setLocalFilters((current) => ({
+      ...current,
+      kinds: current.kinds.includes(kind)
+        ? current.kinds.filter((value) => value !== kind)
+        : [...current.kinds, kind],
+    }));
   };
 
-  const transportOptions = [
-    { key: "metro", label: "Metro", icon: Train },
-    { key: "bus", label: "Bus", icon: Bus },
-    { key: "bike", label: "Bici", icon: Bike },
-    { key: "car", label: "Coche", icon: Car },
-  ] as const;
-
-  const aspectOptions = [
-    { key: "silencio", label: "Silencio", icon: Volume2 },
-    { key: "enchufes", label: "Enchufes", icon: Plug },
-    { key: "wifi", label: "WiFi", icon: Wifi },
-    { key: "temperatura", label: "Temperatura", icon: Thermometer },
-    { key: "limpieza", label: "Limpieza", icon: Sparkles },
-    { key: "iluminacion", label: "Iluminacion", icon: Lightbulb },
-  ] as const;
+  const toggleTransportMode = (mode: TransportMode) => {
+    setLocalFilters((current) => ({
+      ...current,
+      transportModes: current.transportModes.includes(mode)
+        ? current.transportModes.filter((value) => value !== mode)
+        : [...current.transportModes, mode],
+    }));
+  };
 
   return (
     <>
       <button
-        className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium h-9 px-4 py-2 border border-border bg-card text-foreground hover:bg-muted/50"
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 text-[13px] font-medium text-foreground shadow-sm transition hover:bg-muted/55"
         onClick={() => setIsOpen(true)}
         type="button"
       >
         <SlidersHorizontal className="size-4" />
-        <span className="hidden sm:inline">Filtros</span>
+        Filtros
         {activeFiltersCount > 0 ? (
-          <span className="ml-1 flex size-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
+          <span className="inline-flex size-5 items-center justify-center rounded-full bg-primary text-[11px] text-primary-foreground">
             {activeFiltersCount}
           </span>
         ) : null}
       </button>
 
       {isOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
-          <div className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col p-0 w-full rounded-2xl border border-border bg-card shadow-2xl">
-            <div className="px-6 pt-6 pb-4 border-b border-border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <SlidersHorizontal className="size-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Filtros avanzados</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Personaliza tu busqueda para encontrar el espacio perfecto
-                    </p>
-                  </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/36 p-4">
+          <div className="flex max-h-[86vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[22px] border border-border bg-card shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+            <div className="flex items-start justify-between border-b border-border px-5 py-4">
+              <div className="flex items-start gap-4">
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-accent text-primary">
+                  <SlidersHorizontal className="size-5" />
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm"
-                    onClick={handleReset}
-                    type="button"
-                  >
-                    <RotateCcw className="size-4" />
-                    Limpiar
-                  </button>
-                  <button className="text-muted-foreground hover:text-foreground" onClick={() => setIsOpen(false)} type="button">
-                    <X className="size-5" />
-                  </button>
+                <div>
+                  <h3 className="text-[1.6rem] font-semibold leading-none text-foreground">
+                    Filtros avanzados
+                  </h3>
+                  <p className="mt-1.5 text-[13px] text-muted-foreground">
+                    Personaliza tu busqueda para encontrar el espacio perfecto
+                  </p>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-5">
+                <button
+                  className="inline-flex items-center gap-2 text-[14px] text-muted-foreground transition hover:text-foreground"
+                  onClick={handleClear}
+                  type="button"
+                >
+                  <RotateCcw className="size-4" />
+                  Limpiar
+                </button>
+                <button
+                  className="text-muted-foreground transition hover:text-foreground"
+                  onClick={() => setIsOpen(false)}
+                  type="button"
+                >
+                  <X className="size-5" />
+                </button>
               </div>
             </div>
 
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="mx-6 mt-4 grid grid-cols-3 rounded-xl bg-muted p-1">
-                <button
-                  className={cn(
-                    "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                    activeTab === "general" ? "bg-card shadow-sm" : "hover:bg-transparent",
-                  )}
-                  onClick={() => setActiveTab("general")}
-                  type="button"
-                >
-                  <MapPin className="size-4" />
+            <div className="px-5 pt-4">
+              <div className="grid grid-cols-2 rounded-2xl bg-muted p-1">
+                <TabButton active={activeTab === "general"} icon={MapPin} onClick={() => setActiveTab("general")}> 
                   General
-                </button>
-                <button
-                  className={cn(
-                    "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                    activeTab === "horarios" ? "bg-card shadow-sm" : "hover:bg-transparent",
-                  )}
-                  onClick={() => setActiveTab("horarios")}
-                  type="button"
-                >
-                  <Calendar className="size-4" />
+                </TabButton>
+                <TabButton active={activeTab === "horarios"} icon={Calendar} onClick={() => setActiveTab("horarios")}> 
                   Horarios
-                </button>
-                <button
-                  className={cn(
-                    "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all",
-                    activeTab === "calidad" ? "bg-card shadow-sm" : "hover:bg-transparent",
-                  )}
-                  onClick={() => setActiveTab("calidad")}
-                  type="button"
-                >
-                  <Star className="size-4" />
-                  Calidad
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto px-6 py-4">
-                {activeTab === "general" ? (
-                  <div className="space-y-6">
-                    <FilterSection title="Distancia maxima" description="Define el radio de busqueda desde tu ubicacion">
-                      <div className="space-y-4 p-4 rounded-xl bg-muted/30 border border-border">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground flex items-center gap-2">
-                            <MapPin className="size-4" />
-                            Radio de busqueda
-                          </span>
-                          <span className="text-lg font-bold text-primary">5 km</span>
-                        </div>
-                        <div className="space-y-4">
-                          <div className="h-1.5 rounded-full bg-input">
-                            <div className="h-1.5 w-1/2 rounded-full bg-primary relative">
-                              <span className="absolute -right-2 -top-1.5 size-4 rounded-full bg-primary" />
-                            </div>
-                          </div>
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>500m</span>
-                            <span>5 km</span>
-                            <span>10 km</span>
-                          </div>
-                        </div>
-                      </div>
-                    </FilterSection>
-
-                    <FilterSection title="Tipo de espacio" description="Selecciona el tipo de establecimiento">
-                      <div className="flex flex-wrap gap-2">
-                        <ToggleChip
-                          onClick={() => updateLocal({ onlyLibraries: !localFilters.onlyLibraries, onlyStudyRooms: localFilters.onlyLibraries ? localFilters.onlyStudyRooms : false })}
-                          selected={localFilters.onlyLibraries}
-                        >
-                          Biblioteca
-                        </ToggleChip>
-                        <ToggleChip
-                          onClick={() => updateLocal({ onlyStudyRooms: !localFilters.onlyStudyRooms, onlyLibraries: localFilters.onlyStudyRooms ? localFilters.onlyLibraries : false })}
-                          selected={localFilters.onlyStudyRooms}
-                        >
-                          Sala de Estudio
-                        </ToggleChip>
-                      </div>
-                    </FilterSection>
-
-                    <FilterSection title="Transporte disponible" description="Filtra por opciones de transporte cercanas">
-                      <div className="flex flex-wrap gap-2">
-                        {transportOptions.map(({ key, label, icon }) => (
-                          <ToggleChip key={key} icon={icon} onClick={() => undefined} selected={false}>
-                            {label}
-                          </ToggleChip>
-                        ))}
-                      </div>
-                    </FilterSection>
-                  </div>
-                ) : null}
-
-                {activeTab === "horarios" ? (
-                  <div className="space-y-6">
-                    <FilterSection title="Estado actual">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div
-                          className={cn(
-                            "flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer",
-                            localFilters.openNow ? "bg-primary/5 border-primary" : "bg-card border-border hover:border-primary/50",
-                          )}
-                          onClick={() => updateLocal({ openNow: !localFilters.openNow })}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={cn("size-10 rounded-lg flex items-center justify-center", localFilters.openNow ? "bg-primary/10" : "bg-muted")}>
-                              <Clock className={cn("size-5", localFilters.openNow ? "text-primary" : "text-muted-foreground")} />
-                            </div>
-                            <div>
-                              <p className="font-medium">Abierta ahora</p>
-                              <p className="text-xs text-muted-foreground">Solo espacios abiertos</p>
-                            </div>
-                          </div>
-                          <Switch checked={localFilters.openNow} onCheckedChange={(value) => updateLocal({ openNow: value })} />
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 rounded-xl border bg-card border-border">
-                          <div className="flex items-center gap-3">
-                            <div className="size-10 rounded-lg flex items-center justify-center bg-muted">
-                              <span className="text-sm font-bold text-muted-foreground">24h</span>
-                            </div>
-                            <div>
-                              <p className="font-medium">Abierta 24h</p>
-                              <p className="text-xs text-muted-foreground">Horario ininterrumpido</p>
-                            </div>
-                          </div>
-                          <Switch checked={false} onCheckedChange={() => undefined} />
-                        </div>
-                      </div>
-                    </FilterSection>
-
-                    <FilterSection title="Horario de fin de semana" description="Filtra por disponibilidad en sabados y domingos">
-                      <div className="p-4 rounded-xl border bg-card border-border">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="size-10 rounded-lg flex items-center justify-center bg-muted">
-                              <Calendar className="size-5 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <p className="font-medium">Abierta fines de semana</p>
-                              <p className="text-xs text-muted-foreground">Filtrar por dias especificos</p>
-                            </div>
-                          </div>
-                          <Switch checked={false} onCheckedChange={() => undefined} />
-                        </div>
-                      </div>
-                    </FilterSection>
-
-                    <FilterSection title="Hora de cierre minima" description="Encuentra espacios abiertos hasta cierta hora">
-                      <div className="p-4 rounded-xl bg-card border border-border">
-                        <div className="flex items-center gap-4">
-                          <div className="size-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                            <Clock className="size-5 text-muted-foreground" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium mb-2">Abierta al menos hasta</p>
-                            <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground">
-                              <span>Cualquier hora</span>
-                              <span className="text-muted-foreground">⌄</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </FilterSection>
-                  </div>
-                ) : null}
-
-                {activeTab === "calidad" ? (
-                  <div className="space-y-6">
-                    <FilterSection title="Valoracion general" description="Puntuacion minima de los usuarios">
-                      <div className="p-4 rounded-xl bg-muted/30 border border-border">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Star className="size-4 text-amber-500 fill-amber-500" />
-                          <span className="text-sm font-medium">Cualquier valoracion</span>
-                        </div>
-                        <div className="flex gap-2">
-                          {[
-                            { label: "Todas", selected: true },
-                            { label: "3 ★", selected: false },
-                            { label: "3.5 ★", selected: false },
-                            { label: "4 ★", selected: false },
-                            { label: "4.5 ★", selected: false },
-                          ].map(({ label, selected }) => (
-                            <button
-                              className={cn(
-                                "flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border transition-all",
-                                selected
-                                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                  : "bg-card text-foreground border-border hover:border-primary/50",
-                              )}
-                              key={label}
-                              type="button"
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </FilterSection>
-
-                    <FilterSection title="Requisitos por aspecto" description="Establece puntuaciones minimas por categoria">
-                      <div className="grid gap-2">
-                        {aspectOptions.map(({ key, label, icon: Icon }) => (
-                          <div key={key} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/30 transition-all">
-                            <div className="size-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                              <Icon className="size-4 text-muted-foreground" />
-                            </div>
-                            <span className="text-sm font-medium flex-1">{label}</span>
-                            <div className="flex gap-1.5">
-                              {["-", "3+", "4+", "5+"].map((rating, index) => (
-                                <button
-                                  className={cn(
-                                    "size-9 rounded-lg text-xs font-semibold border transition-all",
-                                    index === 0
-                                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                      : "bg-muted/50 text-foreground border-transparent hover:border-primary/50",
-                                  )}
-                                  key={rating}
-                                  type="button"
-                                >
-                                  {rating}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </FilterSection>
-                  </div>
-                ) : null}
+                </TabButton>
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-border bg-muted/30">
-              <p className="text-sm text-center text-muted-foreground mb-3">
-                <span className="font-semibold text-foreground">{resultCount}</span> resultados encontrados
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {activeTab === "general" ? (
+                <div className="space-y-6">
+                  <section>
+                    <h4 className="text-[1rem] font-semibold text-foreground">
+                      Distancia maxima
+                    </h4>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Define el radio de busqueda desde tu ubicacion
+                    </p>
+
+                    <div className="mt-3 rounded-[18px] border border-border bg-card px-4 py-3.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-2 text-[14px] text-muted-foreground">
+                          <MapPin className="size-4" />
+                          Radio de busqueda
+                        </span>
+                        <span className="text-[1.7rem] font-bold leading-none text-primary">
+                          {Math.round(localFilters.radiusMeters / 1000)} km
+                        </span>
+                      </div>
+
+                      <div className="mt-4">
+                        <input
+                          className="w-full accent-primary"
+                          disabled={!metadata?.canUseDistanceFilter}
+                          max={10000}
+                          min={500}
+                          onChange={(event) =>
+                            setLocalFilters((current) => ({
+                              ...current,
+                              radiusMeters: Number(event.target.value),
+                            }))
+                          }
+                          step={250}
+                          type="range"
+                          value={localFilters.radiusMeters}
+                        />
+                        <div className="mt-3 flex justify-between text-[12px] text-muted-foreground">
+                          <span>500m</span>
+                          <span>5 km</span>
+                          <span>10 km</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="text-[1rem] font-semibold text-foreground">
+                      Tipo de espacio
+                    </h4>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Selecciona el tipo de establecimiento
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-2.5">
+                      <ToggleChip
+                        active={localFilters.kinds.includes("library")}
+                        onClick={() => toggleKind("library")}
+                      >
+                        Biblioteca
+                      </ToggleChip>
+                      <ToggleChip
+                        active={localFilters.kinds.includes("study_room")}
+                        onClick={() => toggleKind("study_room")}
+                      >
+                        Sala de Estudio
+                      </ToggleChip>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="text-[1rem] font-semibold text-foreground">
+                      Transporte disponible
+                    </h4>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Filtra por opciones de transporte cercanas
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-2.5">
+                      {(metadata?.availableTransportModes ?? []).map((option) => {
+                        const Icon = transportIcon(option.mode);
+                        return (
+                          <ToggleChip
+                            active={localFilters.transportModes.includes(option.mode)}
+                            icon={Icon}
+                            key={option.mode}
+                            onClick={() => toggleTransportMode(option.mode)}
+                          >
+                            {transportLabel(option.mode)}
+                          </ToggleChip>
+                        );
+                      })}
+                    </div>
+                  </section>
+                </div>
+              ) : null}
+
+              {activeTab === "horarios" ? (
+                <div className="space-y-6">
+                  <section>
+                    <h4 className="text-[1rem] font-semibold text-foreground">
+                      Estado actual
+                    </h4>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Filtra espacios que ahora mismo están abiertos.
+                    </p>
+                    <div className="mt-4">
+                      <SettingCard
+                        checked={localFilters.openNow}
+                        icon={Clock}
+                        onCheckedChange={(value) =>
+                          setLocalFilters((current) => ({ ...current, openNow: value }))
+                        }
+                        subtitle="Solo espacios abiertos"
+                        title="Abierta ahora"
+                      />
+                    </div>
+                  </section>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="border-t border-border bg-muted/35 px-5 py-4">
+              <p className="mb-3 text-center text-[13px] text-muted-foreground">
+                <span className="font-semibold text-foreground">
+                  {loading ? "..." : resultCount}
+                </span>{" "}
+                resultados encontrados
               </p>
               <div className="flex gap-3">
                 <button
-                  className="flex-1 inline-flex items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium"
+                  className="flex-1 rounded-2xl border border-border bg-card px-4 py-3 text-[14px] font-medium text-foreground transition hover:bg-muted/40"
                   onClick={() => setIsOpen(false)}
                   type="button"
                 >
                   Cancelar
                 </button>
                 <button
-                  className="flex-1 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                  className="flex-1 rounded-2xl bg-primary px-4 py-3 text-[14px] font-medium text-primary-foreground transition hover:opacity-90"
                   onClick={handleApply}
                   type="button"
                 >

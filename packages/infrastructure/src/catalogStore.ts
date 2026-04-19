@@ -470,7 +470,7 @@ const TRANSPORT_ORDER: Record<TransportMode, number> = {
   car: 6,
 };
 
-const TRANSPORT_SNAPSHOT_VERSION = "2026-04-18.v2";
+const TRANSPORT_SNAPSHOT_VERSION = "2026-04-19.v1";
 
 const transportResolutionCache = new Map<string, UserResolvedTransportCacheEntry>();
 const inflightTransportResolutions = new Map<string, Promise<UserResolvedTransportCacheEntry>>();
@@ -515,6 +515,10 @@ function ttlSecondsForOrigin(origin: CenterCatalogItem["ratingOrigin"], mode: Tr
   }
 
   return mode === "car" ? 604800 : 86400;
+}
+
+function transportNodeRowId(centerId: string, option: StoredTransportOption): string {
+  return `${centerId}:${option.destinationNodeId ?? option.optionId}`;
 }
 
 function inferWifi(servicesText: string | null, transportText: string | null): boolean {
@@ -1243,21 +1247,25 @@ function buildSnapshotStatements(
 
   for (const option of activeOptions) {
     if (option.destinationNodeName) {
+      const nodeId = transportNodeRowId(center.id, option);
+      const nodeDestinationId = option.destinationNodeId ?? option.optionId;
+
       statements.push(
         database
           .prepare(
             `INSERT OR REPLACE INTO center_transport_nodes (
-              id, center_id, mode, source_kind, external_node_id, node_role, node_name, node_label,
+              id, center_id, mode, source_kind, external_node_id, destination_node_id, node_role, node_name, node_label,
               latitude, longitude, line_codes_json, walking_distance_m_to_center, walking_time_min_to_center,
               relevance_score, display_priority, cache_ttl_seconds, fetched_at, is_active
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
-            option.destinationNodeId ?? option.optionId,
+            nodeId,
             center.id,
             option.mode,
             option.dataOrigin,
             option.destinationNodeId,
+            nodeDestinationId,
             "destination",
             option.destinationNodeName,
             option.destinationNodeLabel,
@@ -1356,6 +1364,15 @@ async function countTransportSnapshots(database: D1LikeDatabase): Promise<number
   return row?.total ?? 0;
 }
 
+async function countOutdatedTransportSnapshots(database: D1LikeDatabase): Promise<number> {
+  const row = await database
+    .prepare("SELECT COUNT(*) AS total FROM center_transport_snapshots WHERE snapshot_version != ?")
+    .bind(TRANSPORT_SNAPSHOT_VERSION)
+    .first<{ total: number }>();
+
+  return row?.total ?? 0;
+}
+
 async function replaceTransportSnapshots(
   database: D1LikeDatabase,
   centers: BaseCenterRecord[],
@@ -1442,7 +1459,7 @@ async function readTransportSnapshotsForCenters(
           options.fetched_at, options.cache_ttl_seconds, options.is_active,
           nodes.latitude AS destination_latitude, nodes.longitude AS destination_longitude, nodes.node_label AS destination_node_label
         FROM center_transport_options AS options
-        LEFT JOIN center_transport_nodes AS nodes ON nodes.id = options.destination_node_id
+        LEFT JOIN center_transport_nodes AS nodes ON nodes.center_id = options.center_id AND nodes.destination_node_id = options.destination_node_id
         WHERE options.center_id IN (${placeholders}) AND options.is_active = 1
         ORDER BY options.center_id ASC, options.display_priority ASC, options.relevance_score DESC`,
       )
@@ -2196,25 +2213,45 @@ export async function getFiltersFromStore(
   inputQuery?: PublicCatalogQuery,
 ): Promise<PublicFiltersResponse> {
   const query = buildAppliedQuery(inputQuery);
-  const payload = await getCatalogFromStore(options, query);
-  const items = payload.items;
+  const { sourceMode, items } = await loadBaseCenters(options);
+  const database = asDatabase(options.database);
+  const transportSnapshots =
+    database && sourceMode === "d1"
+      ? await readTransportSnapshotsForCenters(
+          database,
+          items.map((item) => item.id),
+        )
+      : new Map<string, CenterTransportSnapshot>();
+
+  const enriched = await Promise.all(
+    items.map((item) =>
+      enrichCenterForPublic(
+        item,
+        query,
+        "catalog",
+        transportSnapshots.get(item.id) ?? null,
+      ),
+    ),
+  );
+
+  const matching = enriched.filter((item) => matchesQuery(item, query));
 
   return {
     generatedAt: new Date().toISOString(),
-    totalResults: payload.total,
-    ratingsAvailable: items.some(
+    totalResults: matching.length,
+    ratingsAvailable: matching.some(
       (item) => item.ratingOrigin !== "not_available",
     ),
     availableKinds: [
       {
         kind: "library",
         label: kindLabel("library"),
-        count: items.filter((item) => item.kind === "library").length,
+        count: matching.filter((item) => item.kind === "library").length,
       },
       {
         kind: "study_room",
         label: kindLabel("study_room"),
-        count: items.filter((item) => item.kind === "study_room").length,
+        count: matching.filter((item) => item.kind === "study_room").length,
       },
     ],
     availableTransportModes: ([
@@ -2227,7 +2264,7 @@ export async function getFiltersFromStore(
     ] as TransportMode[]).map((mode) => ({
       mode,
       label: labelForTransportMode(mode),
-      count: items.filter((item) => item.transportOptions.some((option) => option.mode === mode)).length,
+      count: matching.filter((item) => item.transportOptions.some((option) => option.mode === mode)).length,
     })),
     availableSortModes: ([
       "relevance",
