@@ -359,6 +359,7 @@ const SCHEMA_STATEMENTS = [
     mode TEXT NOT NULL,
     source_kind TEXT NOT NULL,
     external_node_id TEXT,
+    destination_node_id TEXT,
     node_role TEXT NOT NULL,
     node_name TEXT NOT NULL,
     node_label TEXT,
