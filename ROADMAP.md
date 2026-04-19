@@ -1,12 +1,12 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-19`
-- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5, 2.6, 3 y 4` completados, `Bloque 5` en curso, no produccion.
+- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5, 2.6, 3 y 4` completados, `Bloque 5` en curso con cierre formal del sub-bloque de correccion global del motor operativo, no produccion.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-- Version desplegada: `77a070f2`
+- Version desplegada: `f4224a04`
 
 # Lo que funciona ya de verdad
 
@@ -44,6 +44,26 @@
 - Motor operativo de horarios corregido para overrides recurrentes (incluido `fines de semana y festivos`) con timezone Madrid coherente en `is_open_now`, `today_summary` y `next_change_at`.
 - Caso real validado en preview: Sala de estudio Sanchinarro (Hortaleza) pasa de `Cerrada` a `Abierta` en fin de semana cuando aplica `8:30-22:00`, sin divergencia entre listado y detalle.
 - Home: bloque `Top 3 opciones para ti` migrado a carrusel real (Embla) alimentado por Top 3 real de API, con cards compactas, CTA y soporte responsive/dark mode.
+- Auditoria global de estado operativo ejecutada sobre `115/115` centros con resultado final `0 inconsistencias`.
+- Convergencia validada entre `GET /api/public/catalog` y `GET /api/public/centers/:slug` para estado operativo (`is_open_now`, `today_summary`, `next_change_at`, `schedule_label`) sin divergencias sistémicas.
+
+## Cierre formal trazable. Correccion global del motor operativo (2026-04-19)
+
+- Alcance auditado: `115/115` centros publicados en preview.
+- Resultado final: `0 inconsistencias`.
+- Causas raiz detectadas:
+  - deriva de esquema D1 (`schedule_needs_review` ausente en algunos entornos),
+  - saturacion de CPU en `GET /api/public/centers/:slug` bajo barrido masivo,
+  - auditoria inicial sin paridad completa frente a `activeOverride.closed`.
+- Correcciones aplicadas:
+  - convergencia de esquema en runtime para `schedule_needs_review`,
+  - carga de detalle por `slug` en O(1) y reduccion de coste en ruta de detalle,
+  - auditoria reforzada con paridad de calculo de open-state (`activeOverride`, `next_opening`, `next_change_at`, `today_summary`) y throttling.
+- Preview validada en este cierre:
+  - `GET /api/health` = `200`,
+  - `GET /api/public/catalog` = `200`,
+  - `GET /api/public/centers/:slug` = `200` en muestreo y auditoria completa.
+- Confirmacion de consistencia: catalogo y detalle no divergen en estado operativo para los centros auditados.
 
 # Reglas de ejecución continua
 

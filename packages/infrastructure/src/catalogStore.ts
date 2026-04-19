@@ -753,6 +753,17 @@ async function ensureSchema(database: D1LikeDatabase): Promise<void> {
   for (const statement of SCHEMA_STATEMENTS) {
     await database.prepare(statement).run();
   }
+
+  const centerColumns = await database
+    .prepare("PRAGMA table_info(centers)")
+    .all<{ name: string }>();
+  const centerColumnNames = new Set(centerColumns.results.map((column) => column.name));
+
+  if (!centerColumnNames.has("schedule_needs_review")) {
+    await database
+      .prepare("ALTER TABLE centers ADD COLUMN schedule_needs_review INTEGER NOT NULL DEFAULT 0")
+      .run();
+  }
 }
 
 async function countCenters(database: D1LikeDatabase): Promise<number> {
@@ -2254,6 +2265,57 @@ async function readBaseCentersFromDatabase(database: D1LikeDatabase): Promise<Ba
   return centers.results.map((row) => enrichBaseRow(row));
 }
 
+async function readBaseCenterBySlugFromDatabase(
+  database: D1LikeDatabase,
+  slug: string,
+): Promise<BaseCenterRecord | null> {
+  const row = await database
+    .prepare(
+      `SELECT
+        id, slug, kind, name, address_line, district, neighborhood, postal_code,
+        latitude, longitude, phone, email, website_url, accessibility, wifi, open_air,
+        capacity_value, services_text, transport_text, source_code, rating_average, rating_count,
+        schedule_text_raw, schedule_summary_text, schedule_confidence, schedule_notes_unparsed,
+        schedule_needs_review
+      FROM centers
+      WHERE slug = ?
+      LIMIT 1`,
+    )
+    .bind(slug)
+    .first<StoredCenterRow>();
+
+  if (!row) {
+    return null;
+  }
+
+  return enrichBaseRow(row);
+}
+
+async function loadBaseCenterBySlug(
+  options: CatalogStoreOptions,
+  slug: string,
+): Promise<{ sourceMode: "d1" | "live"; item: BaseCenterRecord | null }> {
+  const database = asDatabase(options.database);
+
+  if (!database) {
+    console.log(JSON.stringify({ event: "catalog_source_mode", mode: "live" }));
+    const { centers } = await hydrateLiveCatalog(options.sources);
+    const items = centers.map(toBaseCenterRecord);
+    return { sourceMode: "live", item: items.find((item) => item.slug === slug) ?? null };
+  }
+
+  await ensureSchema(database);
+
+  if ((await countCenters(database)) === 0) {
+    console.log(JSON.stringify({ event: "catalog_hydrate_required", mode: "d1" }));
+    const { centers, rejections } = await hydrateLiveCatalog(options.sources);
+    await replaceCatalog(database, centers, rejections, options.sources);
+  }
+
+  const item = await readBaseCenterBySlugFromDatabase(database, slug);
+  return { sourceMode: "d1", item };
+}
+
 function toBaseCenterRecord(center: NormalizedCenter): BaseCenterRecord {
   return {
     id: center.id,
@@ -2390,9 +2452,8 @@ export async function getCenterDetailFromStore(
   inputQuery?: Pick<PublicCatalogQuery, "lat" | "lon">,
 ): Promise<PublicCenterDetailResponse | null> {
   const query = buildAppliedQuery(inputQuery);
-  const { sourceMode, items } = await loadBaseCenters(options);
+  const { sourceMode, item: base } = await loadBaseCenterBySlug(options, slug);
   const database = asDatabase(options.database);
-  const base = items.find((item) => item.slug === slug);
 
   if (!base) {
     return null;
@@ -2402,11 +2463,15 @@ export async function getCenterDetailFromStore(
     database && sourceMode === "d1"
       ? await readTransportSnapshotsForCenters(database, [base.id])
       : new Map<string, CenterTransportSnapshot>();
+  const persistedSnapshot = transportSnapshots.get(base.id) ??
+    (database && sourceMode === "d1"
+      ? { options: [], serZoneLabel: null }
+      : null);
   const center = await enrichCenterForPublic(
     base,
     query,
     "detail",
-    transportSnapshots.get(base.id) ?? null,
+    persistedSnapshot,
   );
 
   return {
