@@ -20,7 +20,7 @@ import {
   Volume2,
   Wifi,
 } from "lucide-react";
-import { useEffect, useState, type ElementType } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/cn";
 import {
@@ -175,35 +175,6 @@ function renderStars(ratingOrigin: DataOrigin) {
           )}
         />
       ))}
-    </div>
-  );
-}
-
-function AspectRow({
-  label,
-  icon: Icon,
-  hasData,
-}: {
-  label: string;
-  icon: ElementType;
-  hasData: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 text-[12px]">
-      <div className="flex items-center gap-2 text-foreground">
-        <Icon className="size-3.5 text-muted-foreground" />
-        <span>{label}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="h-1.5 w-16 rounded-full bg-slate-200 dark:bg-slate-700">
-          {hasData ? (
-            <div className="h-1.5 w-10 rounded-full bg-emerald-500" />
-          ) : null}
-        </div>
-        <span className="min-w-[28px] text-right text-[11px] text-muted-foreground">
-          {hasData ? "4.0" : "N/D"}
-        </span>
-      </div>
     </div>
   );
 }
@@ -388,48 +359,37 @@ function RatingSection({ center }: { center: PublicCenterPresentation }) {
   const hasRatings = center.ratingOrigin !== "not_available";
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
           {renderStars(center.ratingOrigin)}
-          <div className="flex items-baseline gap-2">
-            <span className="text-[1rem] font-semibold text-foreground">
-              {hasRatings && center.ratingAverage !== null
-                ? center.ratingAverage.toFixed(1)
-                : "0.0"}
-            </span>
-            <span className="text-[12px] text-muted-foreground">
-              {hasRatings
-                ? `(${center.ratingCount} opiniones)`
-                : "(sin valoraciones todavia)"}
-            </span>
-          </div>
+          <span className="text-[0.9rem] font-semibold text-foreground">
+            {hasRatings && center.ratingAverage !== null
+              ? center.ratingAverage.toFixed(1)
+              : "0.0"}
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            {hasRatings ? `(${center.ratingCount})` : "(sin valoraciones)"}
+          </span>
         </div>
-
         <button
-          className="inline-flex h-8 items-center justify-center rounded-xl border border-border bg-card px-3 text-[12px] font-medium text-muted-foreground"
+          className="inline-flex h-7 items-center justify-center rounded-xl border border-border bg-card px-2.5 text-[11px] font-medium text-muted-foreground"
           disabled
           type="button"
         >
-          Opinar (proximamente)
+          Opinar
         </button>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2 md:gap-x-6">
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
         {aspectItems.map((aspect) => (
-          <AspectRow
-            hasData={hasRatings}
-            icon={aspect.icon}
-            key={aspect.key}
-            label={aspect.label}
-          />
+          <span className="inline-flex items-center gap-1 text-[11px]" key={aspect.key}>
+            <aspect.icon className="size-3 shrink-0 text-muted-foreground" />
+            <span className="text-muted-foreground">{aspect.label}</span>
+            <span className="font-medium text-foreground">{hasRatings ? "4.0" : "N/D"}</span>
+          </span>
         ))}
       </div>
-      {!hasRatings ? (
-        <p className="text-[11px] text-muted-foreground">
-          Las valoraciones se activaran cuando exista voto real verificado.
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -895,17 +855,17 @@ export function LibraryCard({
             onClick={() => setIsTransportDialogOpen(false)}
             type="button"
           />
-          <div className="relative z-[91] w-full max-w-[520px] rounded-2xl border border-border bg-card shadow-[0_24px_60px_rgba(2,6,23,0.45)]">
+          <div className="relative z-[91] w-full max-w-[500px] rounded-2xl border border-border bg-card shadow-[0_24px_60px_rgba(2,6,23,0.45)]">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="flex items-center gap-2">
                 <Train className="size-4 text-muted-foreground" />
                 <h4 className="text-[14px] font-semibold text-foreground">Transporte</h4>
                 <span className="text-[11px] text-muted-foreground">
-                  {filteredTransportOptions.length} opciones
+                  {filteredTransportOptions.length} opciones · ≤500 m
                 </span>
               </div>
               <button
-                className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground"
+                className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
                 onClick={() => setIsTransportDialogOpen(false)}
                 type="button"
               >
@@ -913,96 +873,116 @@ export function LibraryCard({
               </button>
             </div>
 
-            <div className="max-h-[60vh] space-y-2 overflow-y-auto p-4">
+            <div className="max-h-[60vh] overflow-y-auto">
               {groupedTransportModes.length > 0 ? (
-                groupedTransportModes.map((group) => {
-                  const Icon = modeIcon(group.mode);
-                  const styles = modeClasses(group.mode);
-                  const lineTokens = uniqueTransportTokens(group.options, (option) =>
-                    option.lines.length > 0 ? option.lines.join(" · ") : null,
-                  );
-                  const stopTokens = uniqueTransportTokens(group.options, (option) =>
-                    option.destinationNodeName ??
-                    option.stationName ??
-                    option.stopName ??
-                    option.destinationLabel,
-                  );
+                <div className="divide-y divide-border">
+                  {groupedTransportModes.map((group) => {
+                    const Icon = modeIcon(group.mode);
+                    const styles = modeClasses(group.mode);
+                    const lineTokens = uniqueTransportTokens(group.options, (option) =>
+                      option.lines.length > 0 ? option.lines.join(" · ") : null,
+                    );
+                    const stopTokens = uniqueTransportTokens(group.options, (option) =>
+                      option.destinationNodeName ??
+                      option.stationName ??
+                      option.stopName ??
+                      option.destinationLabel,
+                    );
+                    const originBadge =
+                      group.options[0]?.dataOrigin === "official_structured" ? "OFICIAL" : "TEXTO";
 
-                  const bicimadOption =
-                    group.mode === "bicimad"
-                      ? group.options.find((option) => extractBicimadStationId(option) !== null) ??
-                        group.options[0] ??
-                        null
-                      : null;
-                  const bicimadStationId =
-                    bicimadOption !== null ? extractBicimadStationId(bicimadOption) : null;
-                  const bicimadState =
-                    bicimadStationId !== null
-                      ? bicimadAvailability[bicimadStationId] ?? { status: "idle" }
-                      : null;
+                    const bicimadOption =
+                      group.mode === "bicimad"
+                        ? group.options.find((option) => extractBicimadStationId(option) !== null) ??
+                          group.options[0] ??
+                          null
+                        : null;
+                    const bicimadStationId =
+                      bicimadOption !== null ? extractBicimadStationId(bicimadOption) : null;
+                    const bicimadState =
+                      bicimadStationId !== null
+                        ? bicimadAvailability[bicimadStationId] ?? { status: "idle" }
+                        : null;
+                    const bicimadStationName =
+                      bicimadOption?.destinationNodeName ??
+                      bicimadOption?.stationName ??
+                      bicimadOption?.destinationLabel ??
+                      null;
 
-                  return (
-                    <section
-                      className={cn("rounded-xl border px-3 py-2.5", styles.card)}
-                      key={group.mode}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-[11px] border border-white/55 bg-white/75 dark:border-white/10 dark:bg-white/5">
-                          <Icon className={cn("size-4", styles.text)} />
+                    return (
+                      <div
+                        className="flex items-start gap-3 px-4 py-3"
+                        key={group.mode}
+                      >
+                        {/* Left: mode icon + label */}
+                        <div className="flex w-[76px] shrink-0 flex-col items-start gap-1">
+                          <div className={cn("flex size-6 items-center justify-center rounded-lg border", styles.card)}>
+                            <Icon className={cn("size-3.5", styles.text)} />
+                          </div>
+                          <span className={cn("text-[11px] font-medium leading-tight", styles.text)}>
+                            {modeDialogLabel(group.mode)}
+                          </span>
+                          <span className="rounded-full border border-border bg-muted px-1.5 py-px text-[9px] font-medium text-muted-foreground">
+                            {originBadge}
+                          </span>
                         </div>
 
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className={cn("text-[13px] font-semibold", styles.text)}>
-                              {modeDialogLabel(group.mode)}
-                            </p>
-                            <span className="rounded-full border border-border bg-card px-1.5 py-0.5 text-[9px] text-muted-foreground">
-                              {group.options[0]?.dataOrigin === "official_structured"
-                                ? "OFICIAL"
-                                : "TEXTO OFICIAL"}
-                            </span>
-                          </div>
-
-                          <p className="text-[11px] text-foreground">
-                            {compactTokenList(stopTokens)}
-                          </p>
-
-                          {lineTokens.length > 0 ? (
-                            <p className="text-[10px] text-muted-foreground">
-                              Lineas: {compactTokenList(lineTokens)}
-                            </p>
-                          ) : null}
-
-                          {bicimadStationId && bicimadState ? (
-                            <div className="pt-1">
-                              <button
-                                className="rounded-md border border-border bg-card px-2 py-1 text-[10px] font-medium text-foreground"
-                                onClick={() => loadBicimadOnDemand(bicimadStationId)}
-                                type="button"
-                              >
-                                {bicimadState.status === "loading"
-                                  ? "Consultando..."
-                                  : "Ver disponibilidad"}
-                              </button>
-                              {bicimadState.status === "success" ? (
-                                <p className="mt-1 text-[10px] text-muted-foreground">
-                                  Bicis: {bicimadState.payload.bikesAvailable ?? "N/D"} · Anclajes: {bicimadState.payload.docksAvailable ?? "N/D"}
-                                </p>
-                              ) : null}
-                              {bicimadState.status === "error" ? (
-                                <p className="mt-1 text-[10px] text-muted-foreground">
-                                  Disponibilidad no disponible ahora.
-                                </p>
-                              ) : null}
+                        {/* Right: content */}
+                        <div className="min-w-0 flex-1 space-y-1 pt-0.5">
+                          {group.mode === "bicimad" ? (
+                            <div className="space-y-1.5">
+                              <p className="text-[12px] text-foreground">
+                                {bicimadStationName ?? compactTokenList(stopTokens)}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  className={cn(
+                                    "inline-flex items-center rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-foreground transition hover:bg-muted/60",
+                                    bicimadState?.status === "loading" && "cursor-not-allowed opacity-60",
+                                  )}
+                                  disabled={bicimadState?.status === "loading"}
+                                  onClick={() =>
+                                    bicimadStationId ? loadBicimadOnDemand(bicimadStationId) : undefined
+                                  }
+                                  type="button"
+                                >
+                                  <Bike className="mr-1.5 size-3 text-muted-foreground" />
+                                  {bicimadState?.status === "loading"
+                                    ? "Consultando..."
+                                    : "Ver disponibilidad"}
+                                </button>
+                                {bicimadState?.status === "success" ? (
+                                  <span className="text-[11px] text-foreground">
+                                    <span className="font-semibold">{bicimadState.payload.bikesAvailable ?? "N/D"}</span>
+                                    <span className="text-muted-foreground"> bicis · </span>
+                                    <span className="font-semibold">{bicimadState.payload.docksAvailable ?? "N/D"}</span>
+                                    <span className="text-muted-foreground"> anclajes</span>
+                                  </span>
+                                ) : null}
+                                {bicimadState?.status === "error" ? (
+                                  <span className="text-[11px] text-muted-foreground">No disponible</span>
+                                ) : null}
+                              </div>
                             </div>
-                          ) : null}
+                          ) : (
+                            <>
+                              <p className="text-[12px] text-foreground">
+                                {compactTokenList(stopTokens)}
+                              </p>
+                              {lineTokens.length > 0 ? (
+                                <p className="text-[10px] text-muted-foreground">
+                                  {compactTokenList(lineTokens)}
+                                </p>
+                              ) : null}
+                            </>
+                          )}
                         </div>
                       </div>
-                    </section>
-                  );
-                })
+                    );
+                  })}
+                </div>
               ) : (
-                <p className="rounded-xl border border-border bg-muted/40 px-3 py-3 text-[12px] text-muted-foreground">
+                <p className="px-4 py-4 text-[12px] text-muted-foreground">
                   No hay opciones de transporte publicadas dentro de 500 m para este centro.
                 </p>
               )}

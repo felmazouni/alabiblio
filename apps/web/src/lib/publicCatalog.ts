@@ -278,3 +278,22 @@ export async function fetchBicimadAvailability(
     signal ?? new AbortController().signal,
   );
 }
+
+export interface CallejeroSuggestion {
+  lat: number;
+  lon: number;
+  label: string;
+}
+
+export async function fetchCallejeroSuggestions(
+  query: string,
+  signal?: AbortSignal,
+): Promise<CallejeroSuggestion[]> {
+  if (query.trim().length < 3) {
+    return [];
+  }
+  return fetchJson<CallejeroSuggestion[]>(
+    `/api/public/callejero/autocomplete?q=${encodeURIComponent(query.trim())}`,
+    signal ?? new AbortController().signal,
+  );
+}

@@ -4,6 +4,7 @@ import { buildAdminBootstrapResponse } from "./routes/admin";
 import { buildHealthResponse } from "./routes/health";
 import { buildPublicBootstrapResponse } from "./routes/public";
 import { buildPublicBicimadAvailabilityResponse } from "./routes/publicBicimadAvailability";
+import { buildCallejeroAutocompleteResponse } from "./routes/publicCallejero";
 import { buildPublicCatalogResponse } from "./routes/publicCatalog";
 import { buildPublicCenterDetailResponse } from "./routes/publicCenterDetail";
 import { buildPublicFiltersResponse } from "./routes/publicFilters";
@@ -77,6 +78,9 @@ export async function handleRequest(
     } else if (request.method === "GET" && url.pathname === "/api/public/transport/bicimad/availability") {
       const stationId = url.searchParams.get("station_id") ?? "";
       response = await buildPublicBicimadAvailabilityResponse(env, stationId);
+    } else if (request.method === "GET" && url.pathname === "/api/public/callejero/autocomplete") {
+      const q = url.searchParams.get("q") ?? "";
+      response = await buildCallejeroAutocompleteResponse(q);
     } else if (request.method === "GET" && url.pathname === "/api/public/filters") {
       response = await buildPublicFiltersResponse(env, catalogQuery);
     } else if (request.method === "GET" && url.pathname.startsWith("/api/public/centers/")) {

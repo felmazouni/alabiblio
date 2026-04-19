@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 export interface UserLocation {
   lat: number;
   lon: number;
+  label?: string;
+  source?: "gps" | "manual";
 }
 
 const STORAGE_KEY = "alabiblio:user-location";
@@ -51,12 +53,11 @@ export function useUserLocation() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const nextLocation = {
+        const nextLocation: UserLocation = {
           lat: position.coords.latitude,
           lon: position.coords.longitude,
-        } satisfies UserLocation;
-
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextLocation));
+          source: "gps",
+        };
         setLocation(nextLocation);
         setRequesting(false);
       },
@@ -78,11 +79,19 @@ export function useUserLocation() {
     setError(null);
   };
 
+  const setManualLocation = (lat: number, lon: number, label: string) => {
+    const nextLocation: UserLocation = { lat, lon, label, source: "manual" };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextLocation));
+    setLocation(nextLocation);
+    setError(null);
+  };
+
   return {
     location,
     requesting,
     error,
     requestLocation,
     clearLocation,
+    setManualLocation,
   };
 }

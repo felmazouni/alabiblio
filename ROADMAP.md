@@ -6,7 +6,7 @@
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-- Version desplegada: `c77eaa1e`
+- Version desplegada: `a2f5f2f8`
 
 # Lo que funciona ya de verdad
 
@@ -36,6 +36,11 @@
 - Disponibilidad BiciMAD preparada bajo demanda con endpoint publico dedicado (`/api/public/transport/bicimad/availability`) y degradacion honesta cuando realtime no esta configurado.
 - Dark mode base operativo con persistencia de preferencia.
 - Logging estructurado basico en Worker e ingesta.
+- Ratings compactos en tarjeta: chips inline `[Icon] Label N/D` sin grid vertical, dos filas en escritorio.
+- Dialog de transporte rediseñado: layout horizontal por modo (icono + label + badge a la izquierda, stops/líneas/BiciMAD a la derecha).
+- BiciMAD en dialog: nombre de estación fija + botón "Ver disponibilidad" + resultado inline en la misma fila.
+- Selector de ubicación en home: modo auto (GPS) y manual (autocompletado callejero Madrid), pill con label + Cambiar + X cuando hay ubicación activa.
+- Endpoint `GET /api/public/callejero/autocomplete?q=` operativo: proxy Nominatim con bbox Madrid, caché 1h, UTF-8 correcto.
 
 # Reglas de ejecución continua
 

@@ -1,10 +1,10 @@
-import { ArrowRight, BookOpen, Clock, LayoutGrid, List, MapPin, Moon, Sun, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowRight, BookOpen, Check, Clock, LayoutGrid, List, Loader2, MapPin, Moon, Navigation, Sun, Users, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { BackgroundIllustration } from "../components/BackgroundIllustration";
 import { LibraryCard } from "../components/LibraryCard";
 import { cn } from "../lib/cn";
-import { defaultPublicFilters, usePublicCatalog } from "../lib/publicCatalog";
+import { type CallejeroSuggestion, defaultPublicFilters, fetchCallejeroSuggestions, usePublicCatalog } from "../lib/publicCatalog";
 import { useTheme } from "../lib/theme";
 import { useUserLocation } from "../lib/userLocation";
 
@@ -37,9 +37,227 @@ function Button({
   );
 }
 
+type LocationMode = "auto" | "manual";
+
+function LocationDialog({
+  onClose,
+  requestLocation,
+  requesting,
+  gpsError,
+  setManualLocation,
+}: {
+  onClose: () => void;
+  requestLocation: () => void;
+  requesting: boolean;
+  gpsError: string | null;
+  setManualLocation: (lat: number, lon: number, label: string) => void;
+}) {
+  const [mode, setMode] = useState<LocationMode>("auto");
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<CallejeroSuggestion[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<CallejeroSuggestion | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (mode === "manual") {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (query.trim().length < 3) {
+      setSuggestions([]);
+      setSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+      setSearching(true);
+      try {
+        const results = await fetchCallejeroSuggestions(query, abortRef.current.signal);
+        setSuggestions(results);
+      } catch {
+        // aborted or error — keep existing
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const handleSelectSuggestion = (suggestion: CallejeroSuggestion) => {
+    setSelected(suggestion);
+    setQuery(suggestion.label);
+    setSuggestions([]);
+  };
+
+  const handleConfirm = () => {
+    if (mode === "manual" && selected) {
+      setManualLocation(selected.lat, selected.lon, selected.label);
+      onClose();
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Escape") {
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onKeyDown={handleKeyDown}>
+      <button
+        aria-label="Cerrar selector de ubicacion"
+        className="absolute inset-0 bg-slate-950/55"
+        onClick={onClose}
+        type="button"
+      />
+      <div className="relative z-[101] w-full max-w-[380px] rounded-2xl border border-border bg-card shadow-[0_24px_60px_rgba(2,6,23,0.5)]">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <div className="flex items-center gap-2">
+            <MapPin className="size-4 text-primary" />
+            <h4 className="text-[14px] font-semibold text-foreground">Tu ubicación</h4>
+          </div>
+          <button
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Mode toggle */}
+        <div className="flex border-b border-border">
+          <button
+            className={cn(
+              "flex-1 py-2.5 text-[12px] font-medium transition",
+              mode === "auto"
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setMode("auto")}
+            type="button"
+          >
+            Automática
+          </button>
+          <button
+            className={cn(
+              "flex-1 py-2.5 text-[12px] font-medium transition",
+              mode === "manual"
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setMode("manual")}
+            type="button"
+          >
+            Manual
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          {mode === "auto" ? (
+            <div className="space-y-3">
+              <p className="text-[12px] text-muted-foreground">
+                Usa la geolocalización del navegador para fijar tu posición actual.
+              </p>
+              <button
+                className={cn(
+                  "flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-[13px] font-medium text-primary-foreground transition hover:opacity-90",
+                  requesting && "cursor-not-allowed opacity-70",
+                )}
+                disabled={requesting}
+                onClick={() => {
+                  requestLocation();
+                  onClose();
+                }}
+                type="button"
+              >
+                {requesting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Navigation className="size-4" />
+                )}
+                {requesting ? "Obteniendo..." : "Obtener ubicación GPS"}
+              </button>
+              {gpsError ? (
+                <p className="text-[11px] text-destructive">{gpsError}</p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[12px] text-muted-foreground">
+                Escribe una calle de Madrid para buscar tu ubicación.
+              </p>
+              <div className="relative">
+                <input
+                  ref={inputRef}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setSelected(null);
+                  }}
+                  placeholder="Ej: Gran Vía 5, Calle Mayor..."
+                  type="text"
+                  value={query}
+                />
+                {searching ? (
+                  <Loader2 className="absolute right-3 top-2.5 size-4 animate-spin text-muted-foreground" />
+                ) : null}
+              </div>
+
+              {suggestions.length > 0 ? (
+                <ul className="max-h-[180px] overflow-y-auto rounded-xl border border-border bg-card shadow-sm">
+                  {suggestions.map((suggestion, index) => (
+                    <li key={index}>
+                      <button
+                        className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-[12px] text-foreground transition hover:bg-muted/50"
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        type="button"
+                      >
+                        <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                        {suggestion.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+
+              {query.trim().length > 0 && query.trim().length < 3 ? (
+                <p className="text-[11px] text-muted-foreground">Escribe al menos 3 letras…</p>
+              ) : null}
+
+              <button
+                className={cn(
+                  "flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-[13px] font-medium text-primary-foreground transition hover:opacity-90",
+                  !selected && "cursor-not-allowed opacity-50",
+                )}
+                disabled={!selected}
+                onClick={handleConfirm}
+                type="button"
+              >
+                <Check className="size-4" />
+                Confirmar ubicación
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function HomeRoute() {
   const [viewMode, setViewMode] = useState<"card" | "list">("card");
-  const { location, requestLocation, requesting, error: locationError } = useUserLocation();
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+  const { location, requestLocation, requesting, error: locationError, clearLocation, setManualLocation } = useUserLocation();
   const { theme, toggleTheme } = useTheme();
   const { data, error, loading, topItems } = usePublicCatalog(
     defaultPublicFilters,
@@ -53,6 +271,11 @@ export function HomeRoute() {
     [topItems],
   );
 
+  const locationLabel = location?.label
+    ? location.label.split(",").slice(0, 2).join(",").trim()
+    : location?.source === "gps"
+      ? "Ubicación GPS"
+      : null;
   return (
     <div className="relative min-h-screen bg-background text-foreground transition-colors">
       <BackgroundIllustration />
@@ -155,11 +378,35 @@ export function HomeRoute() {
               </div>
             </div>
 
-            <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
-              <Button onClick={requestLocation}>
-                <MapPin className="size-4" />
-                {requesting ? "Obteniendo ubicacion..." : "Usar mi ubicacion"}
-              </Button>
+            <div className="mt-4 flex flex-wrap items-center gap-2.5">
+              {location ? (
+                <div className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-3 py-2 shadow-sm">
+                  <MapPin className="size-3.5 shrink-0 text-primary" />
+                  <span className="max-w-[160px] truncate text-[12px] font-medium text-foreground">
+                    {locationLabel ?? "Ubicación activa"}
+                  </span>
+                  <button
+                    className="ml-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+                    onClick={() => setLocationDialogOpen(true)}
+                    type="button"
+                  >
+                    Cambiar
+                  </button>
+                  <button
+                    aria-label="Quitar ubicación"
+                    className="ml-0.5 rounded-md text-muted-foreground hover:text-destructive"
+                    onClick={clearLocation}
+                    type="button"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ) : (
+                <Button onClick={() => setLocationDialogOpen(true)}>
+                  <MapPin className="size-4" />
+                  Añadir ubicación
+                </Button>
+              )}
               <Link to="/listado">
                 <Button className="w-full sm:w-auto" variant="outline">
                   Ver todas las bibliotecas
@@ -169,10 +416,20 @@ export function HomeRoute() {
             </div>
 
             {locationError ? (
-              <p className="mt-3 text-sm text-destructive">{locationError}</p>
+              <p className="mt-3 text-[12px] text-destructive">{locationError}</p>
             ) : null}
           </div>
         </header>
+
+        {locationDialogOpen ? (
+          <LocationDialog
+            gpsError={locationError}
+            onClose={() => setLocationDialogOpen(false)}
+            requestLocation={requestLocation}
+            requesting={requesting}
+            setManualLocation={setManualLocation}
+          />
+        ) : null}
 
         <section>
           <div className="mb-4 flex items-end justify-between gap-4">
