@@ -516,7 +516,7 @@ const TRANSPORT_ORDER: Record<TransportMode, number> = {
   car: 7,
 };
 
-const TRANSPORT_SNAPSHOT_VERSION = "2026-04-19.v2";
+const TRANSPORT_SNAPSHOT_VERSION = "2026-04-19.v3";
 const TRANSPORT_SOURCE_URLS = {
   emt: "https://datos.madrid.es/dataset/900023-0-emt-paradas-autobus/resource/900023-0-emt-paradas-autobus/download/900023-0-emt-paradas-autobus.csv",
   crtmMetro: "https://crtm.maps.arcgis.com/sharing/rest/content/items/5c7f2951962540d69ffe8f640d94c246/data",
@@ -1415,7 +1415,7 @@ function buildPrecomputedTransportSnapshot(
   }
 
   return {
-    options: options.sort((left, right) => {
+    options: sanitizeTransportOptionsForVisibility(options).sort((left, right) => {
       if (left.displayPriority !== right.displayPriority) {
         return left.displayPriority - right.displayPriority;
       }
@@ -1424,6 +1424,22 @@ function buildPrecomputedTransportSnapshot(
     }),
     serZoneLabel: serZone?.neighborhood ?? serZone?.district ?? null,
   };
+}
+
+function sanitizeTransportOptionsForVisibility(options: StoredTransportOption[]): StoredTransportOption[] {
+  const structuredModes = new Set(
+    options
+      .filter((option) => option.dataOrigin === "official_structured")
+      .map((option) => option.mode),
+  );
+
+  return options.filter((option) => {
+    if (option.dataOrigin !== "official_text_parsed") {
+      return true;
+    }
+
+    return !structuredModes.has(option.mode);
+  });
 }
 
 function buildSnapshotStatements(

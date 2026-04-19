@@ -1,7 +1,7 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-19`
-- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5, 2.6, 3 y 4` completados, `Bloque 5` en curso con cierre formal del sub-bloque de correccion global del motor operativo, no produccion.
+- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5, 2.6, 3 y 4` completados, `Bloque 5` en curso con saneo de snapshots de transporte (v3) aplicado y verificado en D1, pendiente de validacion externa final y cierre documental definitivo, no produccion.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
@@ -46,6 +46,9 @@
 - Home: bloque `Top 3 opciones para ti` migrado a carrusel real (Embla) alimentado por Top 3 real de API, con cards compactas, CTA y soporte responsive/dark mode.
 - Auditoria global de estado operativo ejecutada sobre `115/115` centros con resultado final `0 inconsistencias`.
 - Convergencia validada entre `GET /api/public/catalog` y `GET /api/public/centers/:slug` para estado operativo (`is_open_now`, `today_summary`, `next_change_at`, `schedule_label`) sin divergencias sistémicas.
+- Saneo de transporte por modo aplicado en snapshot: si existe opcion `official_structured` para un modo, no se mantiene activa una competidora `official_text_parsed` del mismo modo.
+- Lote de snapshots de transporte regenerado a `snapshot_version` uniforme `2026-04-19.v3` para `115/115` centros en preview.
+- Coherencia catalogo/detalle en transporte validada en muestreo: ambos endpoints leen snapshot persistido en D1 y devuelven firmas de opciones equivalentes para los slugs auditados.
 
 ## Cierre formal trazable. Correccion global del motor operativo (2026-04-19)
 
