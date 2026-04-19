@@ -450,7 +450,7 @@ const DEFAULT_PUBLIC_QUERY: Required<PublicCatalogQuery> = {
   q: "",
   lat: Number.NaN,
   lon: Number.NaN,
-  radiusMeters: 5000,
+  radiusMeters: 120000,
   kinds: [],
   transportModes: [],
   openNow: false,

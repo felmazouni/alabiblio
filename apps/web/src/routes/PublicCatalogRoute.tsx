@@ -1,251 +1,323 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, BookOpen, LayoutGrid, List, MapPin, Moon, Search, Sun, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { BackgroundIllustration } from "../components/BackgroundIllustration";
-import { FiltersPanel, defaultPublicFilters, type PublicFilters } from "../components/FiltersPanel";
+import { FiltersPanel } from "../components/FiltersPanel";
 import { LibraryCard } from "../components/LibraryCard";
-import { usePublicCatalog } from "../lib/publicCatalog";
-import { ArrowLeft, BookOpen, LayoutGrid, List, MapPin, Moon, Search, X } from "lucide-react";
 import { cn } from "../lib/cn";
+import {
+  defaultPublicFilters,
+  usePublicCatalog,
+  usePublicFilters,
+  type PublicFiltersState,
+} from "../lib/publicCatalog";
+import { useTheme } from "../lib/theme";
+import { useUserLocation } from "../lib/userLocation";
 
 function Button({
   children,
   className,
-  variant = "default",
   onClick,
-  type = "button",
+  variant = "default",
 }: {
   children: React.ReactNode;
   className?: string;
-  variant?: "default" | "outline" | "ghost";
   onClick?: () => void;
-  type?: "button" | "submit" | "reset";
+  variant?: "default" | "outline" | "ghost";
 }) {
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2",
-        variant === "default" && "bg-primary text-primary-foreground hover:opacity-90",
-        variant === "outline" && "border border-border bg-card text-foreground hover:bg-muted/50",
-        variant === "ghost" && "text-foreground hover:bg-muted/70",
+        "inline-flex items-center justify-center gap-2 rounded-2xl text-[13px] font-medium transition",
+        variant === "default" && "bg-primary px-4 text-primary-foreground hover:opacity-90",
+        variant === "outline" &&
+          "border border-border bg-card px-4 text-foreground shadow-sm hover:bg-muted/55",
+        variant === "ghost" && "text-muted-foreground hover:bg-card/70",
         className,
       )}
       onClick={onClick}
-      type={type}
+      type="button"
     >
       {children}
     </button>
   );
 }
 
-function matchesFilters(filters: PublicFilters, item: ReturnType<typeof usePublicCatalog>["items"][number]) {
-  const haystack = [item.name, item.addressLine, item.neighborhood, item.district]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (filters.query && !haystack.includes(filters.query.toLowerCase())) {
-    return false;
-  }
-
-  if (filters.openNow && item.schedule.isOpenNow !== true) {
-    return false;
-  }
-
-  if (filters.onlyLibraries && item.kind !== "library") {
-    return false;
-  }
-
-  if (filters.onlyStudyRooms && item.kind !== "study_room") {
-    return false;
-  }
-
-  if (filters.withWifi && !item.wifi) {
-    return false;
-  }
-
-  if (filters.accessible && !item.accessibility) {
-    return false;
-  }
-
-  return true;
-}
-
 export function PublicCatalogRoute() {
-  const [isDark, setIsDark] = useState(false);
-  const [viewMode, setViewMode] = useState<"card" | "list">("list");
-  const [filters, setFilters] = useState<PublicFilters>(defaultPublicFilters);
-  const { error, items, loading } = usePublicCatalog();
+  const [viewMode, setViewMode] = useState<"card" | "list">("card");
+  const [draftQuery, setDraftQuery] = useState("");
+  const [filters, setFilters] = useState<PublicFiltersState>(defaultPublicFilters);
+  const [searchParams] = useSearchParams();
+  const { location, requestLocation, requesting } = useUserLocation();
+  const { theme, toggleTheme } = useTheme();
+  const { error, items, loading, total } = usePublicCatalog(filters, location);
+  const { data: filterMetadata, loading: filtersLoading } = usePublicFilters(filters, location);
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", isDark);
-  }, [isDark]);
+  const results = useMemo(
+    () => items.map((item, index) => ({ ...item, rankingPosition: index + 1 })),
+    [items],
+  );
+  const forceOpenFilters = searchParams.get("filters") === "open";
 
-  const filteredLibraries = useMemo(() => items.filter((item) => matchesFilters(filters, item)), [filters, items]);
+  const activeFilterLabels = useMemo(() => {
+    const labels: Array<{ key: string; label: string; clear: () => void }> = [];
 
-  const activeFiltersCount = [
-    filters.query !== "",
-    filters.openNow,
-    filters.onlyLibraries,
-    filters.onlyStudyRooms,
-    filters.withWifi,
-    filters.accessible,
-  ].filter(Boolean).length;
+    if (filters.query) {
+      labels.push({
+        key: "query",
+        label: `Busqueda: ${filters.query}`,
+        clear: () => setFilters((current) => ({ ...current, query: "" })),
+      });
+    }
+    if (filters.openNow) {
+      labels.push({
+        key: "openNow",
+        label: "Abierta ahora",
+        clear: () => setFilters((current) => ({ ...current, openNow: false })),
+      });
+    }
+    if (filters.accessible) {
+      labels.push({
+        key: "accessible",
+        label: "Accesible",
+        clear: () => setFilters((current) => ({ ...current, accessible: false })),
+      });
+    }
+    if (filters.withWifi) {
+      labels.push({
+        key: "withWifi",
+        label: "Con WiFi",
+        clear: () => setFilters((current) => ({ ...current, withWifi: false })),
+      });
+    }
+    if (filters.withCapacity) {
+      labels.push({
+        key: "withCapacity",
+        label: "Con aforo",
+        clear: () => setFilters((current) => ({ ...current, withCapacity: false })),
+      });
+    }
+    if (location && filters.radiusMeters !== defaultPublicFilters.radiusMeters) {
+      labels.push({
+        key: "radius",
+        label: `Radio ${Math.round(filters.radiusMeters / 1000)} km`,
+        clear: () =>
+          setFilters((current) => ({
+            ...current,
+            radiusMeters: defaultPublicFilters.radiusMeters,
+          })),
+      });
+    }
 
-  const clearFilters = () => setFilters(defaultPublicFilters);
+    for (const kind of filters.kinds) {
+      labels.push({
+        key: `kind:${kind}`,
+        label: kind === "library" ? "Biblioteca" : "Sala de estudio",
+        clear: () =>
+          setFilters((current) => ({
+            ...current,
+            kinds: current.kinds.filter((value) => value !== kind),
+          })),
+      });
+    }
+
+    for (const mode of filters.transportModes) {
+      const option = filterMetadata?.availableTransportModes.find((value) => value.mode === mode);
+      labels.push({
+        key: `transport:${mode}`,
+        label: option?.label ?? mode,
+        clear: () =>
+          setFilters((current) => ({
+            ...current,
+            transportModes: current.transportModes.filter((value) => value !== mode),
+          })),
+      });
+    }
+
+    return labels;
+  }, [filterMetadata?.availableTransportModes, filters, location]);
 
   return (
-    <div className="min-h-screen bg-background transition-colors relative">
+    <div className="relative min-h-screen bg-background text-foreground transition-colors">
       <BackgroundIllustration />
 
-      <div className="max-w-5xl mx-auto p-4 sm:p-6 relative">
-        <header className="py-4 mb-4">
-          <div className="flex items-center justify-between mb-6">
+      <div className="relative mx-auto w-full max-w-[1020px] px-4 py-4 sm:px-5">
+        <header className="mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link to="/">
-                <Button className="mr-1 h-9 w-9 px-0" variant="ghost">
-                  <ArrowLeft className="size-5" />
+                <Button className="size-9 px-0" variant="ghost">
+                  <ArrowLeft className="size-4" />
                 </Button>
               </Link>
-              <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-                <BookOpen className="size-5 text-primary-foreground" />
+
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_22px_rgba(15,91,167,0.18)]">
+                <BookOpen className="size-4.5" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-foreground">AlaBiblio</h1>
-                <p className="text-xs text-muted-foreground">Comunidad de Madrid</p>
+                <p className="text-[1.15rem] font-bold leading-none">AlaBiblio</p>
+                <p className="mt-1 text-xs text-muted-foreground">Comunidad de Madrid</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center bg-muted rounded-lg p-1">
-                <Button
-                  className={cn(viewMode === "card" ? "bg-card shadow-sm" : "hover:bg-transparent", "h-8 px-3")}
+              <div className="flex items-center rounded-2xl border border-border bg-card p-1 shadow-sm">
+                <button
+                  className={cn(
+                    "rounded-xl px-2.5 py-2 transition",
+                    viewMode === "card"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground",
+                  )}
                   onClick={() => setViewMode("card")}
-                  variant="ghost"
+                  type="button"
                 >
-                  <LayoutGrid className="size-4" />
-                </Button>
-                <Button
-                  className={cn(viewMode === "list" ? "bg-card shadow-sm" : "hover:bg-transparent", "h-8 px-3")}
+                  <LayoutGrid className="size-3.5" />
+                </button>
+                <button
+                  className={cn(
+                    "rounded-xl px-2.5 py-2 transition",
+                    viewMode === "list"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground",
+                  )}
                   onClick={() => setViewMode("list")}
-                  variant="ghost"
+                  type="button"
                 >
-                  <List className="size-4" />
-                </Button>
+                  <List className="size-3.5" />
+                </button>
               </div>
 
-              <Button className="h-9 w-9 px-0 border-border" onClick={() => setIsDark(!isDark)} variant="outline">
-                <Moon className="size-4" />
-              </Button>
+              <button
+                className="rounded-2xl border border-border bg-card p-2.5 text-muted-foreground shadow-sm transition hover:text-foreground"
+                onClick={toggleTheme}
+                type="button"
+              >
+                {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              </button>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <form
+              className="relative flex-1"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setFilters((current) => ({ ...current, query: draftQuery.trim() }));
+              }}
+            >
+              <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
-                className="flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 pl-10 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
+                className="h-10 w-full rounded-2xl border border-input bg-card pl-11 pr-11 text-sm text-foreground shadow-sm outline-none transition focus:border-primary/40"
+                onChange={(event) => setDraftQuery(event.target.value)}
                 placeholder="Buscar por nombre, direccion o barrio..."
                 type="text"
-                value={filters.query}
+                value={draftQuery}
               />
-              {filters.query ? (
-                <Button
-                  className="absolute right-1 top-1/2 -translate-y-1/2 size-7 px-0"
-                  onClick={() => setFilters((current) => ({ ...current, query: "" }))}
-                  variant="ghost"
+              {draftQuery ? (
+                <button
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
+                  onClick={() => {
+                    setDraftQuery("");
+                    setFilters((current) => ({ ...current, query: "" }));
+                  }}
+                  type="button"
                 >
                   <X className="size-4" />
-                </Button>
+                </button>
               ) : null}
-            </div>
+            </form>
+
             <div className="flex gap-2">
-              <Button className="border-border gap-2" variant="outline">
+              <Button className="h-10" onClick={requestLocation} variant="outline">
                 <MapPin className="size-4" />
-                <span className="hidden sm:inline">Cerca de mi</span>
+                {requesting ? "Buscando..." : "Cerca de mi"}
               </Button>
-              <FiltersPanel filters={filters} onChange={setFilters} resultCount={filteredLibraries.length} />
+              <FiltersPanel
+                filters={filters}
+                forceOpen={forceOpenFilters}
+                loading={filtersLoading}
+                metadata={filterMetadata}
+                onChange={setFilters}
+                resultCount={total}
+              />
             </div>
           </div>
 
-          {(activeFiltersCount > 0 || filters.query) && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-muted-foreground">Filtros activos:</span>
-              {filters.query ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
-                  Busqueda: {filters.query}
-                  <button onClick={() => setFilters((current) => ({ ...current, query: "" }))} type="button">
-                    <X className="size-3" />
+          {activeFilterLabels.length > 0 ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {activeFilterLabels.map((item) => (
+                <span
+                  key={item.key}
+                  className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-[11px] font-medium text-secondary-foreground"
+                >
+                  {item.label}
+                  <button onClick={item.clear} type="button">
+                    <X className="size-3.5" />
                   </button>
                 </span>
-              ) : null}
-              {filters.openNow ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
-                  Abierta ahora
-                  <button onClick={() => setFilters((current) => ({ ...current, openNow: false }))} type="button">
-                    <X className="size-3" />
-                  </button>
-                </span>
-              ) : null}
-              {filters.onlyLibraries ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
-                  Bibliotecas
-                </span>
-              ) : null}
-              {filters.onlyStudyRooms ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
-                  Salas de estudio
-                </span>
-              ) : null}
-              {activeFiltersCount > 0 ? (
-                <Button className="text-xs text-muted-foreground h-6" onClick={clearFilters} variant="ghost">
-                  Limpiar todo
-                </Button>
-              ) : null}
+              ))}
+              <button
+                className="text-[11px] font-medium text-muted-foreground"
+                onClick={() => {
+                  setFilters(defaultPublicFilters);
+                  setDraftQuery("");
+                }}
+                type="button"
+              >
+                Limpiar todo
+              </button>
             </div>
-          )}
+          ) : null}
         </header>
 
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              {loading ? "…" : filteredLibraries.length} {filteredLibraries.length === 1 ? "resultado" : "resultados"}
-            </h2>
-            <p className="text-sm text-muted-foreground">Ordenados por relevancia y distancia</p>
-          </div>
+        <div className="mb-4">
+          <h1 className="text-[1.42rem] font-semibold leading-none text-foreground">
+            {loading ? "..." : total} resultados
+          </h1>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Ordenados por{" "}
+            {filterMetadata?.availableSortModes
+              .find((option) => option.value === filters.sort)
+              ?.label.toLowerCase() ?? "relevancia"}
+          </p>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Cobertura por defecto: toda la Comunidad de Madrid.
+          </p>
         </div>
 
         {loading ? (
-          <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
-            Cargando listado…
+          <div className="rounded-[24px] border border-border bg-card p-7 text-sm text-muted-foreground shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+            Cargando listado...
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-sm text-destructive shadow-sm">
+          <div className="rounded-[24px] border border-destructive/20 bg-destructive/8 p-7 text-sm text-destructive shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
             {error}
           </div>
-        ) : filteredLibraries.length > 0 ? (
-          <div className="space-y-4">
-            {filteredLibraries.map((library, index) => (
-              <LibraryCard
-                key={library.id}
-                onDetails={() => undefined}
-                onNavigate={() => undefined}
-                onReview={() => undefined}
-                viewMode={viewMode}
-                center={{ ...library, rankingPosition: index + 1 }}
-              />
+        ) : results.length > 0 ? (
+          <div className="space-y-3">
+            {results.map((center) => (
+              <LibraryCard center={center} key={center.id} viewMode={viewMode} />
             ))}
           </div>
         ) : (
-          <div className="text-center py-16">
-            <div className="size-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-              <Search className="size-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">No se encontraron resultados</h3>
-            <p className="text-muted-foreground mb-4">Prueba a modificar los filtros o la busqueda</p>
-            <Button onClick={clearFilters} variant="outline">
+          <div className="rounded-[24px] border border-border bg-card p-8 text-center shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+            <h2 className="text-[1.45rem] font-semibold text-foreground">
+              No se encontraron resultados
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Ajusta la busqueda o limpia los filtros activos.
+            </p>
+            <button
+              className="mt-4 rounded-2xl border border-border bg-card px-4 py-3 text-[13px] font-medium text-foreground shadow-sm"
+              onClick={() => {
+                setFilters(defaultPublicFilters);
+                setDraftQuery("");
+              }}
+              type="button"
+            >
               Limpiar filtros
-            </Button>
+            </button>
           </div>
         )}
       </div>

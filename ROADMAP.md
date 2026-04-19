@@ -1,7 +1,7 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-19`
-- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2 y 2.5` completados, `Bloque 3` en curso, no produccion.
+- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5 y 2.6` completados, `Bloque 3` pendiente de inicio, no produccion.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
@@ -81,6 +81,19 @@
   * [x] El modelo de transporte persistido no produce colisiones de nodos entre centros, los filtros devuelven conteos reales y la UI solo muestra controles funcionales.
   * [x] Riesgos o dependencias si aplica
   * [x] Depende de los Bloques 1 y 2; obliga a limpiar la base de datos y la UI antes de continuar con Horarios y Movilidad.
+
+* [x] Bloque 2.6. Corrección UX pública previa a fase 3
+
+  * [x] Objetivo del bloque
+  * [x] Rehacer la jerarquía visual de la tarjeta pública para que la información crítica sea legible en una sola vista útil.
+  * [x] Mantener transporte, horario, aforo publicado, estado y CTA en formato compacto y profesional sin inventar datos.
+  * [x] Mantener estrellas visibles en UI sin activar todavía valoraciones reales.
+  * [x] Corregir el alcance por distancia para no limitar por defecto la búsqueda a pocos kilómetros cuando hay geolocalización.
+  * [x] Dejar cobertura por defecto de toda la Comunidad de Madrid y radio configurable por usuario.
+  * [x] Criterio de cierre del bloque
+  * [x] El usuario ve una ficha más clara y densa sin perder información y el listado no queda recortado por defecto a radio local corto.
+  * [x] Riesgos o dependencias si aplica
+  * [x] Reabre temporalmente UI pública del bloque 7 por corrección urgente de utilidad, sin alterar contratos de API ni taxonomía de procedencia.
 
 * [ ] Bloque 3. Horarios robustos y revisión manual
 

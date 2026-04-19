@@ -1,4 +1,4 @@
-import { ExternalLink, Mail, MapPin, Phone, ShieldCheck, Wifi } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { LibraryCard } from "../components/LibraryCard";
 import { PublicChrome } from "../components/PublicChrome";
@@ -59,147 +59,87 @@ export function CenterDetailRoute() {
           <div className="space-y-4">
             <LibraryCard center={center} />
 
-            <section className="grid gap-4 md:grid-cols-2">
-              <article className="rounded-[22px] border border-border bg-card p-4 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
-                <h2 className="text-[1.05rem] font-semibold text-foreground">
-                  Identidad y contacto
-                </h2>
-                <div className="mt-3 space-y-3 text-[13px] text-muted-foreground">
-                  <p className="flex items-start gap-2">
-                    <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <span>
-                      {[
-                        data.item.location.addressLine,
-                        data.item.location.postalCode,
-                        data.item.location.neighborhood,
-                        data.item.location.district,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "Direccion no disponible"}
-                    </span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <Phone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <span>{data.item.contact.phone ?? "Telefono no publicado"}</span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <Mail className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <span>{data.item.contact.email ?? "Email no publicado"}</span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <Wifi className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <span>
-                      {center.wifi
-                        ? center.wifiOrigin === "official_text_parsed"
-                          ? "WiFi detectado en texto oficial"
-                          : "WiFi confirmado en fuente oficial"
-                        : "WiFi no confirmado"}
-                    </span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <span>
-                      {center.accessibility
-                        ? "Accesibilidad indicada en la fuente"
-                        : "Accesibilidad no confirmada"}
-                    </span>
-                  </p>
-                </div>
-
-                {data.item.contact.websiteUrl ? (
-                  <a
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl border border-border bg-muted/45 px-4 py-2.5 text-[12px] font-medium text-foreground transition hover:bg-muted/65"
-                    href={data.item.contact.websiteUrl}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    Ver ficha oficial
-                    <ExternalLink className="size-4" />
-                  </a>
-                ) : null}
-              </article>
-
-              <article className="rounded-[22px] border border-border bg-card p-4 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
-                <h2 className="text-[1.05rem] font-semibold text-foreground">
-                  Calidad del dato
-                </h2>
-                <div className="mt-3 space-y-2.5 text-[13px] text-muted-foreground">
-                  <p>Fuente: {center.sourceCode === "libraries" ? "Bibliotecas" : "Salas de estudio"}</p>
-                  <p>Confianza del horario: {center.schedule.confidence}</p>
-                  <p>Resumen de hoy: {center.schedule.todaySummary ?? "No disponible"}</p>
-                  <p>Proxima apertura: {center.schedule.nextOpening ?? "No disponible"}</p>
-                  <p>Proximo cambio: {center.schedule.nextChangeAt ?? "No disponible"}</p>
-                  <p>
-                    Distancia real:{" "}
-                    {center.dataQuality.hasRealDistance
-                      ? center.distanceLabel
-                      : "No disponible sin geolocalizacion"}
-                  </p>
-                  <p>
-                    Aforo:{" "}
-                    {center.capacityValue !== null
-                      ? center.capacityOrigin === "official_text_parsed"
-                        ? `${center.capacityValue} plazas (texto oficial)`
-                        : `${center.capacityValue} plazas`
-                      : "No disponible"}
-                  </p>
-                </div>
-              </article>
-            </section>
-
             <section className="rounded-[22px] border border-border bg-card p-4 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
-              <h2 className="text-[1.05rem] font-semibold text-foreground">
-                Horario estructurado
-              </h2>
-              <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
-                {center.schedule.displayText ?? center.schedule.rawText ?? "Horario no disponible"}
-              </p>
-              <div className="mt-4">
-                <ScheduleRulesBlock rules={center.schedule.rules} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-border bg-muted/45 px-3.5 py-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                    Direccion y contacto
+                  </p>
+                  <p className="mt-2 text-[13px] text-foreground">
+                    {[
+                      data.item.location.addressLine,
+                      data.item.location.postalCode,
+                      data.item.location.neighborhood,
+                      data.item.location.district,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "Direccion no disponible"}
+                  </p>
+                  <p className="mt-1 text-[12px] text-muted-foreground">
+                    {data.item.contact.phone ?? "Telefono no publicado"}
+                    {data.item.contact.email ? ` · ${data.item.contact.email}` : ""}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border bg-muted/45 px-3.5 py-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                    Calidad y trazabilidad
+                  </p>
+                  <p className="mt-2 text-[13px] text-foreground">
+                    Fuente: {center.sourceCode === "libraries" ? "Bibliotecas" : "Salas de estudio"}
+                  </p>
+                  <p className="mt-1 text-[12px] text-muted-foreground">
+                    Confianza horario: {center.schedule.confidence} · Revision manual: {center.schedule.needsManualReview ? "si" : "no"}
+                  </p>
+                </div>
               </div>
-              {center.schedule.notesUnparsed ? (
-                <p className="mt-4 text-[12px] leading-6 text-muted-foreground">
-                  Notas no estructuradas: {center.schedule.notesUnparsed}
+
+              <details className="mt-4 rounded-2xl border border-border bg-muted/35 px-3.5 py-3">
+                <summary className="cursor-pointer text-[13px] font-medium text-foreground">
+                  Ver horario estructurado
+                </summary>
+                <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
+                  {center.schedule.displayText ?? center.schedule.rawText ?? "Horario no disponible"}
                 </p>
-              ) : null}
-            </section>
+                <div className="mt-3">
+                  <ScheduleRulesBlock rules={center.schedule.rules} />
+                </div>
+                {center.schedule.notesUnparsed ? (
+                  <p className="mt-3 text-[12px] leading-6 text-muted-foreground">
+                    Notas no estructuradas: {center.schedule.notesUnparsed}
+                  </p>
+                ) : null}
+              </details>
 
-            <section className="rounded-[22px] border border-border bg-card p-4 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
-              <h2 className="text-[1.05rem] font-semibold text-foreground">
-                Equipamiento y transporte
-              </h2>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                {data.item.equipment.map((equipment) => (
-                  <div
-                    className="rounded-2xl border border-border bg-muted/45 px-3.5 py-3"
-                    key={equipment.key}
-                  >
-                    <p className="text-[13px] font-medium text-foreground">{equipment.label}</p>
-                    <p className="mt-1 text-[12px] text-muted-foreground">
-                      {equipment.available ? equipment.value : "No disponible"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 space-y-2.5">
-                {center.transportOptions.map((option) => (
-                  <div
-                    className="rounded-2xl border border-border bg-muted/45 px-3.5 py-3"
-                    key={option.id}
-                  >
-                    <p className="text-[13px] font-semibold text-foreground">
-                      {option.title}
-                    </p>
-                    <p className="mt-1 text-[12px] text-muted-foreground">{option.summary}</p>
-                    <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {option.sourceLabel}
-                    </p>
-                    {option.note ? (
-                      <p className="mt-2 text-[12px] text-muted-foreground">{option.note}</p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
+              <details className="mt-3 rounded-2xl border border-border bg-muted/35 px-3.5 py-3">
+                <summary className="cursor-pointer text-[13px] font-medium text-foreground">
+                  Ver equipamiento tecnico
+                </summary>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  {data.item.equipment.map((equipment) => (
+                    <div
+                      className="rounded-2xl border border-border bg-card px-3.5 py-3"
+                      key={equipment.key}
+                    >
+                      <p className="text-[13px] font-medium text-foreground">{equipment.label}</p>
+                      <p className="mt-1 text-[12px] text-muted-foreground">
+                        {equipment.available ? equipment.value : "No disponible"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+
+              {data.item.contact.websiteUrl ? (
+                <a
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl border border-border bg-muted/45 px-4 py-2.5 text-[12px] font-medium text-foreground transition hover:bg-muted/65"
+                  href={data.item.contact.websiteUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Ver ficha oficial
+                  <ExternalLink className="size-4" />
+                </a>
+              ) : null}
             </section>
 
             <div className="flex justify-start">

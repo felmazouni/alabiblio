@@ -152,7 +152,7 @@ function joinPlace(center: PublicCenterPresentation) {
 }
 
 function availabilityProgress(center: PublicCenterPresentation) {
-  return 0;
+  return center.capacityOrigin !== "not_available" && center.capacityValue !== null ? 100 : 0;
 }
 
 function renderStars(ratingOrigin: DataOrigin) {
@@ -390,41 +390,40 @@ function RatingSection({ center }: { center: PublicCenterPresentation }) {
             <span className="text-[1rem] font-semibold text-foreground">
               {hasRatings && center.ratingAverage !== null
                 ? center.ratingAverage.toFixed(1)
-                : "Valoraciones pendientes"}
+                : "0.0"}
             </span>
             <span className="text-[12px] text-muted-foreground">
               {hasRatings
                 ? `(${center.ratingCount} opiniones)`
-                : "(sin dato real todavia)"}
+                : "(sin valoraciones todavia)"}
             </span>
           </div>
         </div>
 
         <button
           className="inline-flex h-8 items-center justify-center rounded-xl border border-border bg-card px-3 text-[12px] font-medium text-muted-foreground"
-          disabled={!hasRatings}
+          disabled
           type="button"
         >
-          Opinar
+          Opinar (proximamente)
         </button>
       </div>
 
-      {hasRatings ? (
-        <div className="grid gap-2 md:grid-cols-2 md:gap-x-6">
-          {aspectItems.map((aspect) => (
-            <AspectRow
-              hasData={hasRatings}
-              icon={aspect.icon}
-              key={aspect.key}
-              label={aspect.label}
-            />
-          ))}
-        </div>
-      ) : (
+      <div className="grid gap-2 md:grid-cols-2 md:gap-x-6">
+        {aspectItems.map((aspect) => (
+          <AspectRow
+            hasData={hasRatings}
+            icon={aspect.icon}
+            key={aspect.key}
+            label={aspect.label}
+          />
+        ))}
+      </div>
+      {!hasRatings ? (
         <p className="text-[11px] text-muted-foreground">
-          Las valoraciones y subratings se activaran cuando exista voto real verificado.
+          Las valoraciones se activaran cuando exista voto real verificado.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -481,15 +480,15 @@ function SummaryBox({ center }: { center: PublicCenterPresentation }) {
   const progress = availabilityProgress(center);
   const capacitySummaryLabel =
     center.capacityOrigin === "official_structured"
-      ? "Aforo oficial"
+      ? "Aforo publicado"
       : center.capacityOrigin === "official_text_parsed"
-        ? "Aforo en texto oficial"
-        : "Ocupacion no disponible";
+        ? "Aforo publicado (texto oficial)"
+        : "Aforo no disponible";
   const capacitySummaryNote =
     center.capacityOrigin === "official_structured"
-      ? "Aforo oficial disponible. La ocupacion en tiempo real todavia no esta integrada."
+      ? "Dato oficial de capacidad. La ocupacion en tiempo real todavia no esta integrada."
       : center.capacityOrigin === "official_text_parsed"
-        ? "Aforo extraido de texto oficial. La ocupacion en tiempo real todavia no esta integrada."
+        ? "Capacidad extraida de texto oficial. La ocupacion en tiempo real todavia no esta integrada."
         : "Sin aforo publicado o verificable.";
 
   return (

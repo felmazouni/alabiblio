@@ -351,7 +351,7 @@ export function FiltersPanel({
                       Distancia maxima
                     </h4>
                     <p className="mt-1 text-[13px] text-muted-foreground">
-                      Define el radio de busqueda desde tu ubicacion
+                      Por defecto se muestra toda la Comunidad de Madrid.
                     </p>
 
                     <div className="mt-3 rounded-[18px] border border-border bg-card px-4 py-3.5">
@@ -369,22 +369,22 @@ export function FiltersPanel({
                         <input
                           className="w-full accent-primary"
                           disabled={!metadata?.canUseDistanceFilter}
-                          max={10000}
-                          min={500}
+                          max={120000}
+                          min={5000}
                           onChange={(event) =>
                             setLocalFilters((current) => ({
                               ...current,
                               radiusMeters: Number(event.target.value),
                             }))
                           }
-                          step={250}
+                          step={1000}
                           type="range"
                           value={localFilters.radiusMeters}
                         />
                         <div className="mt-3 flex justify-between text-[12px] text-muted-foreground">
-                          <span>500m</span>
                           <span>5 km</span>
-                          <span>10 km</span>
+                          <span>60 km</span>
+                          <span>120 km</span>
                         </div>
                       </div>
                     </div>
