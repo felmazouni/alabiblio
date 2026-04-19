@@ -1,7 +1,7 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-19`
-- Estado del proyecto: `preview funcional estable`, `Bloque 1` completado, no produccion.
+- Estado del proyecto: `preview funcional estable`, `Bloques 1 y 2` completados, no produccion.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
@@ -21,6 +21,8 @@
 - Normalizacion persistente basica de horarios con `rules`, `schedule_confidence`, `notes_unparsed`, `is_open_now` y `next_change_at`.
 - Esquema runtime de D1 alineado con migraciones versionadas para transporte persistido y cobertura SER.
 - Reclasificacion inicial de procedencia ya aplicada para `wifi`, `aforo`, flags de detalle y payloads visibles.
+- Reingesta real de centros ejecutada sobre preview con 7 descartes persistidos y auditables.
+- Normalizacion de centros validada sin slugs duplicados y sin espacios al aire libre retenidos.
 - Home, listado, detalle basico y modal de filtros visibles en preview.
 - Dark mode base operativo con persistencia de preferencia.
 - Logging estructurado basico en Worker e ingesta.
@@ -51,20 +53,20 @@
   * [x] Riesgos o dependencias si aplica
   * [x] Riesgo de tocar piezas que hoy sostienen preview; resuelto en este bloque sin romper endpoints ni bindings ya operativos.
 
-* [ ] Bloque 2. Reingesta y normalización total de centros
+* [x] Bloque 2. Reingesta y normalización total de centros
 
-  * [ ] Objetivo del bloque
-  * [ ] Reprocesar bibliotecas y salas de estudio para dejar una entidad canónica limpia, coherente y visible en producto.
-  * [ ] Revisar y normalizar nombre, dirección, barrio, distrito, teléfono, email, web, coordenadas, tipología y exclusiones.
-  * [ ] Reparar encoding, entidades HTML, separadores, duplicados, slugs estables y claves externas.
-  * [ ] Reclasificar `wifi`, `accesibilidad`, `aforo`, contacto y notas operativas según su origen real.
-  * [ ] Persistir campos crudos de origen y campos normalizados separados para trazabilidad.
-  * [ ] Persistir rechazos con motivo de descarte para bibliotecas al aire libre, salas no válidas, parques y elementos abiertos.
-  * [ ] Definir qué campos pueden mostrarse como features visibles y cuáles deben quedarse fuera de UI por baja calidad o ambigüedad.
-  * [ ] Criterio de cierre del bloque
-  * [ ] Todos los centros publicados en preview salen de una normalización consistente, sin espacios al aire libre, con slugs estables y con campos visibles clasificados honestamente.
-  * [ ] Riesgos o dependencias si aplica
-  * [ ] Depende del Bloque 1 y puede mover conteos, slugs y snapshots existentes.
+  * [x] Objetivo del bloque
+  * [x] Reprocesar bibliotecas y salas de estudio para dejar una entidad canónica limpia, coherente y visible en producto.
+  * [x] Revisar y normalizar nombre, dirección, barrio, distrito, teléfono, email, web, coordenadas, tipología y exclusiones.
+  * [x] Reparar encoding, entidades HTML, separadores, duplicados, slugs estables y claves externas.
+  * [x] Reclasificar `wifi`, `accesibilidad`, `aforo`, contacto y notas operativas según su origen real.
+  * [x] Persistir campos crudos de origen y campos normalizados separados para trazabilidad.
+  * [x] Persistir rechazos con motivo de descarte para bibliotecas al aire libre, salas no válidas, parques y elementos abiertos.
+  * [x] Definir qué campos pueden mostrarse como features visibles y cuáles deben quedarse fuera de UI por baja calidad o ambigüedad.
+  * [x] Criterio de cierre del bloque
+  * [x] Todos los centros publicados en preview salen de una normalización consistente, sin espacios al aire libre, con slugs estables y con campos visibles clasificados honestamente.
+  * [x] Riesgos o dependencias si aplica
+  * [x] Dependencia del Bloque 1 resuelta; este bloque ha actualizado conteos y reingesta sin romper preview.
 
 * [ ] Bloque 3. Horarios robustos y revisión manual
 

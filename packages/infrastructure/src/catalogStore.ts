@@ -119,6 +119,15 @@ interface NormalizedCenter {
   rawJson: string;
 }
 
+interface RejectedCenter {
+  id: string;
+  sourceCode: SourceCode;
+  externalId: string;
+  title: string | null;
+  reason: "missing_external_id_or_name" | "not_interior_study_space_candidate";
+  rawJson: string;
+}
+
 interface StoredCenterRow {
   id: string;
   slug: string;
@@ -268,6 +277,15 @@ const SCHEMA_STATEMENTS = [
     finished_at TEXT,
     item_count INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS center_ingestion_rejections (
+    id TEXT PRIMARY KEY,
+    source_code TEXT NOT NULL,
+    external_id TEXT,
+    title TEXT,
+    reason TEXT NOT NULL,
+    raw_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS centers (
     id TEXT PRIMARY KEY,
@@ -517,14 +535,27 @@ function toBooleanFlag(value: string | undefined): boolean {
   return value === "1";
 }
 
-function normalizeRecord(record: MadridOpenDataRecord, sourceCode: SourceCode): NormalizedCenter | null {
+function normalizeRecord(
+  record: MadridOpenDataRecord,
+  sourceCode: SourceCode,
+): { accepted: NormalizedCenter | null; rejected: RejectedCenter | null } {
   const externalId = String(record.id ?? "").trim();
   const name = repairSourceText(record.organization?.["organization-name"] ?? record.title);
   const servicesText = repairSourceText(record.organization?.services);
   const schedule = parseSchedule(record.organization?.schedule);
 
   if (!externalId || !name) {
-    return null;
+    return {
+      accepted: null,
+      rejected: {
+        id: `${sourceCode}:${externalId || "missing"}:missing_external_id_or_name`,
+        sourceCode,
+        externalId,
+        title: name,
+        reason: "missing_external_id_or_name",
+        rawJson: JSON.stringify(record),
+      },
+    };
   }
 
   const kind: CenterKind = sourceCode === "libraries" ? "library" : "study_room";
@@ -537,7 +568,17 @@ function normalizeRecord(record: MadridOpenDataRecord, sourceCode: SourceCode): 
       schedule: schedule.rawText,
     })
   ) {
-    return null;
+    return {
+      accepted: null,
+      rejected: {
+        id: `${sourceCode}:${externalId}:not_interior_study_space_candidate`,
+        sourceCode,
+        externalId,
+        title: name,
+        reason: "not_interior_study_space_candidate",
+        rawJson: JSON.stringify(record),
+      },
+    };
   }
 
   const district = repairSourceText(record.address?.district?.["@id"]?.split("/").filter(Boolean).at(-1) ?? null);
@@ -550,34 +591,37 @@ function normalizeRecord(record: MadridOpenDataRecord, sourceCode: SourceCode): 
   const capacityValue = inferCapacity(servicesText);
 
   return {
-    id: `${sourceCode}:${externalId}`,
-    slug,
-    kind,
-    sourceCode,
-    externalId,
-    name,
-    addressLine,
-    district,
-    neighborhood,
-    postalCode: repairSourceText(record.address?.["postal-code"]),
-    latitude:
-      typeof record.location?.latitude === "number" ? record.location.latitude : null,
-    longitude:
-      typeof record.location?.longitude === "number" ? record.location.longitude : null,
-    phone: normalizePhone(record.organization?.telephone),
-    email: repairSourceText(record.organization?.email),
-    websiteUrl: repairSourceText(record.relation),
-    accessibility,
-    accessibilityOrigin: accessibility ? "official_structured" : "not_available",
-    wifi,
-    wifiOrigin: wifi ? "official_text_parsed" : "not_available",
-    openAir: false,
-    capacityValue,
-    capacityOrigin: capacityValue !== null ? "official_text_parsed" : "not_available",
-    servicesText,
-    transportText,
-    schedule,
-    rawJson: JSON.stringify(record),
+    accepted: {
+      id: `${sourceCode}:${externalId}`,
+      slug,
+      kind,
+      sourceCode,
+      externalId,
+      name,
+      addressLine,
+      district,
+      neighborhood,
+      postalCode: repairSourceText(record.address?.["postal-code"]),
+      latitude:
+        typeof record.location?.latitude === "number" ? record.location.latitude : null,
+      longitude:
+        typeof record.location?.longitude === "number" ? record.location.longitude : null,
+      phone: normalizePhone(record.organization?.telephone),
+      email: repairSourceText(record.organization?.email),
+      websiteUrl: repairSourceText(record.relation),
+      accessibility,
+      accessibilityOrigin: accessibility ? "official_structured" : "not_available",
+      wifi,
+      wifiOrigin: wifi ? "official_text_parsed" : "not_available",
+      openAir: false,
+      capacityValue,
+      capacityOrigin: capacityValue !== null ? "official_text_parsed" : "not_available",
+      servicesText,
+      transportText,
+      schedule,
+      rawJson: JSON.stringify(record),
+    },
+    rejected: null,
   };
 }
 
@@ -615,16 +659,24 @@ async function fetchOfficialDataset(url: string): Promise<MadridOpenDataRecord[]
   return records;
 }
 
-async function hydrateLiveCatalog(sources: SourceConfig): Promise<NormalizedCenter[]> {
+async function hydrateLiveCatalog(
+  sources: SourceConfig,
+): Promise<{ centers: NormalizedCenter[]; rejections: RejectedCenter[] }> {
   const [libraries, studyRooms] = await Promise.all([
     fetchOfficialDataset(sources.libraries),
     fetchOfficialDataset(sources.studyRooms),
   ]);
 
-  const centers = [
+  const normalized = [
     ...libraries.map((record) => normalizeRecord(record, "libraries")),
     ...studyRooms.map((record) => normalizeRecord(record, "study_rooms")),
-  ].filter((center): center is NormalizedCenter => center !== null);
+  ];
+  const centers = normalized
+    .map((item) => item.accepted)
+    .filter((center): center is NormalizedCenter => center !== null);
+  const rejections = normalized
+    .map((item) => item.rejected)
+    .filter((item): item is RejectedCenter => item !== null);
 
   console.log(
     JSON.stringify({
@@ -632,10 +684,11 @@ async function hydrateLiveCatalog(sources: SourceConfig): Promise<NormalizedCent
       source_libraries: libraries.length,
       source_study_rooms: studyRooms.length,
       kept_centers: centers.length,
+      rejected_centers: rejections.length,
     }),
   );
 
-  return centers;
+  return { centers, rejections };
 }
 
 async function ensureSchema(database: D1LikeDatabase): Promise<void> {
@@ -652,7 +705,13 @@ async function countCenters(database: D1LikeDatabase): Promise<number> {
   return row?.total ?? 0;
 }
 
-async function replaceCatalog(database: D1LikeDatabase, centers: NormalizedCenter[], sources: SourceConfig) {
+async function replaceCatalog(
+  database: D1LikeDatabase,
+  centers: NormalizedCenter[],
+  rejections: RejectedCenter[],
+  sources: SourceConfig,
+) {
+  await database.prepare("DELETE FROM center_ingestion_rejections").run();
   await database.prepare("DELETE FROM center_schedule_rules").run();
   await database.prepare("DELETE FROM center_transport_relevance").run();
   await database.prepare("DELETE FROM center_transport_options").run();
@@ -734,6 +793,24 @@ async function replaceCatalog(database: D1LikeDatabase, centers: NormalizedCente
     }
   }
 
+  for (const rejection of rejections) {
+    statements.push(
+      database
+        .prepare(
+          "INSERT INTO center_ingestion_rejections (id, source_code, external_id, title, reason, raw_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(
+          rejection.id,
+          rejection.sourceCode,
+          rejection.externalId || null,
+          rejection.title,
+          rejection.reason,
+          rejection.rawJson,
+          now,
+        ),
+    );
+  }
+
   await runStatementsInChunks(database, statements);
 
   await replaceTransportSnapshots(
@@ -745,6 +822,7 @@ async function replaceCatalog(database: D1LikeDatabase, centers: NormalizedCente
     JSON.stringify({
       event: "catalog_replace_complete",
       total_centers: centers.length,
+      total_rejections: rejections.length,
     }),
   );
 }
@@ -1915,7 +1993,8 @@ async function loadBaseCenters(options: CatalogStoreOptions): Promise<{ sourceMo
 
   if (!database) {
     console.log(JSON.stringify({ event: "catalog_source_mode", mode: "live" }));
-    const items = (await hydrateLiveCatalog(options.sources)).map(toBaseCenterRecord);
+    const { centers } = await hydrateLiveCatalog(options.sources);
+    const items = centers.map(toBaseCenterRecord);
     return { sourceMode: "live", items };
   }
 
@@ -1923,8 +2002,8 @@ async function loadBaseCenters(options: CatalogStoreOptions): Promise<{ sourceMo
 
   if ((await countCenters(database)) === 0) {
     console.log(JSON.stringify({ event: "catalog_hydrate_required", mode: "d1" }));
-    const centers = await hydrateLiveCatalog(options.sources);
-    await replaceCatalog(database, centers, options.sources);
+    const { centers, rejections } = await hydrateLiveCatalog(options.sources);
+    await replaceCatalog(database, centers, rejections, options.sources);
   }
 
   const items = await readBaseCentersFromDatabase(database);

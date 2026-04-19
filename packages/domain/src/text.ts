@@ -1,8 +1,51 @@
-const MOJIBAKE_HINTS = ["Ã", "Â", "â", "€", "™"];
+const MOJIBAKE_HINTS = ["Ã", "Â", "â", "ð"];
+
+const HTML_ENTITY_MAP: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  aacute: "á",
+  eacute: "é",
+  iacute: "í",
+  oacute: "ó",
+  uacute: "ú",
+  Aacute: "Á",
+  Eacute: "É",
+  Iacute: "Í",
+  Oacute: "Ó",
+  Uacute: "Ú",
+  ntilde: "ñ",
+  Ntilde: "Ñ",
+  uuml: "ü",
+  Uuml: "Ü",
+};
 
 function decodeLatin1Mojibake(value: string): string {
   const bytes = Uint8Array.from(value, (char) => char.charCodeAt(0) & 0xff);
   return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity) => {
+    if (!entity) {
+      return match;
+    }
+
+    if (entity.startsWith("#x") || entity.startsWith("#X")) {
+      const codePoint = Number.parseInt(entity.slice(2), 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+    }
+
+    if (entity.startsWith("#")) {
+      const codePoint = Number.parseInt(entity.slice(1), 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+    }
+
+    return HTML_ENTITY_MAP[entity] ?? match;
+  });
 }
 
 export function repairSourceText(value: string | null | undefined): string | null {
@@ -10,7 +53,7 @@ export function repairSourceText(value: string | null | undefined): string | nul
     return null;
   }
 
-  const trimmed = value.replace(/\u00a0/g, " ").trim();
+  const trimmed = decodeHtmlEntities(value).replace(/\u00a0/g, " ").trim();
 
   if (trimmed === "") {
     return null;
@@ -18,7 +61,7 @@ export function repairSourceText(value: string | null | undefined): string | nul
 
   let current = trimmed;
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     if (!MOJIBAKE_HINTS.some((hint) => current.includes(hint))) {
       break;
     }
@@ -68,10 +111,16 @@ export function normalizePhone(value: string | null | undefined): string | null 
 }
 
 export function includesAny(value: string, terms: string[]): boolean {
-  const search = value
-    .normalize("NFD")
-    .replace(/\p{M}+/gu, "")
-    .toLowerCase();
+  const search = normalizeSearch(value);
 
   return terms.some((term) => search.includes(term));
+}
+
+export function normalizeSearch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
