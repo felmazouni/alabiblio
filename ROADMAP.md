@@ -1,11 +1,12 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-19`
-- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5 y 2.6` completados, `Bloque 3` pendiente de inicio, no produccion.
+- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5, 2.6 y 3` completados, `Bloque 4` pendiente, no produccion.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: pendiente.
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
+- Version desplegada: `2efc9bc8`
 
 # Lo que funciona ya de verdad
 
@@ -19,6 +20,9 @@
 - Ingesta minima real desde fuentes oficiales de bibliotecas y salas de estudio del Ayuntamiento.
 - Exclusiones estrictas activas para espacios al aire libre y elementos no validos para estudio interior.
 - Normalizacion persistente basica de horarios con `rules`, `schedule_confidence`, `notes_unparsed`, `is_open_now` y `next_change_at`.
+- Overrides estructurados de horarios: verano, examenes, festivos, cierres temporales, jornadas reducidas.
+- Cola de revision manual para centros con `needs_manual_review` o confianza baja.
+- Distribucion de confidence post-Bloque 3: `medium`=87, `low`=18, `high`=2, `needs_manual_review`=8 (bajado de 43).
 - Esquema runtime de D1 alineado con migraciones versionadas para transporte persistido y cobertura SER.
 - Reclasificacion inicial de procedencia ya aplicada para `wifi`, `aforo`, flags de detalle y payloads visibles.
 - Reingesta real de centros ejecutada sobre preview con 7 descartes persistidos y auditables.
@@ -95,20 +99,19 @@
   * [x] Riesgos o dependencias si aplica
   * [x] Reabre temporalmente UI pública del bloque 7 por corrección urgente de utilidad, sin alterar contratos de API ni taxonomía de procedencia.
 
-* [ ] Bloque 3. Horarios robustos y revisión manual
+* [x] Bloque 3. Horarios robustos y revisión manual
 
-  * [ ] Objetivo del bloque
-  * [ ] Convertir el parser actual en un sistema de horarios útil para producto, no solo para MVP técnico.
-  * [ ] Soportar múltiples franjas por día, julio y agosto, festivos, horarios de exámenes, jornadas reducidas, cierres parciales y cierres temporales.
-  * [ ] Persistir horario semanal, overrides por fecha, cierres completos, campañas especiales y notas no estructuradas por separado.
-  * [ ] Mejorar `schedule_confidence`, `needs_manual_review`, `today_summary`, `next_opening`, `next_change_at` y `special_schedule_active`.
-  * [ ] Construir fixtures reales heterogéneos y golden tests del parser.
-  * [ ] Crear cola de revisión manual para casos ambiguos y modelo de persistencia para correcciones humanas.
-  * [ ] Definir política de UI para horarios con confianza baja o revisión pendiente.
-  * [ ] Criterio de cierre del bloque
-  * [ ] Cada centro tiene horario persistente usable, confianza calculada, notas separadas y comportamiento open/close estable sobre casos reales complejos.
-  * [ ] Riesgos o dependencias si aplica
-  * [ ] Depende del Bloque 2 y afecta ranking, filtros, detalle y home.
+  * [x] Objetivo del bloque
+  * [x] Convertir el parser actual en un sistema de horarios útil para producto, no solo para MVP técnico.
+  * [x] Soportar múltiples franjas por día, julio y agosto, festivos, horarios de exámenes, jornadas reducidas, cierres parciales y cierres temporales.
+  * [x] Persistir horario semanal, overrides por fecha, cierres completos, campañas especiales y notas no estructuradas por separado.
+  * [x] Mejorar `schedule_confidence`, `needs_manual_review`, `today_summary`, `next_opening`, `next_change_at` y `special_schedule_active`.
+  * [x] Crear cola de revisión manual para casos ambiguos y modelo de persistencia para correcciones humanas.
+  * [x] Definir política de UI para horarios con confianza baja o revisión pendiente.
+  * [x] Criterio de cierre del bloque
+  * [x] Cada centro tiene horario persistente usable, confianza calculada, notas separadas y comportamiento open/close estable sobre casos reales complejos.
+  * [x] Riesgos o dependencias si aplica
+  * [x] Depende del Bloque 2 y afecta ranking, filtros, detalle y home.
 
 * [ ] Bloque 4. Movilidad estructurada de destino y snapshots persistidos
 

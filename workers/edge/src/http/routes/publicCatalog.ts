@@ -1,9 +1,13 @@
 import { loadPublicCatalog } from "@alabiblio/application";
+import type { PublicCatalogQuery } from "@alabiblio/contracts";
 import type { EdgeEnv } from "../../env";
 
-export async function buildPublicCatalogResponse(env: EdgeEnv): Promise<Response> {
+export async function buildPublicCatalogResponse(
+  env: EdgeEnv,
+  query: PublicCatalogQuery,
+): Promise<Response> {
   try {
-    const payload = await loadPublicCatalog(env.DB);
+    const payload = await loadPublicCatalog(env.DB, query);
 
     console.log(
       JSON.stringify({

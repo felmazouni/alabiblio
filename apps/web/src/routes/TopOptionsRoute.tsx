@@ -1,32 +1,41 @@
 import { LibraryCard } from "../components/LibraryCard";
 import { PublicChrome } from "../components/PublicChrome";
-import { usePublicCatalog } from "../lib/publicCatalog";
+import { defaultPublicFilters, usePublicCatalog } from "../lib/publicCatalog";
+import { useUserLocation } from "../lib/userLocation";
 
 export function TopOptionsRoute() {
-  const { error, items, loading } = usePublicCatalog();
+  const { location } = useUserLocation();
+  const { error, items, loading } = usePublicCatalog(
+    defaultPublicFilters,
+    location,
+    10,
+  );
 
   return (
     <PublicChrome backTo="/" compact>
       <main className="mx-auto max-w-[820px]">
-        <div className="mb-6">
-          <h1 className="text-3xl font-semibold text-slate-950">Mejores opciones para ti</h1>
-          <p className="mt-1 text-base text-slate-500">
-            Ranking inicial sobre datos reales: apertura, calidad del horario estructurado y riqueza operativa del centro
+        <div className="mb-5">
+          <h1 className="text-[1.95rem] font-semibold text-foreground">
+            Mejores opciones para ti
+          </h1>
+          <p className="mt-1.5 text-[13px] text-muted-foreground">
+            Ranking calculado con horario, confianza del dato, capacidad,
+            accesibilidad, transporte y distancia real si hay ubicacion.
           </p>
         </div>
 
         {loading ? (
-          <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-slate-500 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
-            Calculando ranking…
+          <div className="rounded-[24px] border border-border bg-card p-6 text-sm text-muted-foreground shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+            Calculando ranking...
           </div>
         ) : error ? (
-          <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-8 text-rose-700 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
+          <div className="rounded-[24px] border border-destructive/20 bg-destructive/8 p-6 text-sm text-destructive shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
             {error}
           </div>
         ) : (
-          <div className="space-y-4">
-            {items.slice(0, 10).map((item) => (
-              <LibraryCard center={item} key={item.id} />
+          <div className="space-y-3">
+            {items.map((item, index) => (
+              <LibraryCard center={{ ...item, rankingPosition: index + 1 }} key={item.id} />
             ))}
           </div>
         )}

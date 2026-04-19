@@ -155,6 +155,7 @@ interface StoredCenterRow {
   schedule_summary_text: string | null;
   schedule_confidence: ScheduleSummary["confidence"];
   schedule_notes_unparsed: string | null;
+  schedule_needs_review: number;
 }
 
 interface BaseCenterRecord {
@@ -313,6 +314,7 @@ const SCHEMA_STATEMENTS = [
     schedule_summary_text TEXT,
     schedule_confidence TEXT,
     schedule_notes_unparsed TEXT,
+    schedule_needs_review INTEGER NOT NULL DEFAULT 0,
     rating_average REAL,
     rating_count INTEGER NOT NULL DEFAULT 0,
     raw_json TEXT NOT NULL,
@@ -445,6 +447,34 @@ const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_transport_options_center ON center_transport_options(center_id)`,
   `CREATE INDEX IF NOT EXISTS idx_transport_nodes_center ON center_transport_nodes(center_id)`,
   `CREATE INDEX IF NOT EXISTS idx_transport_relevance_center ON center_transport_relevance(center_id)`,
+  `CREATE TABLE IF NOT EXISTS center_schedule_overrides (
+    id TEXT PRIMARY KEY,
+    center_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    label TEXT NOT NULL,
+    rules_json TEXT,
+    from_date TEXT,
+    to_date TEXT,
+    notes TEXT,
+    closed INTEGER NOT NULL DEFAULT 0,
+    source TEXT NOT NULL DEFAULT 'parsed',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(center_id) REFERENCES centers(id) ON DELETE CASCADE
+  )`,
+  `CREATE TABLE IF NOT EXISTS center_schedule_manual_review_queue (
+    id TEXT PRIMARY KEY,
+    center_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    raw_text TEXT,
+    reviewed_at TEXT,
+    reviewed_by TEXT,
+    review_action TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(center_id) REFERENCES centers(id) ON DELETE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_schedule_overrides_center ON center_schedule_overrides(center_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_schedule_review_center ON center_schedule_manual_review_queue(center_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_centers_needs_review ON centers(schedule_needs_review)`,
 ];
 
 const DEFAULT_PUBLIC_QUERY: Required<PublicCatalogQuery> = {
@@ -718,6 +748,8 @@ async function replaceCatalog(
 ) {
   await database.prepare("DELETE FROM center_ingestion_rejections").run();
   await database.prepare("DELETE FROM center_schedule_rules").run();
+  await database.prepare("DELETE FROM center_schedule_overrides").run();
+  await database.prepare("DELETE FROM center_schedule_manual_review_queue").run();
   await database.prepare("DELETE FROM center_transport_relevance").run();
   await database.prepare("DELETE FROM center_transport_options").run();
   await database.prepare("DELETE FROM center_transport_nodes").run();
@@ -749,9 +781,9 @@ async function replaceCatalog(
             id, slug, external_id, source_code, kind, name, address_line, district, neighborhood,
             postal_code, latitude, longitude, phone, email, website_url, accessibility, wifi,
             open_air, capacity_value, services_text, transport_text, schedule_text_raw,
-            schedule_summary_text, schedule_confidence, schedule_notes_unparsed, rating_average,
-            rating_count, raw_json, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            schedule_summary_text, schedule_confidence, schedule_notes_unparsed, schedule_needs_review,
+            rating_average, rating_count, raw_json, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           center.id,
@@ -779,6 +811,7 @@ async function replaceCatalog(
           center.schedule.displayText,
           center.schedule.confidence,
           center.schedule.notesUnparsed,
+          center.schedule.needsManualReview ? 1 : 0,
           null,
           0,
           center.rawJson,
@@ -794,6 +827,50 @@ async function replaceCatalog(
             "INSERT INTO center_schedule_rules (center_id, weekday, opens_at, closes_at) VALUES (?, ?, ?, ?)",
           )
           .bind(center.id, rule.weekday, rule.opensAt, rule.closesAt),
+      );
+    }
+
+    for (const [overrideIndex, override] of center.schedule.overrides.entries()) {
+      const overrideId = `${center.id}:override:${override.kind}:${override.fromDate ?? "nodate"}:${overrideIndex}`;
+      statements.push(
+        database
+          .prepare(
+            `INSERT INTO center_schedule_overrides
+              (id, center_id, kind, label, rules_json, from_date, to_date, notes, closed, source, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'parsed', ?)`,
+          )
+          .bind(
+            overrideId,
+            center.id,
+            override.kind,
+            override.label,
+            override.rules.length > 0 ? JSON.stringify(override.rules) : null,
+            override.fromDate,
+            override.toDate,
+            override.notes,
+            override.closed ? 1 : 0,
+            now,
+          ),
+      );
+    }
+
+    if (center.schedule.needsManualReview) {
+      statements.push(
+        database
+          .prepare(
+            `INSERT INTO center_schedule_manual_review_queue
+              (id, center_id, reason, raw_text, created_at)
+             VALUES (?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            `${center.id}:review`,
+            center.id,
+            center.schedule.confidence === "needs_manual_review"
+              ? "no_rules_found"
+              : "low_confidence",
+            center.schedule.rawText,
+            now,
+          ),
       );
     }
   }
@@ -1765,6 +1842,8 @@ function enrichBaseRow(row: StoredCenterRow): BaseCenterRecord {
       parsedSchedule.notesUnparsed ?? row.schedule_notes_unparsed,
     confidence: parsedSchedule.confidence,
     rules: parsedSchedule.rules,
+    overrides: parsedSchedule.overrides,
+    activeOverride: parsedSchedule.activeOverride,
   } satisfies ScheduleSummary;
 
   return {
@@ -1966,7 +2045,8 @@ async function readBaseCentersFromDatabase(database: D1LikeDatabase): Promise<Ba
         id, slug, kind, name, address_line, district, neighborhood, postal_code,
         latitude, longitude, phone, email, website_url, accessibility, wifi, open_air,
         capacity_value, services_text, transport_text, source_code, rating_average, rating_count,
-        schedule_text_raw, schedule_summary_text, schedule_confidence, schedule_notes_unparsed
+        schedule_text_raw, schedule_summary_text, schedule_confidence, schedule_notes_unparsed,
+        schedule_needs_review
       FROM centers`,
     )
     .all<StoredCenterRow>();

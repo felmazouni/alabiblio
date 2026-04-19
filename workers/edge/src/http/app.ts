@@ -1,8 +1,11 @@
 import type { EdgeEnv } from "../env";
+import { parsePublicCatalogQuery } from "./query";
 import { buildAdminBootstrapResponse } from "./routes/admin";
 import { buildHealthResponse } from "./routes/health";
-import { buildPublicCatalogResponse } from "./routes/publicCatalog";
 import { buildPublicBootstrapResponse } from "./routes/public";
+import { buildPublicCatalogResponse } from "./routes/publicCatalog";
+import { buildPublicCenterDetailResponse } from "./routes/publicCenterDetail";
+import { buildPublicFiltersResponse } from "./routes/publicFilters";
 
 function logRequest(
   request: Request,
@@ -24,13 +27,21 @@ function logRequest(
   );
 }
 
-function notFound(request: Request, env: EdgeEnv): Promise<Response> | Response {
+async function notFound(request: Request, env: EdgeEnv): Promise<Response> {
   if (env.ASSETS) {
     const url = new URL(request.url);
     const hasExtension = /\.[a-z0-9]+$/i.test(url.pathname);
 
     if (request.method === "GET" && !url.pathname.startsWith("/api/") && !hasExtension) {
-      return env.ASSETS.fetch(new Request(new URL("/", request.url), request));
+      const rootResponse = await env.ASSETS.fetch(
+        new Request(new URL("/", request.url), request),
+      );
+
+      if (rootResponse.status !== 404) {
+        return rootResponse;
+      }
+
+      return env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
     }
 
     return env.ASSETS.fetch(request);
@@ -39,18 +50,19 @@ function notFound(request: Request, env: EdgeEnv): Promise<Response> | Response 
   return Response.json(
     {
       error: "not_found",
-      message: "No route or static asset matched the request."
+      message: "No route or static asset matched the request.",
     },
-    { status: 404 }
+    { status: 404 },
   );
 }
 
 export async function handleRequest(
   request: Request,
-  env: EdgeEnv
+  env: EdgeEnv,
 ): Promise<Response> {
   const startedAt = Date.now();
   const url = new URL(request.url);
+  const catalogQuery = parsePublicCatalogQuery(url);
 
   try {
     let response: Response;
@@ -60,7 +72,15 @@ export async function handleRequest(
     } else if (request.method === "GET" && url.pathname === "/api/public/bootstrap") {
       response = buildPublicBootstrapResponse();
     } else if (request.method === "GET" && url.pathname === "/api/public/catalog") {
-      response = await buildPublicCatalogResponse(env);
+      response = await buildPublicCatalogResponse(env, catalogQuery);
+    } else if (request.method === "GET" && url.pathname === "/api/public/filters") {
+      response = await buildPublicFiltersResponse(env, catalogQuery);
+    } else if (request.method === "GET" && url.pathname.startsWith("/api/public/centers/")) {
+      const slug = decodeURIComponent(url.pathname.replace("/api/public/centers/", ""));
+      response = await buildPublicCenterDetailResponse(env, slug, {
+        lat: catalogQuery.lat,
+        lon: catalogQuery.lon,
+      });
     } else if (request.method === "GET" && url.pathname === "/api/admin/bootstrap") {
       response = buildAdminBootstrapResponse();
     } else {

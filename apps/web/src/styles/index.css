@@ -3,56 +3,80 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.98 0.002 250);
-  --foreground: oklch(0.18 0.02 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 250);
-  --primary: oklch(0.42 0.14 250);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.96 0.003 250);
-  --secondary-foreground: oklch(0.28 0.02 250);
-  --muted: oklch(0.96 0.003 250);
-  --muted-foreground: oklch(0.48 0.008 250);
-  --accent: oklch(0.52 0.14 195);
-  --accent-foreground: oklch(1 0 0);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(1 0 0);
-  --success: oklch(0.55 0.16 155);
-  --success-foreground: oklch(1 0 0);
-  --warning: oklch(0.78 0.14 70);
-  --warning-foreground: oklch(0.22 0.02 70);
-  --border: oklch(0.91 0.003 250);
-  --input: oklch(0.93 0.003 250);
-  --ring: oklch(0.42 0.14 250);
-  --radius: 0.625rem;
+  --background: #f7f7f4;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0f5ba7;
+  --primary-foreground: #ffffff;
+  --secondary: #edf2f7;
+  --secondary-foreground: #1e293b;
+  --muted: #f3f5f7;
+  --muted-foreground: #64748b;
+  --accent: #dbeafe;
+  --accent-foreground: #0f172a;
+  --destructive: #d92d20;
+  --destructive-foreground: #ffffff;
+  --success: #067647;
+  --success-foreground: #ffffff;
+  --warning: #b54708;
+  --warning-foreground: #ffffff;
+  --border: #dbe3ea;
+  --input: #e7edf3;
+  --ring: rgba(15, 91, 167, 0.35);
+  --transport-metro-bg: #fff2f2;
+  --transport-metro-border: #fecaca;
+  --transport-metro-text: #b42318;
+  --transport-bus-bg: #eef4ff;
+  --transport-bus-border: #bfdbfe;
+  --transport-bus-text: #1d4ed8;
+  --transport-bike-bg: #ecfdf3;
+  --transport-bike-border: #a7f3d0;
+  --transport-bike-text: #047857;
+  --transport-car-bg: #fff9eb;
+  --transport-car-border: #fcd34d;
+  --transport-car-text: #b45309;
+  --radius: 0.875rem;
 }
 
 .dark {
-  --background: oklch(0.12 0.015 250);
-  --foreground: oklch(0.94 0.003 250);
-  --card: oklch(0.16 0.015 250);
-  --card-foreground: oklch(0.94 0.003 250);
-  --popover: oklch(0.16 0.015 250);
-  --popover-foreground: oklch(0.94 0.003 250);
-  --primary: oklch(0.62 0.14 250);
-  --primary-foreground: oklch(0.08 0.01 250);
-  --secondary: oklch(0.2 0.015 250);
-  --secondary-foreground: oklch(0.88 0.003 250);
-  --muted: oklch(0.2 0.015 250);
-  --muted-foreground: oklch(0.62 0.008 250);
-  --accent: oklch(0.52 0.14 195);
-  --accent-foreground: oklch(0.08 0.01 250);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(1 0 0);
-  --success: oklch(0.55 0.16 155);
-  --success-foreground: oklch(1 0 0);
-  --warning: oklch(0.78 0.14 70);
-  --warning-foreground: oklch(0.12 0.015 70);
-  --border: oklch(0.26 0.015 250);
-  --input: oklch(0.2 0.015 250);
-  --ring: oklch(0.62 0.14 250);
+  --background: #09111e;
+  --foreground: #edf2f7;
+  --card: #101b2d;
+  --card-foreground: #edf2f7;
+  --popover: #101b2d;
+  --popover-foreground: #edf2f7;
+  --primary: #5aa3e7;
+  --primary-foreground: #08111d;
+  --secondary: #162132;
+  --secondary-foreground: #dbe4ef;
+  --muted: #162132;
+  --muted-foreground: #8fa2ba;
+  --accent: #143152;
+  --accent-foreground: #edf2f7;
+  --destructive: #f97066;
+  --destructive-foreground: #08111d;
+  --success: #32d583;
+  --success-foreground: #08111d;
+  --warning: #fdb022;
+  --warning-foreground: #08111d;
+  --border: #213149;
+  --input: #172338;
+  --ring: rgba(90, 163, 231, 0.35);
+  --transport-metro-bg: rgba(127, 29, 29, 0.22);
+  --transport-metro-border: rgba(248, 113, 113, 0.35);
+  --transport-metro-text: #fecaca;
+  --transport-bus-bg: rgba(30, 64, 175, 0.22);
+  --transport-bus-border: rgba(96, 165, 250, 0.35);
+  --transport-bus-text: #bfdbfe;
+  --transport-bike-bg: rgba(6, 95, 70, 0.22);
+  --transport-bike-border: rgba(52, 211, 153, 0.35);
+  --transport-bike-text: #a7f3d0;
+  --transport-car-bg: rgba(146, 64, 14, 0.22);
+  --transport-car-border: rgba(251, 191, 36, 0.35);
+  --transport-car-text: #fde68a;
 }
 
 @theme inline {
@@ -83,7 +107,7 @@
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 6px);
 }
 
 @layer base {
@@ -91,11 +115,14 @@
     @apply border-border outline-ring/50;
   }
 
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   html {
-    background:
-      radial-gradient(circle at top left, rgba(15, 91, 167, 0.05), transparent 28%),
-      radial-gradient(circle at top right, rgba(8, 145, 178, 0.04), transparent 24%),
-      linear-gradient(180deg, #f9fafb 0%, #f5f7fa 100%);
+    background-color: var(--background);
   }
 
   body {
@@ -103,6 +130,9 @@
     margin: 0;
     min-height: 100vh;
     font-family: var(--font-sans);
+    transition:
+      background-color 180ms ease,
+      color 180ms ease;
   }
 
   a {

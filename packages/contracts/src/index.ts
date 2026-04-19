@@ -34,12 +34,32 @@ export interface ScheduleRule {
   closesAt: string;
 }
 
+export type ScheduleOverrideKind =
+  | "summer"
+  | "exam_period"
+  | "temporary_closure"
+  | "reduced_hours"
+  | "holiday_exceptions"
+  | "special";
+
+export interface ScheduleOverride {
+  kind: ScheduleOverrideKind;
+  label: string;
+  rules: ScheduleRule[];
+  fromDate: string | null;
+  toDate: string | null;
+  notes: string | null;
+  closed: boolean;
+}
+
 export interface ScheduleSummary {
   rawText: string | null;
   displayText: string | null;
   notesUnparsed: string | null;
   confidence: ScheduleConfidence;
   rules: ScheduleRule[];
+  overrides: ScheduleOverride[];
+  activeOverride: ScheduleOverride | null;
   isOpenNow: boolean | null;
   nextChangeAt: string | null;
   nextOpening: string | null;

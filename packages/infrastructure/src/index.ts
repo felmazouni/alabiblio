@@ -1,1 +1,5 @@
-export { getCatalogFromStore } from "./catalogStore";
+export {
+  getCatalogFromStore,
+  getCenterDetailFromStore,
+  getFiltersFromStore,
+} from "./catalogStore";
