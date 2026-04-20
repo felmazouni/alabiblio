@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "alabiblio-prod",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-17",
+  "assets": {
+    "directory": "../../apps/web/dist",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "alabiblio-prod",
+      "database_id": "d7f14afd-ee4d-40a7-8dd5-687127959456"
+    }
+  ],
+  "vars": {
+    "APP_ENV": "production",
+    "APP_BASE_URL": "https://alabiblio.org"
+  }
+}

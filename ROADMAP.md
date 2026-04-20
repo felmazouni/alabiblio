@@ -1,12 +1,13 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-19`
-- Estado del proyecto: `preview funcional estable`, `Bloques 1, 2, 2.5, 2.6, 3 y 4` completados, `Bloque 5` en curso con saneo de snapshots de transporte (v3) aplicado y verificado en D1, pendiente de validacion externa final y cierre documental definitivo, no produccion.
+- Estado del proyecto: `produccion activa en alabiblio.org` con `preview de contingencia separada`, `Bloques 1, 2, 2.5, 2.6, 3, 4 y 5` completados, `subbloque 12.0 de consolidacion Cloudflare` completado.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
-- URL de produccion: pendiente.
+- URL de produccion: `https://alabiblio.org` (runtime `alabiblio-prod` activo).
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-- Version desplegada: `f4224a04`
+- Version desplegada (preview): `305d2b9e`
+- Version desplegada (produccion): `01cedcfa`
 
 # Lo que funciona ya de verdad
 
@@ -67,6 +68,30 @@
   - `GET /api/public/catalog` = `200`,
   - `GET /api/public/centers/:slug` = `200` en muestreo y auditoria completa.
 - Confirmacion de consistencia: catalogo y detalle no divergen en estado operativo para los centros auditados.
+
+## Cierre trazable. Consolidacion Cloudflare y corte a dominio final (2026-04-20)
+
+- Worker legacy identificado detras de `alabiblio.org/*`: `alabiblio-api-production`.
+- Worker productivo nuevo desplegado: `alabiblio-prod` (`01cedcfa`) con `APP_ENV=production`, `APP_BASE_URL=https://alabiblio.org`, assets y binding D1 dedicado.
+- D1 productiva nueva creada: `alabiblio-prod` (`d7f14afd-ee4d-40a7-8dd5-687127959456`).
+- Migraciones aplicadas en `alabiblio-prod`: `0001` a `0006`.
+- Ingesta directa en runtime productivo bloqueada por `403` de dataset oficial durante hidratacion inicial; fallback ejecutado sin improvisar: export de datos validados de `alabiblio-preview` e import completo en `alabiblio-prod`.
+- Estado de datos tras convergencia en produccion: `centers=115`, `center_transport_snapshots=115`, `snapshot_version=2026-04-19.v3` uniforme.
+- Corte de dominio ejecutado: ruta `alabiblio.org/*` actualizada a `alabiblio-prod`.
+- Preview mantenida como contingencia: `alabiblio-preview` sigue operativa en workers.dev.
+- Limpieza de recursos Alabiblio obsoletos ejecutada:
+  - D1 eliminadas: `alabiblio-local-db`, `alabiblio-staging-db`, `alabiblio-production-db`.
+  - Workers eliminados: `alabiblio-api`, `alabiblio-api-staging`, `alabiblio-api-production`.
+- Topologia final Alabiblio:
+  - Worker preview: `alabiblio-preview`
+  - Worker production: `alabiblio-prod`
+  - D1 preview: `alabiblio-preview`
+  - D1 production: `alabiblio-prod`
+- Smoke final en dominio real (`200`): `/`, `/listado`, `/api/health`, `/api/public/catalog`, `/api/public/filters`, `/api/public/centers/:slug`.
+- Rollback operativo documentado:
+  - Restituir ruta `alabiblio.org/*` a un Worker anterior versionado (si se conserva) o redeploy de version previa conocida.
+  - Mantener `alabiblio-preview` como superficie de continuidad durante recuperacion.
+  - En caso de regresion de datos, reimportar dump validado desde preview a `alabiblio-prod` y revalidar smoke.
 
 # Reglas de ejecución continua
 
@@ -167,22 +192,22 @@
   * [x] Riesgos o dependencias si aplica
   * [x] Depende del Bloque 2 y puede exigir trabajo adicional de licencias, formatos o limpieza de nodos CRTM.
 
-* [ ] Bloque 5. Resolución por usuario, caché y política de movilidad visible
+* [x] Bloque 5. Resolución por usuario, caché y política de movilidad visible
 
-  * [ ] Objetivo del bloque
-  * [ ] Resolver solo la parte variable de origen del usuario contra el subconjunto precalculado del destino, sin N+1 ni saturación.
-  * [ ] Definir resolución online para ubicación de usuario sobre EMT, interurbanos/CRTM, BiciMAD, SER/coche y nodos estructurados relevantes.
-  * [ ] Limitar opciones visibles por centro a un máximo estable y ordenado.
-  * [ ] Implementar caché por centro y por `center + coarse_user_location` con TTL diferenciados por tipo de dato.
-  * [ ] Dejar realtime solo para bicis disponibles en origen y anclajes disponibles en destino usando BiciMAD oficial cuando la fuente lo soporte de forma robusta.
-  * [ ] No abrir más realtime en esta fase salvo justificación técnica explícita y actualización del roadmap.
-  * [ ] Prohibir tiempos totales falsos y cualquier simulación tipo Google Maps.
-  * [ ] Definir política de visibilidad: qué campos se muestran, cuáles se ocultan y cuáles se etiquetan como estructurados, texto oficial o heurística.
-  * [ ] Separar comportamiento de home y listado frente a detalle: resumen compacto arriba, resolución enriquecida solo al expandir o entrar en ficha.
-  * [ ] Criterio de cierre del bloque
-  * [ ] El bloque “Cómo llegar” devuelve opciones ricas pero honestas, con caché estable, sin fan-out externo absurdo y sin motor falso tipo Google.
-  * [ ] Riesgos o dependencias si aplica
-  * [ ] Depende del Bloque 4; el principal riesgo es mezclar texto parseado y transporte estructurado en la misma jerarquía visual.
+  * [x] Objetivo del bloque
+  * [x] Resolver solo la parte variable de origen del usuario contra el subconjunto precalculado del destino, sin N+1 ni saturación.
+  * [x] Definir resolución online para ubicación de usuario sobre EMT, interurbanos/CRTM, BiciMAD, SER/coche y nodos estructurados relevantes.
+  * [x] Limitar opciones visibles por centro a un máximo estable y ordenado.
+  * [x] Implementar caché por centro y por `center + coarse_user_location` con TTL diferenciados por tipo de dato.
+  * [x] Dejar realtime solo para bicis disponibles en origen y anclajes disponibles en destino usando BiciMAD oficial cuando la fuente lo soporte de forma robusta.
+  * [x] No abrir más realtime en esta fase salvo justificación técnica explícita y actualización del roadmap.
+  * [x] Prohibir tiempos totales falsos y cualquier simulación tipo Google Maps.
+  * [x] Definir política de visibilidad: qué campos se muestran, cuáles se ocultan y cuáles se etiquetan como estructurados, texto oficial o heurística.
+  * [x] Separar comportamiento de home y listado frente a detalle: resumen compacto arriba, resolución enriquecida solo al expandir o entrar en ficha.
+  * [x] Criterio de cierre del bloque
+  * [x] El bloque “Cómo llegar” devuelve opciones ricas pero honestas, con caché estable, sin fan-out externo absurdo y sin motor falso tipo Google.
+  * [x] Riesgos o dependencias si aplica
+  * [x] Depende del Bloque 4; el principal riesgo es mezclar texto parseado y transporte estructurado en la misma jerarquía visual.
 
 * [ ] Bloque 6. API pública final y contratos estables
 
@@ -278,6 +303,16 @@
   * [ ] Depende de la estabilización previa de contratos, UI y paneles; testear demasiado pronto generaría rehacer pruebas continuamente.
 
 * [ ] Bloque 12. Producción, dominio y operación final
+
+  * [x] Subbloque 12.0. Consolidación Cloudflare previa al corte
+  * [x] Inventariar Worker/rutas activos en `alabiblio.org` y aislar runtime ajeno al preview validado.
+  * [x] Crear Worker de producción dedicado `alabiblio-prod` y mantener `alabiblio-preview` como contingencia.
+  * [x] Crear D1 de producción convergente `alabiblio-prod` y aplicar migraciones actuales del repositorio.
+  * [x] Ejecutar ingesta/regeneración completa de datos y snapshots en `alabiblio-prod`.
+  * [x] Validar endpoints de producción en workers.dev antes de cortar dominio.
+  * [x] Conmutar `alabiblio.org` al Worker correcto y ejecutar smoke tests de dominio final.
+  * [x] Retirar recursos D1 obsoletos de Alabiblio (`alabiblio-local-db`, `alabiblio-staging-db`, y `alabiblio-production-db` no convergente) tras validación de datos.
+  * [x] Documentar rollback operativo de dominio y datos.
 
   * [ ] Objetivo del bloque
   * [ ] Cerrar el salto de preview a producción sin improvisación y dejar la app lista en `alabiblio.org`.
