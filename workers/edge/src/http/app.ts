@@ -61,10 +61,12 @@ async function notFound(request: Request, env: EdgeEnv): Promise<Response> {
 export async function handleRequest(
   request: Request,
   env: EdgeEnv,
+  ctx?: { waitUntil: (p: Promise<unknown>) => void },
 ): Promise<Response> {
   const startedAt = Date.now();
   const url = new URL(request.url);
   const catalogQuery = parsePublicCatalogQuery(url);
+  const waitUntil = ctx ? (p: Promise<unknown>) => ctx.waitUntil(p) : undefined;
 
   try {
     let response: Response;
@@ -74,7 +76,7 @@ export async function handleRequest(
     } else if (request.method === "GET" && url.pathname === "/api/public/bootstrap") {
       response = buildPublicBootstrapResponse();
     } else if (request.method === "GET" && url.pathname === "/api/public/catalog") {
-      response = await buildPublicCatalogResponse(env, catalogQuery);
+      response = await buildPublicCatalogResponse(env, catalogQuery, waitUntil);
     } else if (request.method === "GET" && url.pathname === "/api/public/transport/bicimad/availability") {
       const stationId = url.searchParams.get("station_id") ?? "";
       const stationName = url.searchParams.get("station_name") ?? "";
@@ -83,7 +85,7 @@ export async function handleRequest(
       const q = url.searchParams.get("q") ?? "";
       response = await buildCallejeroAutocompleteResponse(q);
     } else if (request.method === "GET" && url.pathname === "/api/public/filters") {
-      response = await buildPublicFiltersResponse(env, catalogQuery);
+      response = await buildPublicFiltersResponse(env, catalogQuery, waitUntil);
     } else if (request.method === "GET" && url.pathname.startsWith("/api/public/centers/")) {
       const slug = decodeURIComponent(url.pathname.replace("/api/public/centers/", ""));
       response = await buildPublicCenterDetailResponse(env, slug, {

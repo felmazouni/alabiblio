@@ -66,6 +66,7 @@ interface D1LikeDatabase {
 interface CatalogStoreOptions {
   database?: unknown;
   sources: SourceConfig;
+  waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 interface MadridOpenDataRecord {
@@ -498,10 +499,13 @@ const DEFAULT_PUBLIC_QUERY: Required<PublicCatalogQuery> = {
   radiusMeters: 120000,
   kinds: [],
   transportModes: [],
+  districts: [],
+  neighborhoods: [],
   openNow: false,
   accessible: false,
   withWifi: false,
   withCapacity: false,
+  withSer: false,
   sort: "relevance",
   limit: 500,
 };
@@ -529,6 +533,18 @@ const TRANSPORT_SOURCE_URLS = {
 const transportResolutionCache = new Map<string, UserResolvedTransportCacheEntry>();
 const inflightTransportResolutions = new Map<string, Promise<UserResolvedTransportCacheEntry>>();
 let transportSnapshotRefreshPromise: Promise<void> | null = null;
+
+function normalizeFacetValue(value: string): string {
+  return normalizeSearch(value).replace(/\s+/g, " ").trim();
+}
+
+function normalizeFacetValues(values: string[] | undefined): string[] {
+  if (!values || values.length === 0) {
+    return [];
+  }
+
+  return [...new Set(values.map((value) => normalizeFacetValue(value)).filter((value) => value.length > 0))];
+}
 
 function asDatabase(database: unknown): D1LikeDatabase | null {
   if (database && typeof database === "object" && "prepare" in database) {
@@ -2060,10 +2076,13 @@ function buildAppliedQuery(input?: PublicCatalogQuery): Required<PublicCatalogQu
         : DEFAULT_PUBLIC_QUERY.radiusMeters,
     kinds: input?.kinds ?? [],
     transportModes: input?.transportModes ?? [],
+    districts: normalizeFacetValues(input?.districts),
+    neighborhoods: normalizeFacetValues(input?.neighborhoods),
     openNow: Boolean(input?.openNow),
     accessible: Boolean(input?.accessible),
     withWifi: Boolean(input?.withWifi),
     withCapacity: Boolean(input?.withCapacity),
+    withSer: Boolean(input?.withSer),
     sort: input?.sort ?? "relevance",
     limit:
       typeof input?.limit === "number" && Number.isFinite(input.limit)
@@ -2199,6 +2218,20 @@ function matchesQuery(item: EnrichedCenterRecord, query: Required<PublicCatalogQ
     return false;
   }
 
+  if (query.districts.length > 0) {
+    const district = item.district ? normalizeFacetValue(item.district) : "";
+    if (!district || !query.districts.includes(district)) {
+      return false;
+    }
+  }
+
+  if (query.neighborhoods.length > 0) {
+    const neighborhood = item.neighborhood ? normalizeFacetValue(item.neighborhood) : "";
+    if (!neighborhood || !query.neighborhoods.includes(neighborhood)) {
+      return false;
+    }
+  }
+
   if (query.openNow && item.schedule.isOpenNow !== true) {
     return false;
   }
@@ -2212,6 +2245,10 @@ function matchesQuery(item: EnrichedCenterRecord, query: Required<PublicCatalogQ
   }
 
   if (query.withCapacity && item.capacityValue === null) {
+    return false;
+  }
+
+  if (query.withSer && !item.serZoneLabel) {
     return false;
   }
 
@@ -2419,7 +2456,11 @@ async function loadBaseCenters(options: CatalogStoreOptions): Promise<{ sourceMo
         outdated_snapshot_count: outdatedSnapshotCount,
       }),
     );
-    await replaceTransportSnapshots(database, items);
+    if (options.waitUntil) {
+      options.waitUntil(replaceTransportSnapshots(database, items));
+    } else {
+      await replaceTransportSnapshots(database, items);
+    }
   }
 
   console.log(
@@ -2620,6 +2661,29 @@ export async function getFiltersFromStore(
 
   const matching = enriched.filter((item) => matchesQuery(item, query));
 
+  const districtCounts = new Map<string, { label: string; count: number }>();
+  const neighborhoodCounts = new Map<string, { label: string; count: number }>();
+
+  for (const item of matching) {
+    if (item.district) {
+      const key = normalizeFacetValue(item.district);
+      const current = districtCounts.get(key);
+      districtCounts.set(key, {
+        label: item.district,
+        count: (current?.count ?? 0) + 1,
+      });
+    }
+
+    if (item.neighborhood) {
+      const key = normalizeFacetValue(item.neighborhood);
+      const current = neighborhoodCounts.get(key);
+      neighborhoodCounts.set(key, {
+        label: item.neighborhood,
+        count: (current?.count ?? 0) + 1,
+      });
+    }
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     totalResults: matching.length,
@@ -2651,6 +2715,34 @@ export async function getFiltersFromStore(
       label: labelForTransportMode(mode),
       count: matching.filter((item) => item.transportOptions.some((option) => option.mode === mode)).length,
     })),
+    availableDistricts: [...districtCounts.entries()]
+      .map(([value, payload]) => ({ value, label: payload.label, count: payload.count }))
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "es")),
+    availableNeighborhoods: [...neighborhoodCounts.entries()]
+      .map(([value, payload]) => ({ value, label: payload.label, count: payload.count }))
+      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "es")),
+    availableFeatureFilters: [
+      {
+        key: "accessible",
+        label: "Accesible",
+        count: matching.filter((item) => item.accessibility).length,
+      },
+      {
+        key: "withWifi",
+        label: "Con WiFi",
+        count: matching.filter((item) => item.wifi).length,
+      },
+      {
+        key: "withCapacity",
+        label: "Con aforo",
+        count: matching.filter((item) => item.capacityValue !== null).length,
+      },
+      {
+        key: "withSer",
+        label: "Con cobertura SER",
+        count: matching.filter((item) => Boolean(item.serZoneLabel)).length,
+      },
+    ],
     availableSortModes: ([
       "relevance",
       "distance",

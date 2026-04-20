@@ -20,11 +20,13 @@ export const officialSources = {
 export async function loadPublicCatalog(
   database?: unknown,
   query?: PublicCatalogQuery,
+  waitUntil?: (promise: Promise<unknown>) => void,
 ): Promise<PublicCatalogResponse> {
   return getCatalogFromStore(
     {
       database,
       sources: officialSources,
+      waitUntil,
     },
     query,
   );
@@ -48,11 +50,13 @@ export async function loadPublicCenterDetail(
 export async function loadPublicFilters(
   database?: unknown,
   query?: PublicCatalogQuery,
+  waitUntil?: (promise: Promise<unknown>) => void,
 ): Promise<PublicFiltersResponse> {
   return getFiltersFromStore(
     {
       database,
       sources: officialSources,
+      waitUntil,
     },
     query,
   );

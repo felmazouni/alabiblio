@@ -97,6 +97,13 @@ export function PublicCatalogRoute() {
         clear: () => setFilters((current) => ({ ...current, withCapacity: false })),
       });
     }
+    if (filters.withSer) {
+      labels.push({
+        key: "withSer",
+        label: "Con cobertura SER",
+        clear: () => setFilters((current) => ({ ...current, withSer: false })),
+      });
+    }
     if (location && filters.radiusMeters !== defaultPublicFilters.radiusMeters) {
       labels.push({
         key: "radius",
@@ -121,6 +128,34 @@ export function PublicCatalogRoute() {
       });
     }
 
+    for (const district of filters.districts) {
+      const option = filterMetadata?.availableDistricts.find((value) => value.value === district);
+      labels.push({
+        key: `district:${district}`,
+        label: option?.label ?? district,
+        clear: () =>
+          setFilters((current) => ({
+            ...current,
+            districts: current.districts.filter((value) => value !== district),
+          })),
+      });
+    }
+
+    for (const neighborhood of filters.neighborhoods) {
+      const option = filterMetadata?.availableNeighborhoods.find(
+        (value) => value.value === neighborhood,
+      );
+      labels.push({
+        key: `neighborhood:${neighborhood}`,
+        label: option?.label ?? neighborhood,
+        clear: () =>
+          setFilters((current) => ({
+            ...current,
+            neighborhoods: current.neighborhoods.filter((value) => value !== neighborhood),
+          })),
+      });
+    }
+
     for (const mode of filters.transportModes) {
       const option = filterMetadata?.availableTransportModes.find((value) => value.mode === mode);
       labels.push({
@@ -135,7 +170,13 @@ export function PublicCatalogRoute() {
     }
 
     return labels;
-  }, [filterMetadata?.availableTransportModes, filters, location]);
+  }, [
+    filterMetadata?.availableDistricts,
+    filterMetadata?.availableNeighborhoods,
+    filterMetadata?.availableTransportModes,
+    filters,
+    location,
+  ]);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground transition-colors">

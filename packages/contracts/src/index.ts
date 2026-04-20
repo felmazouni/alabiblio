@@ -171,10 +171,13 @@ export interface PublicCatalogQuery {
   radiusMeters?: number;
   kinds?: CenterKind[];
   transportModes?: TransportMode[];
+  districts?: string[];
+  neighborhoods?: string[];
   openNow?: boolean;
   accessible?: boolean;
   withWifi?: boolean;
   withCapacity?: boolean;
+  withSer?: boolean;
   sort?: SortMode;
   limit?: number;
 }
@@ -230,6 +233,21 @@ export interface PublicFiltersResponse {
   }>;
   availableTransportModes: Array<{
     mode: TransportMode;
+    label: string;
+    count: number;
+  }>;
+  availableDistricts: Array<{
+    value: string;
+    label: string;
+    count: number;
+  }>;
+  availableNeighborhoods: Array<{
+    value: string;
+    label: string;
+    count: number;
+  }>;
+  availableFeatureFilters: Array<{
+    key: "accessible" | "withWifi" | "withCapacity" | "withSer";
     label: string;
     count: number;
   }>;

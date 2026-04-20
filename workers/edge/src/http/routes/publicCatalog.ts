@@ -5,9 +5,10 @@ import type { EdgeEnv } from "../../env";
 export async function buildPublicCatalogResponse(
   env: EdgeEnv,
   query: PublicCatalogQuery,
+  waitUntil?: (promise: Promise<unknown>) => void,
 ): Promise<Response> {
   try {
-    const payload = await loadPublicCatalog(env.DB, query);
+    const payload = await loadPublicCatalog(env.DB, query, waitUntil);
 
     console.log(
       JSON.stringify({

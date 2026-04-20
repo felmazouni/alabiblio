@@ -1,13 +1,13 @@
 # Estado actual
 
 - Fecha de corte: `2026-04-20`
-- Estado del proyecto: `produccion activa en alabiblio.org` con `preview de contingencia separada`, `Bloques 1, 2, 2.5, 2.6, 3, 4 y 5` completados, `subbloque 12.0 de consolidacion Cloudflare` completado y `deuda critica de ingesta autonoma en produccion resuelta`.
+- Estado del proyecto: `produccion activa en alabiblio.org` con `preview de contingencia separada`, `Bloques 1, 2, 2.5, 2.6, 3, 4, 5 y 6` completados, `subbloque 12.0 de consolidacion Cloudflare` completado y `deuda critica de ingesta autonoma en produccion resuelta`.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: `https://alabiblio.org` (runtime `alabiblio-prod` activo).
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-- Version desplegada (preview): `e3685499`
-- Version desplegada (produccion): `d77b94d1`
+- Version desplegada (preview): `b7263732`
+- Version desplegada (produccion): `8c8362b4`
 
 # Lo que funciona ya de verdad
 
@@ -102,6 +102,28 @@
 - Validacion de fuentes oficiales en produccion tras fix: `libraries=50`, `study_rooms=72`, `emt=4926`, `crtm_metro=291`, `crtm_cercanias=111`, `crtm_interurbanos=8683`, `bicimad=631`, `ser=67`.
 - Regeneracion completa de `alabiblio-prod` ejecutada desde cero sin export/import desde preview.
 - Smoke API produccion repetido en dominio real con `200`: `/api/public/catalog`, `/api/public/filters`, `/api/public/centers/:slug`.
+
+## Cierre trazable. Bloque 6 API publica final y contratos estables (2026-04-20)
+
+- Contrato backend/UI alineado 1:1 para filtros y ordenaciones reales de catalogo.
+- Query parser de API publica consolidado con soporte real para: `q`, `lat`, `lon`, `radius_m`, `kinds`, `transport`, `district`, `neighborhood`, `open_now`, `accessible`, `wifi`, `with_capacity`, `ser`, `sort`, `limit`.
+- `GET /api/public/filters` ampliado con metadatos reales para `availableDistricts`, `availableNeighborhoods`, `availableFeatureFilters`, `availableTransportModes` y `availableSortModes`.
+- Politica de cierre de zonas grises aplicada: los filtros no soportados extremo a extremo no se exponen; los que se exponen estan implementados en parser + backend + endpoint + UI.
+- Smoke de bloque ejecutado en dominio real (`200`): `/api/public/catalog`, `/api/public/filters`, `/api/public/centers/:slug`.
+
+| Filtro/Capacidad | Contrato | Parser query | Backend real | Endpoint | UI | Estado |
+|---|---|---|---|---|---|---|
+| accesible | `accessible` | `accessible` | `matchesQuery` por `accessibility` | `/api/public/catalog`, `/api/public/filters` | modal filtros | ok |
+| wifi | `withWifi` | `wifi` | `matchesQuery` por `wifi` | `/api/public/catalog`, `/api/public/filters` | modal filtros | ok |
+| aforo | `withCapacity` | `with_capacity` | `matchesQuery` por `capacityValue` | `/api/public/catalog`, `/api/public/filters` | modal filtros | ok |
+| distrito | `districts` | `district`/`districts` | `matchesQuery` normalizado por `district` | `/api/public/catalog`, `/api/public/filters` + `availableDistricts` | modal filtros | ok |
+| barrio | `neighborhoods` | `neighborhood`/`neighborhoods` | `matchesQuery` normalizado por `neighborhood` | `/api/public/catalog`, `/api/public/filters` + `availableNeighborhoods` | modal filtros | ok |
+| SER | `withSer` | `ser`/`with_ser` | `matchesQuery` por `serZoneLabel` | `/api/public/catalog`, `/api/public/filters` | modal filtros | ok |
+| bici | `transportModes` | `transport=bicimad` | `matchesQuery` por `transportOptions.mode` | `/api/public/catalog`, `/api/public/filters` | modal filtros (Transporte) | ok |
+| bus | `transportModes` | `transport=emt_bus` | `matchesQuery` por `transportOptions.mode` | `/api/public/catalog`, `/api/public/filters` | modal filtros (Transporte) | ok |
+| metro | `transportModes` | `transport=metro` | `matchesQuery` por `transportOptions.mode` | `/api/public/catalog`, `/api/public/filters` | modal filtros (Transporte) | ok |
+| interurbanos/CRTM | `transportModes` | `transport=interurban_bus` | `matchesQuery` por `transportOptions.mode` | `/api/public/catalog`, `/api/public/filters` | modal filtros (Transporte) | ok |
+| ordenaciones sostenibles | `sort` | `sort` | `sortItems` (`relevance`,`distance`,`closing`,`capacity`,`name`) | `/api/public/catalog`, `/api/public/filters` + `availableSortModes` | modal filtros (Ordenacion) | ok |
 
 # Reglas de ejecución continua
 
@@ -219,20 +241,20 @@
   * [x] Riesgos o dependencias si aplica
   * [x] Depende del Bloque 4; el principal riesgo es mezclar texto parseado y transporte estructurado en la misma jerarquía visual.
 
-* [ ] Bloque 6. API pública final y contratos estables
+* [x] Bloque 6. API pública final y contratos estables
 
-  * [ ] Objetivo del bloque
-  * [ ] Cerrar la API pública con contratos finales para catálogo, detalle, filtros y bootstrap.
-  * [ ] Consolidar `GET /api/public/catalog` con filtros reales, ordenación útil, resumen compacto de movilidad y ranking explicable.
-  * [ ] Consolidar `GET /api/public/centers/:slug` con identidad, horario estructurado, flags de calidad, movilidad expandida y datos operativos reales.
-  * [ ] Consolidar `GET /api/public/filters` con solo filtros realmente soportados por API y contador real de resultados.
-  * [ ] Exponer búsqueda, cerca de mí, distancia máxima, tipo, abierto ahora, accesible, wifi, aforo, distrito, barrio, SER, bici, bus, metro e interurbanos/CRTM.
-  * [ ] Exponer ordenación final: relevancia, distancia, cierre, aforo y las que queden realmente sostenibles.
-  * [ ] Añadir headers de caché, validación de query params, flags de visibilidad y metadatos de procedencia sin inflar payload.
-  * [ ] Criterio de cierre del bloque
-  * [ ] La API pública cubre por completo home, listado, detalle y filtros sin vender precisión falsa y sin depender de payloads ambiguos.
-  * [ ] Riesgos o dependencias si aplica
-  * [ ] Depende de los Bloques 3, 4 y 5; cualquier cambio de contrato impacta directamente frontend y tests.
+  * [x] Objetivo del bloque
+  * [x] Cerrar la API pública con contratos finales para catálogo, detalle, filtros y bootstrap.
+  * [x] Consolidar `GET /api/public/catalog` con filtros reales, ordenación útil, resumen compacto de movilidad y ranking explicable.
+  * [x] Consolidar `GET /api/public/centers/:slug` con identidad, horario estructurado, flags de calidad, movilidad expandida y datos operativos reales.
+  * [x] Consolidar `GET /api/public/filters` con solo filtros realmente soportados por API y contador real de resultados.
+  * [x] Exponer búsqueda, cerca de mí, distancia máxima, tipo, abierto ahora, accesible, wifi, aforo, distrito, barrio, SER, bici, bus, metro e interurbanos/CRTM.
+  * [x] Exponer ordenación final: relevancia, distancia, cierre, aforo y las que queden realmente sostenibles.
+  * [x] Añadir headers de caché, validación de query params, flags de visibilidad y metadatos de procedencia sin inflar payload.
+  * [x] Criterio de cierre del bloque
+  * [x] La API pública cubre por completo home, listado, detalle y filtros sin vender precisión falsa y sin depender de payloads ambiguos.
+  * [x] Riesgos o dependencias si aplica
+  * [x] Depende de los Bloques 3, 4 y 5; cierre ejecutado sin reabrir infraestructura de dominio.
 
 * [ ] Bloque 7. UI pública final, compactación y fidelidad v0
 
@@ -326,14 +348,14 @@
 
   * [ ] Objetivo del bloque
   * [ ] Cerrar el salto de preview a producción sin improvisación y dejar la app lista en `alabiblio.org`.
-  * [ ] Separar completamente entornos preview y producción con D1, bindings y variables de entorno propios.
-  * [ ] Preparar migraciones por entorno, seeds iniciales y checklist de despliegue.
-  * [ ] Configurar dominio `alabiblio.org`, rutas, caché y estrategia de rollback.
-  * [ ] Documentar refresco de fuentes, runbook de operación, proveedor final de email y requisitos de atribución y licencias.
-  * [ ] Ejecutar verificación final de `/`, `/listado`, `/centros/:slug`, `/api/public/catalog`, `/api/public/filters` y `/api/public/centers/:slug` en producción.
-  * [ ] Ejecutar verificación final también sobre el dominio real `alabiblio.org` y no solo sobre endpoints técnicos.
+  * [x] Separar completamente entornos preview y producción con D1, bindings y variables de entorno propios.
+  * [ ] Preparar migraciones por entorno, seeds iniciales y checklist final de despliegue/operación.
+  * [x] Configurar dominio `alabiblio.org`, rutas, caché y estrategia de rollback.
+  * [ ] Documentar refresco de fuentes, runbook fino de operación, proveedor final de email y requisitos de atribución/licencias.
+  * [x] Ejecutar verificación final de `/`, `/listado`, `/centros/:slug`, `/api/public/catalog`, `/api/public/filters` y `/api/public/centers/:slug` en producción.
+  * [x] Ejecutar verificación final también sobre el dominio real `alabiblio.org` y no solo sobre endpoints técnicos.
   * [ ] Promover a producción solo si todos los checks de preview, hardening, smoke test y validación visual están superados.
   * [ ] Criterio de cierre del bloque
   * [ ] Producción queda desplegada, verificada, operable y separada de preview, con documentación mínima suficiente para mantenimiento.
   * [ ] Riesgos o dependencias si aplica
-  * [ ] No debe iniciarse hasta completar hardening, contratos finales, movilidad estable, validación visual y paneles mínimos operativos.
+  * [ ] Pendiente de cierre formal integral de operación final tras completar hardening (Bloque 11) y documentación operativa/licencias.

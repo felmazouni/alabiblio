@@ -60,6 +60,23 @@ function transportLabel(mode: TransportMode) {
   }
 }
 
+function sortLabel(sort: string) {
+  switch (sort) {
+    case "relevance":
+      return "Relevancia";
+    case "distance":
+      return "Distancia";
+    case "closing":
+      return "Hora de cierre";
+    case "capacity":
+      return "Aforo";
+    case "name":
+      return "Nombre";
+    default:
+      return sort;
+  }
+}
+
 function TabButton({
   active,
   children,
@@ -242,10 +259,13 @@ export function FiltersPanel({
       [
         filters.kinds.length > 0,
         filters.transportModes.length > 0,
+        filters.districts.length > 0,
+        filters.neighborhoods.length > 0,
         filters.openNow,
         filters.accessible,
         filters.withWifi,
         filters.withCapacity,
+        filters.withSer,
         metadata?.canUseDistanceFilter &&
           filters.radiusMeters !== defaultPublicFilters.radiusMeters,
       ].filter(Boolean).length,
@@ -276,6 +296,18 @@ export function FiltersPanel({
       transportModes: current.transportModes.includes(mode)
         ? current.transportModes.filter((value) => value !== mode)
         : [...current.transportModes, mode],
+    }));
+  };
+
+  const toggleStringValue = (
+    field: "districts" | "neighborhoods",
+    value: string,
+  ) => {
+    setLocalFilters((current) => ({
+      ...current,
+      [field]: current[field].includes(value)
+        ? current[field].filter((item) => item !== value)
+        : [...current[field], value],
     }));
   };
 
@@ -416,6 +448,94 @@ export function FiltersPanel({
 
                   <section>
                     <h4 className="text-[1rem] font-semibold text-foreground">
+                      Caracteristicas
+                    </h4>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Activa solo filtros soportados extremo a extremo.
+                    </p>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <SettingCard
+                        checked={localFilters.accessible}
+                        icon={MapPin}
+                        onCheckedChange={(value) =>
+                          setLocalFilters((current) => ({ ...current, accessible: value }))
+                        }
+                        subtitle="Centros con accesibilidad indicada"
+                        title="Accesible"
+                      />
+                      <SettingCard
+                        checked={localFilters.withWifi}
+                        icon={Wifi}
+                        onCheckedChange={(value) =>
+                          setLocalFilters((current) => ({ ...current, withWifi: value }))
+                        }
+                        subtitle="Centros con WiFi disponible"
+                        title="Con WiFi"
+                      />
+                      <SettingCard
+                        checked={localFilters.withCapacity}
+                        icon={Calendar}
+                        onCheckedChange={(value) =>
+                          setLocalFilters((current) => ({ ...current, withCapacity: value }))
+                        }
+                        subtitle="Centros con aforo informado"
+                        title="Con aforo"
+                      />
+                      <SettingCard
+                        checked={localFilters.withSer}
+                        icon={Car}
+                        onCheckedChange={(value) =>
+                          setLocalFilters((current) => ({ ...current, withSer: value }))
+                        }
+                        subtitle="Centros en zona con cobertura SER"
+                        title="Con SER"
+                      />
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="text-[1rem] font-semibold text-foreground">
+                      Distrito
+                    </h4>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Filtra por distrito operativo real.
+                    </p>
+                    <div className="mt-4 flex max-h-32 flex-wrap gap-2.5 overflow-y-auto pr-1">
+                      {(metadata?.availableDistricts ?? []).map((option) => (
+                        <ToggleChip
+                          active={localFilters.districts.includes(option.value)}
+                          key={option.value}
+                          onClick={() => toggleStringValue("districts", option.value)}
+                        >
+                          {option.label} ({option.count})
+                        </ToggleChip>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="text-[1rem] font-semibold text-foreground">
+                      Barrio
+                    </h4>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Filtra por barrio operativo real.
+                    </p>
+                    <div className="mt-4 flex max-h-32 flex-wrap gap-2.5 overflow-y-auto pr-1">
+                      {(metadata?.availableNeighborhoods ?? []).map((option) => (
+                        <ToggleChip
+                          active={localFilters.neighborhoods.includes(option.value)}
+                          key={option.value}
+                          onClick={() => toggleStringValue("neighborhoods", option.value)}
+                        >
+                          {option.label} ({option.count})
+                        </ToggleChip>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="text-[1rem] font-semibold text-foreground">
                       Transporte disponible
                     </h4>
                     <p className="mt-1 text-[13px] text-muted-foreground">
@@ -436,6 +556,29 @@ export function FiltersPanel({
                           </ToggleChip>
                         );
                       })}
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="text-[1rem] font-semibold text-foreground">
+                      Ordenacion
+                    </h4>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Selecciona un orden soportado por la API.
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-2.5">
+                      {(metadata?.availableSortModes ?? []).map((option) => (
+                        <ToggleChip
+                          active={localFilters.sort === option.value}
+                          key={option.value}
+                          onClick={() =>
+                            setLocalFilters((current) => ({ ...current, sort: option.value }))
+                          }
+                        >
+                          {sortLabel(option.value)}
+                        </ToggleChip>
+                      ))}
                     </div>
                   </section>
                 </div>

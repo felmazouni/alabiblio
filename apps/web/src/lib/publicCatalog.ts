@@ -15,10 +15,13 @@ export interface PublicFiltersState {
   query: string;
   kinds: CenterKind[];
   transportModes: TransportMode[];
+  districts: string[];
+  neighborhoods: string[];
   openNow: boolean;
   accessible: boolean;
   withWifi: boolean;
   withCapacity: boolean;
+  withSer: boolean;
   radiusMeters: number;
   sort: SortMode;
 }
@@ -27,10 +30,13 @@ export const defaultPublicFilters: PublicFiltersState = {
   query: "",
   kinds: [],
   transportModes: [],
+  districts: [],
+  neighborhoods: [],
   openNow: false,
   accessible: false,
   withWifi: false,
   withCapacity: false,
+  withSer: false,
   radiusMeters: 120000,
   sort: "relevance",
 };
@@ -60,6 +66,14 @@ function buildQueryString(
     params.set("transport", filters.transportModes.join(","));
   }
 
+  if (filters.districts.length > 0) {
+    params.set("district", filters.districts.join(","));
+  }
+
+  if (filters.neighborhoods.length > 0) {
+    params.set("neighborhood", filters.neighborhoods.join(","));
+  }
+
   if (filters.openNow) {
     params.set("open_now", "1");
   }
@@ -74,6 +88,10 @@ function buildQueryString(
 
   if (filters.withCapacity) {
     params.set("with_capacity", "1");
+  }
+
+  if (filters.withSer) {
+    params.set("ser", "1");
   }
 
   params.set("sort", filters.sort);
