@@ -1,7 +1,8 @@
-import { ArrowRight, BookOpen, Check, Clock, Loader2, MapPin, Moon, Navigation, Sun, Users, X } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Clock, Loader2, MapPin, Moon, Navigation, Sun, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { BackgroundIllustration } from "../components/BackgroundIllustration";
+import { LibraryCard } from "../components/LibraryCard";
 import { MotionCarousel } from "../components/animate-ui/components/community/motion-carousel";
 import { cn } from "../lib/cn";
 import { type EmblaOptionsType } from "embla-carousel";
@@ -287,22 +288,22 @@ export function HomeRoute() {
     <div className="relative min-h-screen bg-background text-foreground transition-colors">
       <BackgroundIllustration />
 
-      <div className="relative mx-auto w-full max-w-[960px] px-4 py-5 sm:px-6 sm:py-6">
-        <header className="mb-7">
-          <div className="mb-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_22px_rgba(15,91,167,0.18)]">
-                <BookOpen className="size-4.5" />
+      <div className="relative mx-auto w-full max-w-[1080px] px-4 py-3 sm:px-6 sm:py-4">
+        <header className="mb-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_22px_rgba(15,91,167,0.18)]">
+                <BookOpen className="size-4" />
               </div>
               <div>
-                <p className="text-[1.15rem] font-bold leading-none">AlaBiblio</p>
-                <p className="mt-1 text-xs text-muted-foreground">Comunidad de Madrid</p>
+                <p className="text-[1.05rem] font-bold leading-none">AlaBiblio</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Comunidad de Madrid</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <button
-                className="rounded-2xl border border-border bg-card p-2.5 text-muted-foreground shadow-sm transition hover:text-foreground"
+                className="rounded-2xl border border-border bg-card p-2 text-muted-foreground shadow-sm transition hover:text-foreground"
                 onClick={toggleTheme}
                 type="button"
               >
@@ -312,88 +313,75 @@ export function HomeRoute() {
           </div>
 
           <div>
-            <h1 className="max-w-[620px] text-[1.85rem] font-bold leading-[1.05] tracking-[-0.04em] text-foreground sm:text-[2.35rem]">
+            <h1 className="max-w-[760px] text-[1.55rem] font-bold leading-[1] tracking-[-0.04em] text-foreground sm:text-[1.95rem] lg:text-[2.05rem]">
               Encuentra tu espacio de estudio ideal
             </h1>
-            <p className="mt-2 text-[13px] text-muted-foreground">
+            <p className="mt-1 text-[11px] text-muted-foreground sm:text-[12px]">
               Las mejores opciones cerca de ti, actualizadas en tiempo real
             </p>
 
-            <div className="mt-4 flex flex-wrap gap-3.5">
-              <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                <div className="flex size-7.5 items-center justify-center rounded-xl bg-accent text-primary">
-                  <BookOpen className="size-3.5" />
-                </div>
-                <span>
-                  <span className="font-semibold text-foreground">
-                    {loading ? "..." : metrics?.totalCenters ?? 0}
-                  </span>{" "}
-                  centros validos
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                <div className="flex size-7.5 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
-                  <Clock className="size-3.5" />
-                </div>
-                <span>
-                  <span className="font-semibold text-foreground">
-                    {loading ? "..." : metrics?.openNowCount ?? 0}
-                  </span>{" "}
-                  abiertas ahora
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                <div className="flex size-7.5 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300">
-                  <Users className="size-3.5" />
-                </div>
-                <span>
-                  <span className="font-semibold text-foreground">
-                    {loading
-                      ? "..."
-                      : metrics?.totalCapacity !== null && metrics?.totalCapacity !== undefined
-                        ? new Intl.NumberFormat("es-ES").format(metrics.totalCapacity)
-                        : "N/D"}
-                  </span>{" "}
-                  plazas oficiales
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2.5">
-              {location ? (
-                <div className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-3 py-2 shadow-sm">
-                  <MapPin className="size-3.5 shrink-0 text-primary" />
-                  <span className="max-w-[160px] truncate text-[12px] font-medium text-foreground">
-                    {locationLabel ?? "Ubicación activa"}
+            <div className="mt-2.5 flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-2.5 lg:gap-4">
+                <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                  <div className="flex size-7 items-center justify-center rounded-xl bg-accent text-primary">
+                    <BookOpen className="size-3.5" />
+                  </div>
+                  <span>
+                    <span className="font-semibold text-foreground">
+                      {loading ? "..." : metrics?.totalCenters ?? 0}
+                    </span>{" "}
+                    centros validos
                   </span>
-                  <button
-                    className="ml-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
-                    onClick={() => setLocationDialogOpen(true)}
-                    type="button"
-                  >
-                    Cambiar
-                  </button>
-                  <button
-                    aria-label="Quitar ubicación"
-                    className="ml-0.5 rounded-md text-muted-foreground hover:text-destructive"
-                    onClick={clearLocation}
-                    type="button"
-                  >
-                    <X className="size-3" />
-                  </button>
                 </div>
-              ) : (
-                <Button onClick={() => setLocationDialogOpen(true)}>
-                  <MapPin className="size-4" />
-                  Añadir ubicación
-                </Button>
-              )}
-              <Link to="/listado">
-                <Button className="w-full sm:w-auto" variant="outline">
-                  Ver todas las bibliotecas
-                  <ArrowRight className="size-4" />
-                </Button>
-              </Link>
+                <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                  <div className="flex size-7 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <Clock className="size-3.5" />
+                  </div>
+                  <span>
+                    <span className="font-semibold text-foreground">
+                      {loading ? "..." : metrics?.openNowCount ?? 0}
+                    </span>{" "}
+                    abiertas ahora
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 lg:justify-end">
+                {location ? (
+                  <div className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-3 py-1.5 shadow-sm">
+                    <MapPin className="size-3.5 shrink-0 text-primary" />
+                    <span className="max-w-[160px] truncate text-[12px] font-medium text-foreground">
+                      {locationLabel ?? "Ubicación activa"}
+                    </span>
+                    <button
+                      className="ml-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+                      onClick={() => setLocationDialogOpen(true)}
+                      type="button"
+                    >
+                      Cambiar
+                    </button>
+                    <button
+                      aria-label="Quitar ubicación"
+                      className="ml-0.5 rounded-md text-muted-foreground hover:text-destructive"
+                      onClick={clearLocation}
+                      type="button"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <Button className="h-11 px-4 text-[12px]" onClick={() => setLocationDialogOpen(true)}>
+                    <MapPin className="size-4" />
+                    Añadir ubicación
+                  </Button>
+                )}
+                <Link to="/listado">
+                  <Button className="h-11 w-full px-4 text-[12px] sm:w-auto" variant="outline">
+                    Ver todas las bibliotecas
+                    <ArrowRight className="size-4" />
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             {locationError ? (
@@ -413,18 +401,15 @@ export function HomeRoute() {
         ) : null}
 
         <section>
-          <div className="mb-4 flex items-end justify-between gap-4">
+          <div className="mb-2.5 flex items-end justify-between gap-4">
             <div>
-              <h2 className="text-[1.35rem] font-semibold leading-none text-foreground">
+              <h2 className="text-[1.18rem] font-semibold leading-none text-foreground sm:text-[1.25rem]">
                 Top 3 opciones para ti
               </h2>
-              <p className="mt-1 text-[12px] text-muted-foreground">
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
                 Basado en tu ubicacion y en los datos operativos disponibles
               </p>
             </div>
-            <Link className="text-[13px] font-medium text-primary" to="/top">
-              Ver mas →
-            </Link>
           </div>
 
           {loading ? (
@@ -438,68 +423,12 @@ export function HomeRoute() {
           ) : (
             <MotionCarousel
               options={carouselOptions}
-              renderSlide={(center) => <TopOptionSlide center={center} />}
+              renderSlide={(center) => <LibraryCard center={center} density="compact" />}
               slides={topRanked}
             />
           )}
         </section>
       </div>
     </div>
-  );
-}
-
-function TopOptionSlide({ center }: { center: PublicCenterPresentation }) {
-  const mainTransport = center.transportOptions[0];
-
-  return (
-    <article className="h-full rounded-[22px] border border-border bg-card p-4 shadow-[0_18px_36px_rgba(15,23,42,0.08)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-            Top {center.rankingPosition}
-          </p>
-          <h3 className="mt-1 line-clamp-2 text-[15px] font-semibold leading-tight text-foreground">
-            {center.name}
-          </h3>
-        </div>
-        <span
-          className={cn(
-            "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.06em]",
-            center.headlineStatus === "Abierta"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-600/40 dark:bg-emerald-950/45 dark:text-emerald-200"
-              : center.headlineStatus === "Cerrada"
-                ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-600/40 dark:bg-rose-950/45 dark:text-rose-200"
-                : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-600/40 dark:bg-amber-950/45 dark:text-amber-200",
-          )}
-        >
-          {center.headlineStatus}
-        </span>
-      </div>
-
-      <div className="mt-3 space-y-2 text-[12px] text-muted-foreground">
-        <p className="line-clamp-1">{center.addressLine}</p>
-        <p className="line-clamp-1">{center.scheduleLabel}</p>
-        <p className="line-clamp-1">
-          {mainTransport
-            ? `${mainTransport.title}: ${mainTransport.destinationNodeName ?? "Conexion cercana"}`
-            : "Sin transporte destacado"}
-        </p>
-      </div>
-
-      <div className="mt-4 flex items-center gap-2">
-        <Link
-          className="inline-flex h-9 items-center justify-center rounded-xl bg-primary px-3 text-[12px] font-medium text-primary-foreground transition hover:opacity-90"
-          to={`/centros/${center.slug}`}
-        >
-          Ver detalle
-        </Link>
-        <Link
-          className="inline-flex h-9 items-center justify-center rounded-xl border border-border px-3 text-[12px] font-medium text-foreground transition hover:bg-muted/55"
-          to="/listado"
-        >
-          Ir al listado
-        </Link>
-      </div>
-    </article>
   );
 }

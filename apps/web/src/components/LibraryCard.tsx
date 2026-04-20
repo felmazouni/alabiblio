@@ -23,6 +23,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/cn";
 import {
@@ -357,25 +358,34 @@ function TransportOptionCard({ option }: { option: TransportOption }) {
   );
 }
 
-function RatingSection({ center }: { center: PublicCenterPresentation }) {
+function RatingSection({
+  center,
+  compact = false,
+}: {
+  center: PublicCenterPresentation;
+  compact?: boolean;
+}) {
   const hasRatings = center.ratingOrigin !== "not_available";
 
   return (
-    <div className="space-y-2">
+    <div className={cn(compact ? "space-y-1.5" : "space-y-2")}>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>
           {renderStars(center.ratingOrigin)}
-          <span className="text-[0.9rem] font-semibold text-foreground">
+          <span className={cn("font-semibold text-foreground", compact ? "text-[0.85rem]" : "text-[0.9rem]")}>
             {hasRatings && center.ratingAverage !== null
               ? center.ratingAverage.toFixed(1)
               : "0.0"}
           </span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className={cn("text-muted-foreground", compact ? "text-[10px]" : "text-[11px]")}>
             {hasRatings ? `(${center.ratingCount})` : "(sin valoraciones)"}
           </span>
         </div>
         <button
-          className="inline-flex h-7 items-center justify-center rounded-xl border border-border bg-card px-2.5 text-[11px] font-medium text-muted-foreground"
+          className={cn(
+            "inline-flex items-center justify-center rounded-xl border border-border bg-card px-2.5 font-medium text-muted-foreground",
+            compact ? "h-6.5 text-[10px]" : "h-7 text-[11px]",
+          )}
           disabled
           type="button"
         >
@@ -383,9 +393,9 @@ function RatingSection({ center }: { center: PublicCenterPresentation }) {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
+      <div className={cn("flex flex-wrap gap-y-1", compact ? "gap-x-3" : "gap-x-4")}>
         {aspectItems.map((aspect) => (
-          <span className="inline-flex items-center gap-1 text-[11px]" key={aspect.key}>
+          <span className={cn("inline-flex items-center gap-1", compact ? "text-[10px]" : "text-[11px]")} key={aspect.key}>
             <aspect.icon className="size-3 shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">{aspect.label}</span>
             <span className="font-medium text-foreground">{hasRatings ? "4.0" : "N/D"}</span>
@@ -592,10 +602,21 @@ function bicimadStatusMessage(note: string | null): string {
   }
 }
 
-function MetaLine({ center }: { center: PublicCenterPresentation }) {
+function MetaLine({
+  center,
+  compact = false,
+}: {
+  center: PublicCenterPresentation;
+  compact?: boolean;
+}) {
   return (
     <>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground",
+          compact ? "mt-1 text-[11px]" : "mt-1.5 text-[12px]",
+        )}
+      >
         {center.addressLine ? (
           <span className="inline-flex items-center gap-1">
             <MapPin className="size-3.5" />
@@ -607,13 +628,19 @@ function MetaLine({ center }: { center: PublicCenterPresentation }) {
         ) : null}
       </div>
       {joinPlace(center) ? (
-        <p className="mt-1 text-[11px] text-muted-foreground">{joinPlace(center)}</p>
+        <p className={cn("text-muted-foreground", compact ? "mt-0.5 text-[10px]" : "mt-1 text-[11px]")}>{joinPlace(center)}</p>
       ) : null}
     </>
   );
 }
 
-function SummaryBox({ center }: { center: PublicCenterPresentation }) {
+function SummaryBox({
+  center,
+  compact = false,
+}: {
+  center: PublicCenterPresentation;
+  compact?: boolean;
+}) {
   const progress = availabilityProgress(center);
   const capacitySummaryLabel =
     center.capacityOrigin === "official_structured"
@@ -629,15 +656,15 @@ function SummaryBox({ center }: { center: PublicCenterPresentation }) {
         : "Sin aforo publicado o verificable.";
 
   return (
-    <div className="rounded-[16px] border border-border bg-muted/40 px-3 py-3">
-      <div className="flex items-center gap-2 text-[12px]">
+    <div className={cn("rounded-[16px] border border-border bg-muted/40", compact ? "px-3 py-2.5" : "px-3 py-3")}>
+      <div className={cn("flex items-center gap-2", compact ? "text-[11px]" : "text-[12px]")}>
         <Clock className="size-3.5 text-muted-foreground" />
         <span className="text-muted-foreground">Horario:</span>
         <span className="font-medium text-foreground">{center.scheduleLabel}</span>
       </div>
 
-      <div className="mt-3">
-        <div className="mb-1.5 flex items-center justify-between gap-3 text-[12px]">
+      <div className={cn(compact ? "mt-2" : "mt-3")}>
+        <div className={cn("mb-1.5 flex items-center justify-between gap-3", compact ? "text-[11px]" : "text-[12px]")}>
           <span className="inline-flex items-center gap-2 text-muted-foreground">
             <Users className="size-3.5" />
             {capacitySummaryLabel}
@@ -661,7 +688,7 @@ function SummaryBox({ center }: { center: PublicCenterPresentation }) {
           />
         </div>
 
-        <p className="mt-1.5 text-[10px] text-muted-foreground">{capacitySummaryNote}</p>
+        <p className={cn("mt-1.5 text-muted-foreground", compact ? "text-[9px]" : "text-[10px]")}>{capacitySummaryNote}</p>
       </div>
     </div>
   );
@@ -670,9 +697,11 @@ function SummaryBox({ center }: { center: PublicCenterPresentation }) {
 export function LibraryCard({
   center,
   viewMode = "card",
+  density = "default",
 }: {
   center: PublicCenterPresentation;
   viewMode?: "card" | "list";
+  density?: "default" | "compact";
 }) {
   const [isTransportExpanded, setIsTransportExpanded] = useState(
     viewMode === "card",
@@ -681,6 +710,7 @@ export function LibraryCard({
   const [bicimadAvailability, setBicimadAvailability] = useState<
     Record<string, BicimadAvailabilityUiState>
   >({});
+  const compact = density === "compact";
 
   useEffect(() => {
     if (!isTransportDialogOpen) {
@@ -867,20 +897,20 @@ export function LibraryCard({
 
   return (
     <article className="overflow-hidden rounded-[22px] border border-border bg-card shadow-[0_12px_28px_rgba(15,23,42,0.07)]">
-      <div className="p-4 pb-3">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-primary text-[1.2rem] font-bold text-primary-foreground shadow-[0_12px_20px_rgba(15,91,167,0.18)]">
+      <div className={cn(compact ? "p-3 pb-2" : "p-4 pb-3")}>
+        <div className={cn("flex items-start", compact ? "gap-2.5" : "gap-3")}>
+          <div className={cn("flex shrink-0 items-center justify-center rounded-[14px] bg-primary font-bold text-primary-foreground shadow-[0_12px_20px_rgba(15,91,167,0.18)]", compact ? "size-9 text-[1.1rem]" : "size-10 text-[1.2rem]")}>
             {center.rankingPosition ?? "1"}
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <div className={cn("flex flex-wrap items-center", compact ? "gap-1" : "gap-1.5")}>
+              <span className={cn("rounded-full border border-border font-medium text-muted-foreground", compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]")}>
                 {center.kindLabel}
               </span>
               <span
                 className={cn(
-                  "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                  compact ? "rounded-full border px-1.5 py-0.5 text-[9px] font-medium" : "rounded-full border px-2 py-0.5 text-[10px] font-medium",
                   statusBadge(center.headlineStatus),
                 )}
               >
@@ -888,29 +918,29 @@ export function LibraryCard({
               </span>
             </div>
 
-            <h3 className="mt-2 text-[1rem] font-semibold leading-tight text-foreground md:text-[1.08rem]">
+            <h3 className={cn("font-semibold leading-tight text-foreground", compact ? "mt-1.5 text-[0.96rem] md:text-[1rem]" : "mt-2 text-[1rem] md:text-[1.08rem]")}>
               {center.name}
             </h3>
-            <MetaLine center={center} />
+            <MetaLine center={center} compact={compact} />
           </div>
         </div>
       </div>
 
-      <div className="px-4 pb-3">
-        <SummaryBox center={center} />
+      <div className={cn(compact ? "px-3 pb-2" : "px-4 pb-3")}>
+        <SummaryBox center={center} compact={compact} />
       </div>
 
-      <div className="px-4 pb-3">
-        <RatingSection center={center} />
+      <div className={cn(compact ? "px-3 pb-2" : "px-4 pb-3")}>
+        <RatingSection center={center} compact={compact} />
       </div>
 
       {center.operationalNote && center.operationalNoteOrigin !== "not_available" ? (
-        <div className="px-4 pb-3">
-          <div className="rounded-[16px] border border-amber-300 bg-amber-50 px-3 py-3 dark:border-amber-600/40 dark:bg-amber-950/30">
-            <div className="flex items-start gap-3">
+        <div className={cn(compact ? "px-3 pb-2" : "px-4 pb-3")}>
+          <div className={cn("rounded-[16px] border border-amber-300 bg-amber-50 dark:border-amber-600/40 dark:bg-amber-950/30", compact ? "px-2.5 py-2" : "px-3 py-3")}>
+            <div className={cn("flex items-start", compact ? "gap-2.5" : "gap-3")}>
               <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-300" />
               <div className="min-w-0">
-                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                <div className={cn("flex flex-wrap items-center gap-2", compact ? "mb-1" : "mb-1.5")}>
                   <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-amber-700 dark:text-amber-200">
                     Texto operativo
                   </span>
@@ -923,7 +953,7 @@ export function LibraryCard({
                     {originLabel(center.operationalNoteOrigin)}
                   </span>
                 </div>
-                <p className="text-[11px] leading-5 text-amber-900 dark:text-amber-100">
+                <p className={cn("text-amber-900 dark:text-amber-100", compact ? "text-[9px] leading-[0.95rem]" : "text-[11px] leading-5")}>
                   {center.operationalNote}
                 </p>
               </div>
@@ -932,205 +962,210 @@ export function LibraryCard({
         </div>
       ) : null}
 
-      <div className="px-4 pb-3">
+      <div className={cn(compact ? "px-3 pb-2" : "px-4 pb-3")}>
         <button
-          className="flex w-full items-center justify-between rounded-[14px] border border-border bg-muted/35 px-3 py-2.5"
+          className={cn("flex w-full items-center justify-between rounded-[14px] border border-border bg-muted/35", compact ? "px-2.5 py-1.5" : "px-3 py-2.5")}
           onClick={() => setIsTransportDialogOpen(true)}
           type="button"
         >
-          <div className="flex items-center gap-2">
+          <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>
             <Train className="size-3.5 text-muted-foreground" />
-            <span className="text-[12px] font-medium text-foreground">Transporte</span>
-            <span className="text-[10px] text-muted-foreground">
+            <span className={cn("font-medium text-foreground", compact ? "text-[11px]" : "text-[12px]")}>Transporte</span>
+            <span className={cn("text-muted-foreground", compact ? "text-[9px]" : "text-[10px]")}>
               ({visibleTransportCount} opciones)
             </span>
           </div>
-          <span className="rounded-md border border-border bg-card px-2 py-1 text-[10px] font-medium text-foreground">
+          <span className={cn("rounded-md border border-border bg-card font-medium text-foreground", compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[10px]")}>
             Abrir
           </span>
         </button>
       </div>
 
-      {isTransportDialogOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-          <button
-            aria-label="Cerrar dialogo de transporte"
-            className="absolute inset-0 bg-slate-950/55"
-            onClick={() => setIsTransportDialogOpen(false)}
-            type="button"
-          />
-          <div className="relative z-[91] w-full max-w-[500px] rounded-2xl border border-border bg-card shadow-[0_24px_60px_rgba(2,6,23,0.45)]">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div className="flex items-center gap-2">
-                <Train className="size-4 text-muted-foreground" />
-                <h4 className="text-[14px] font-semibold text-foreground">Transporte</h4>
-                <span className="text-[11px] text-muted-foreground">
-                  {visibleTransportCount} opciones · ≤500 m
-                </span>
-              </div>
+      {isTransportDialogOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
               <button
-                className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                aria-label="Cerrar dialogo de transporte"
+                className="absolute inset-0 bg-slate-950/55"
                 onClick={() => setIsTransportDialogOpen(false)}
                 type="button"
-              >
-                Cerrar
-              </button>
-            </div>
-
-            <p className="border-b border-border px-4 py-2 text-[11px] text-muted-foreground">
-              Paradas y estaciones cercanas al centro
-            </p>
-
-            <div className="max-h-[60vh] overflow-y-auto">
-              {groupedTransportModes.length > 0 ? (
-                <div className="divide-y divide-border">
-                  {groupedTransportModes.map((group) => {
-                    const Icon = modeIcon(group.mode);
-                    const styles = modeClasses(group.mode);
-                    const primaryOption = group.options[0];
-                    const lineCodes = uniqueLineCodes(group.options);
-                    const stationOrStop = primaryOption
-                      ? destinationNodeLabel(primaryOption)
-                      : "Parada o estacion";
-                    const walkLabel = primaryOption
-                      ? walkMetricValue(primaryOption)
-                      : "N/D";
-                    const originBadge =
-                      group.options[0]?.dataOrigin === "official_structured" ? "OFICIAL" : "TEXTO";
-
-                    const bicimadOption =
-                      group.mode === "bicimad"
-                        ? group.options.find((option) => extractBicimadStationId(option) !== null) ??
-                          group.options[0] ??
-                          null
-                        : null;
-                    const bicimadStationId =
-                      bicimadOption !== null ? extractBicimadStationId(bicimadOption) : null;
-                    const bicimadState =
-                      bicimadStationId !== null
-                        ? bicimadAvailability[bicimadStationId] ?? { status: "idle" }
-                        : null;
-                    const bicimadStationName =
-                      bicimadOption?.destinationNodeName ??
-                      bicimadOption?.stationName ??
-                      bicimadOption?.destinationLabel ??
-                      null;
-                    const bicimadWalkLabel = bicimadOption
-                      ? walkMetricValue(bicimadOption)
-                      : "N/D";
-
-                    return (
-                      <div
-                        className="flex items-start gap-3 px-4 py-3"
-                        key={group.mode}
-                      >
-                        <div className="flex w-[84px] shrink-0 flex-col items-start gap-1">
-                          <div className={cn("flex size-7 items-center justify-center rounded-lg border", styles.card)}>
-                            <Icon className={cn("size-3.5", styles.text)} />
-                          </div>
-                          <span className={cn("text-[11px] font-medium leading-tight", styles.text)}>
-                            {modeDialogLabel(group.mode)}
-                          </span>
-                          <span className="rounded-full border border-border bg-muted px-1.5 py-px text-[9px] font-medium text-muted-foreground">
-                            {originBadge}
-                          </span>
-                        </div>
-
-                        <div className="min-w-0 flex-1 space-y-1 pt-0.5">
-                          {group.mode === "bicimad" ? (
-                            <div className="space-y-1.5">
-                              <p className="text-[12px] font-medium text-foreground">
-                                {bicimadStationName ?? stationOrStop}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  className={cn(
-                                    "inline-flex items-center rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-600/40 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/40",
-                                    bicimadState?.status === "loading" && "cursor-not-allowed opacity-60",
-                                  )}
-                                  disabled={bicimadState?.status === "loading"}
-                                  onClick={() =>
-                                    bicimadStationId ? loadBicimadOnDemand(bicimadStationId) : undefined
-                                  }
-                                  type="button"
-                                >
-                                  <Bike className="mr-1.5 size-3 text-muted-foreground" />
-                                  {bicimadState?.status === "loading"
-                                    ? "Consultando..."
-                                    : "Ver disponibilidad"}
-                                </button>
-                                {bicimadState?.status === "success" ? (
-                                  <span className="text-[11px] text-foreground">
-                                    <span className={cn("font-semibold", availabilityCountTone(bicimadState.payload.bikesAvailable))}>
-                                      {bicimadState.payload.bikesAvailable ?? 0}
-                                    </span>
-                                    <span className="text-muted-foreground"> bicis disponibles · </span>
-                                    <span className={cn("font-semibold", availabilityCountTone(bicimadState.payload.docksAvailable))}>
-                                      {bicimadState.payload.docksAvailable ?? 0}
-                                    </span>
-                                    <span className="text-muted-foreground"> anclajes disponibles</span>
-                                  </span>
-                                ) : null}
-                                {bicimadState?.status === "error" ? (
-                                  <span className="text-[11px] text-muted-foreground">{bicimadState.message}</span>
-                                ) : null}
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <p className="text-[12px] font-medium text-foreground">
-                                {stationOrStop}
-                              </p>
-                              {lineCodes.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {lineCodes.map((line) => (
-                                    <span
-                                      className={cn(
-                                        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold",
-                                        lineChipTone(group.mode),
-                                      )}
-                                      key={`${group.mode}:${line}`}
-                                    >
-                                      {(group.mode === "metro" || group.mode === "cercanias" || group.mode === "metro_ligero") ? (
-                                        <Train className="size-3" />
-                                      ) : (
-                                        <Bus className="size-3" />
-                                      )}
-                                      {line}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : null}
-                            </>
-                          )}
-                        </div>
-
-                        <div className="w-[138px] shrink-0 self-center text-right">
-                          <div className="inline-flex items-center gap-1 text-muted-foreground">
-                            <PersonStanding className="size-3.5" />
-                            <Building2 className="size-3.5" />
-                          </div>
-                          <p className="mt-1 text-[11px] font-semibold leading-snug text-foreground">
-                            {group.mode === "bicimad" ? bicimadWalkLabel : walkLabel}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
+              />
+              <div className="relative z-[91] w-full max-w-[500px] rounded-2xl border border-border bg-card shadow-[0_24px_60px_rgba(2,6,23,0.45)]">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Train className="size-4 text-muted-foreground" />
+                    <h4 className="text-[14px] font-semibold text-foreground">Transporte</h4>
+                    <span className="text-[11px] text-muted-foreground">
+                      {visibleTransportCount} opciones · ≤500 m
+                    </span>
+                  </div>
+                  <button
+                    className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                    onClick={() => setIsTransportDialogOpen(false)}
+                    type="button"
+                  >
+                    Cerrar
+                  </button>
                 </div>
-              ) : (
-                <p className="px-4 py-4 text-[12px] text-muted-foreground">
-                  No hay opciones de transporte publicadas dentro de 500 m para este centro.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
 
-      <div className="flex gap-2.5 px-4 pb-4">
+                <p className="border-b border-border px-4 py-2 text-[11px] text-muted-foreground">
+                  Paradas y estaciones cercanas al centro
+                </p>
+
+                <div className="max-h-[60vh] overflow-y-auto">
+                  {groupedTransportModes.length > 0 ? (
+                    <div className="divide-y divide-border">
+                      {groupedTransportModes.map((group) => {
+                        const Icon = modeIcon(group.mode);
+                        const styles = modeClasses(group.mode);
+                        const primaryOption = group.options[0];
+                        const lineCodes = uniqueLineCodes(group.options);
+                        const stationOrStop = primaryOption
+                          ? destinationNodeLabel(primaryOption)
+                          : "Parada o estacion";
+                        const walkLabel = primaryOption
+                          ? walkMetricValue(primaryOption)
+                          : "N/D";
+                        const originBadge =
+                          group.options[0]?.dataOrigin === "official_structured" ? "OFICIAL" : "TEXTO";
+
+                        const bicimadOption =
+                          group.mode === "bicimad"
+                            ? group.options.find((option) => extractBicimadStationId(option) !== null) ??
+                              group.options[0] ??
+                              null
+                            : null;
+                        const bicimadStationId =
+                          bicimadOption !== null ? extractBicimadStationId(bicimadOption) : null;
+                        const bicimadState =
+                          bicimadStationId !== null
+                            ? bicimadAvailability[bicimadStationId] ?? { status: "idle" }
+                            : null;
+                        const bicimadStationName =
+                          bicimadOption?.destinationNodeName ??
+                          bicimadOption?.stationName ??
+                          bicimadOption?.destinationLabel ??
+                          null;
+                        const bicimadWalkLabel = bicimadOption
+                          ? walkMetricValue(bicimadOption)
+                          : "N/D";
+
+                        return (
+                          <div
+                            className="flex items-start gap-3 px-4 py-3"
+                            key={group.mode}
+                          >
+                            <div className="flex w-[84px] shrink-0 flex-col items-start gap-1">
+                              <div className={cn("flex size-7 items-center justify-center rounded-lg border", styles.card)}>
+                                <Icon className={cn("size-3.5", styles.text)} />
+                              </div>
+                              <span className={cn("text-[11px] font-medium leading-tight", styles.text)}>
+                                {modeDialogLabel(group.mode)}
+                              </span>
+                              <span className="rounded-full border border-border bg-muted px-1.5 py-px text-[9px] font-medium text-muted-foreground">
+                                {originBadge}
+                              </span>
+                            </div>
+
+                            <div className="min-w-0 flex-1 space-y-1 pt-0.5">
+                              {group.mode === "bicimad" ? (
+                                <div className="space-y-1.5">
+                                  <p className="text-[12px] font-medium text-foreground">
+                                    {bicimadStationName ?? stationOrStop}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      className={cn(
+                                        "inline-flex items-center rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-600/40 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/40",
+                                        bicimadState?.status === "loading" && "cursor-not-allowed opacity-60",
+                                      )}
+                                      disabled={bicimadState?.status === "loading"}
+                                      onClick={() =>
+                                        bicimadStationId ? loadBicimadOnDemand(bicimadStationId) : undefined
+                                      }
+                                      type="button"
+                                    >
+                                      <Bike className="mr-1.5 size-3 text-muted-foreground" />
+                                      {bicimadState?.status === "loading"
+                                        ? "Consultando..."
+                                        : "Ver disponibilidad"}
+                                    </button>
+                                    {bicimadState?.status === "success" ? (
+                                      <span className="text-[11px] text-foreground">
+                                        <span className={cn("font-semibold", availabilityCountTone(bicimadState.payload.bikesAvailable))}>
+                                          {bicimadState.payload.bikesAvailable ?? 0}
+                                        </span>
+                                        <span className="text-muted-foreground"> bicis disponibles · </span>
+                                        <span className={cn("font-semibold", availabilityCountTone(bicimadState.payload.docksAvailable))}>
+                                          {bicimadState.payload.docksAvailable ?? 0}
+                                        </span>
+                                        <span className="text-muted-foreground"> anclajes disponibles</span>
+                                      </span>
+                                    ) : null}
+                                    {bicimadState?.status === "error" ? (
+                                      <span className="text-[11px] text-muted-foreground">{bicimadState.message}</span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="text-[12px] font-medium text-foreground">
+                                    {stationOrStop}
+                                  </p>
+                                  {lineCodes.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {lineCodes.map((line) => (
+                                        <span
+                                          className={cn(
+                                            "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold",
+                                            lineChipTone(group.mode),
+                                          )}
+                                          key={`${group.mode}:${line}`}
+                                        >
+                                          {group.mode === "metro" ||
+                                          group.mode === "cercanias" ||
+                                          group.mode === "metro_ligero" ? (
+                                            <Train className="size-3" />
+                                          ) : (
+                                            <Bus className="size-3" />
+                                          )}
+                                          {line}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </>
+                              )}
+                            </div>
+
+                            <div className="w-[138px] shrink-0 self-center text-right">
+                              <div className="inline-flex items-center gap-1 text-muted-foreground">
+                                <PersonStanding className="size-3.5" />
+                                <Building2 className="size-3.5" />
+                              </div>
+                              <p className="mt-1 text-[11px] font-semibold leading-snug text-foreground">
+                                {group.mode === "bicimad" ? bicimadWalkLabel : walkLabel}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="px-4 py-4 text-[12px] text-muted-foreground">
+                      No hay opciones de transporte publicadas dentro de 500 m para este centro.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      <div className={cn("flex gap-2", compact ? "px-3 pb-2.5" : "px-4 pb-4")}>
         <Link
-          className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card text-[13px] font-medium text-foreground transition hover:bg-muted/40"
+          className={cn("inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card font-medium text-foreground transition hover:bg-muted/40", compact ? "h-9 text-[11px]" : "h-10 text-[13px]")}
           to={`/centros/${center.slug}`}
         >
           <ExternalLink className="size-4" />
@@ -1138,7 +1173,8 @@ export function LibraryCard({
         </Link>
         <a
           className={cn(
-            "inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-[13px] font-medium text-primary-foreground transition hover:opacity-90",
+            "inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary font-medium text-primary-foreground transition hover:opacity-90",
+            compact ? "h-9 text-[11px]" : "h-10 text-[13px]",
             !center.mapsUrl && "pointer-events-none opacity-40",
           )}
           href={center.mapsUrl ?? "#"}
@@ -1150,15 +1186,15 @@ export function LibraryCard({
         </a>
       </div>
 
-      <div className="flex flex-wrap gap-2 px-4 pb-4">
+      <div className={cn("flex flex-wrap gap-1.5", compact ? "px-3 pb-2.5" : "px-4 pb-4")}>
         {center.wifi ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950/40 dark:text-sky-200">
+          <span className={cn("inline-flex items-center gap-1 rounded-full bg-sky-50 font-medium text-sky-700 dark:bg-sky-950/40 dark:text-sky-200", compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]")}>
             <Wifi className="size-3" />
             WiFi
           </span>
         ) : null}
         {center.accessibility ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <span className={cn("inline-flex items-center gap-1 rounded-full bg-emerald-50 font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200", compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]")}>
             <ShieldCheck className="size-3" />
             Accesible
           </span>
