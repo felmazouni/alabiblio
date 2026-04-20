@@ -8,18 +8,13 @@ import {
   ChevronUp,
   Clock,
   ExternalLink,
-  Lightbulb,
   MapPin,
   Navigation,
   PersonStanding,
-  Plug,
   ShieldCheck,
-  Star,
-  Thermometer,
   Train,
   TriangleAlert,
   Users,
-  Volume2,
   Wifi,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -32,39 +27,6 @@ import {
   type PublicCenterPresentation,
 } from "../lib/publicCatalog";
 
-const aspectItems = [
-  { key: "silencio", label: "Silencio", icon: Volume2 },
-  { key: "wifi", label: "WiFi", icon: Wifi },
-  { key: "limpieza", label: "Limpieza", icon: SparklineIcon },
-  { key: "enchufes", label: "Enchufes", icon: Plug },
-  { key: "temperatura", label: "Temperatura", icon: Thermometer },
-  { key: "iluminacion", label: "Iluminacion", icon: Lightbulb },
-] as const;
-
-function SparklineIcon(props: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={props.className}
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="M4 16.5L8 12l3 3 5-7 4 4"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M4 19h16"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
 
 function modeIcon(mode: TransportOption["mode"]) {
   switch (mode) {
@@ -160,27 +122,6 @@ function joinPlace(center: PublicCenterPresentation) {
   return [center.neighborhood, center.district].filter(Boolean).join(" - ");
 }
 
-function availabilityProgress(center: PublicCenterPresentation) {
-  return center.capacityOrigin !== "not_available" && center.capacityValue !== null ? 100 : 0;
-}
-
-function renderStars(ratingOrigin: DataOrigin) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <Star
-          key={index}
-          className={cn(
-            "size-3.5",
-            ratingOrigin === "not_available"
-              ? "text-slate-300 dark:text-slate-600"
-              : "fill-amber-400 text-amber-400",
-          )}
-        />
-      ))}
-    </div>
-  );
-}
 
 function TransportMetric({
   option,
@@ -358,53 +299,6 @@ function TransportOptionCard({ option }: { option: TransportOption }) {
   );
 }
 
-function RatingSection({
-  center,
-  compact = false,
-}: {
-  center: PublicCenterPresentation;
-  compact?: boolean;
-}) {
-  const hasRatings = center.ratingOrigin !== "not_available";
-
-  return (
-    <div className={cn(compact ? "space-y-1.5" : "space-y-2")}>
-      <div className="flex items-center justify-between gap-2">
-        <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>
-          {renderStars(center.ratingOrigin)}
-          <span className={cn("font-semibold text-foreground", compact ? "text-[0.85rem]" : "text-[0.9rem]")}>
-            {hasRatings && center.ratingAverage !== null
-              ? center.ratingAverage.toFixed(1)
-              : "0.0"}
-          </span>
-          <span className={cn("text-muted-foreground", compact ? "text-[10px]" : "text-[11px]")}>
-            {hasRatings ? `(${center.ratingCount})` : "(sin valoraciones)"}
-          </span>
-        </div>
-        <button
-          className={cn(
-            "inline-flex items-center justify-center rounded-xl border border-border bg-card px-2.5 font-medium text-muted-foreground",
-            compact ? "h-6.5 text-[10px]" : "h-7 text-[11px]",
-          )}
-          disabled
-          type="button"
-        >
-          Opinar
-        </button>
-      </div>
-
-      <div className={cn("flex flex-wrap gap-y-1", compact ? "gap-x-3" : "gap-x-4")}>
-        {aspectItems.map((aspect) => (
-          <span className={cn("inline-flex items-center gap-1", compact ? "text-[10px]" : "text-[11px]")} key={aspect.key}>
-            <aspect.icon className="size-3 shrink-0 text-muted-foreground" />
-            <span className="text-muted-foreground">{aspect.label}</span>
-            <span className="font-medium text-foreground">{hasRatings ? "4.0" : "N/D"}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function listTransportSummary(options: TransportOption[]) {
   return (
@@ -631,66 +525,6 @@ function MetaLine({
         <p className={cn("text-muted-foreground", compact ? "mt-0.5 text-[10px]" : "mt-1 text-[11px]")}>{joinPlace(center)}</p>
       ) : null}
     </>
-  );
-}
-
-function SummaryBox({
-  center,
-  compact = false,
-}: {
-  center: PublicCenterPresentation;
-  compact?: boolean;
-}) {
-  const progress = availabilityProgress(center);
-  const capacitySummaryLabel =
-    center.capacityOrigin === "official_structured"
-      ? "Aforo publicado"
-      : center.capacityOrigin === "official_text_parsed"
-        ? "Aforo publicado (texto oficial)"
-        : "Aforo no disponible";
-  const capacitySummaryNote =
-    center.capacityOrigin === "official_structured"
-      ? "Dato oficial de capacidad. La ocupacion en tiempo real todavia no esta integrada."
-      : center.capacityOrigin === "official_text_parsed"
-        ? "Capacidad extraida de texto oficial. La ocupacion en tiempo real todavia no esta integrada."
-        : "Sin aforo publicado o verificable.";
-
-  return (
-    <div className={cn("rounded-[16px] border border-border bg-muted/40", compact ? "px-3 py-2.5" : "px-3 py-3")}>
-      <div className={cn("flex items-center gap-2", compact ? "text-[11px]" : "text-[12px]")}>
-        <Clock className="size-3.5 text-muted-foreground" />
-        <span className="text-muted-foreground">Horario:</span>
-        <span className="font-medium text-foreground">{center.scheduleLabel}</span>
-      </div>
-
-      <div className={cn(compact ? "mt-2" : "mt-3")}>
-        <div className={cn("mb-1.5 flex items-center justify-between gap-3", compact ? "text-[11px]" : "text-[12px]")}>
-          <span className="inline-flex items-center gap-2 text-muted-foreground">
-            <Users className="size-3.5" />
-            {capacitySummaryLabel}
-          </span>
-          <span className="font-medium text-foreground">
-            {center.capacityOrigin !== "not_available" && center.capacityValue !== null
-              ? `${center.capacityValue} plazas`
-              : "N/D"}
-          </span>
-        </div>
-
-        <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
-          <div
-            className={cn(
-              "h-2 rounded-full transition-all",
-              center.capacityOrigin !== "not_available"
-                ? "bg-slate-300 dark:bg-slate-600"
-                : "bg-slate-300 dark:bg-slate-600",
-            )}
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-
-        <p className={cn("mt-1.5 text-muted-foreground", compact ? "text-[9px]" : "text-[10px]")}>{capacitySummaryNote}</p>
-      </div>
-    </div>
   );
 }
 
@@ -926,12 +760,17 @@ export function LibraryCard({
         </div>
       </div>
 
-      <div className={cn(compact ? "px-3 pb-2" : "px-4 pb-3")}>
-        <SummaryBox center={center} compact={compact} />
-      </div>
-
-      <div className={cn(compact ? "px-3 pb-2" : "px-4 pb-3")}>
-        <RatingSection center={center} compact={compact} />
+      <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-0.5 text-muted-foreground", compact ? "px-3 pb-2.5 text-[11px]" : "px-4 pb-3 text-[12px]")}>
+        <span className="inline-flex items-center gap-1.5">
+          <Clock className="size-3.5" />
+          <span className="font-medium text-foreground">{center.scheduleLabel}</span>
+        </span>
+        {center.capacityOrigin !== "not_available" && center.capacityValue !== null ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Users className="size-3.5" />
+            <span className="font-medium text-foreground">{center.capacityValue} plazas</span>
+          </span>
+        ) : null}
       </div>
 
       {center.operationalNote && center.operationalNoteOrigin !== "not_available" ? (
@@ -940,19 +779,9 @@ export function LibraryCard({
             <div className={cn("flex items-start", compact ? "gap-2.5" : "gap-3")}>
               <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-300" />
               <div className="min-w-0">
-                <div className={cn("flex flex-wrap items-center gap-2", compact ? "mb-1" : "mb-1.5")}>
-                  <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-amber-700 dark:text-amber-200">
-                    Texto operativo
-                  </span>
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                      originTone(center.operationalNoteOrigin),
-                    )}
-                  >
-                    {originLabel(center.operationalNoteOrigin)}
-                  </span>
-                </div>
+                <p className={cn("text-[10px] font-medium uppercase tracking-[0.12em] text-amber-700 dark:text-amber-200", compact ? "mb-1" : "mb-1.5")}>
+                  Aviso
+                </p>
                 <p className={cn("text-amber-900 dark:text-amber-100", compact ? "text-[9px] leading-[0.95rem]" : "text-[11px] leading-5")}>
                   {center.operationalNote}
                 </p>

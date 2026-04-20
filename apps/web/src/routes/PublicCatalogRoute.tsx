@@ -322,9 +322,6 @@ export function PublicCatalogRoute() {
               .find((option) => option.value === filters.sort)
               ?.label.toLowerCase() ?? "relevancia"}
           </p>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            Cobertura por defecto: toda la Comunidad de Madrid.
-          </p>
         </div>
 
         {loading ? (
