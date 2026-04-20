@@ -691,12 +691,26 @@ async function fetchOfficialDataset(url: string): Promise<MadridOpenDataRecord[]
     }),
   );
 
-  const response = await fetch(url, {
-    headers: {
-      accept: "application/json,text/plain,*/*",
-      "user-agent": "alabiblio-catalog-ingest/0.1",
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        accept: "application/json,text/plain,*/*",
+        "accept-language": "es-ES,es;q=0.9,en;q=0.8",
+        "cache-control": "no-cache",
+        pragma: "no-cache",
+        referer: "https://datos.madrid.es/",
+        "user-agent": "alabiblio-ingest/1.0 (+https://alabiblio.org)",
+      },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error(`Official dataset fetch failed: ${response.status} ${response.statusText}`);

@@ -1,13 +1,13 @@
 # Estado actual
 
-- Fecha de corte: `2026-04-19`
-- Estado del proyecto: `produccion activa en alabiblio.org` con `preview de contingencia separada`, `Bloques 1, 2, 2.5, 2.6, 3, 4 y 5` completados, `subbloque 12.0 de consolidacion Cloudflare` completado.
+- Fecha de corte: `2026-04-20`
+- Estado del proyecto: `produccion activa en alabiblio.org` con `preview de contingencia separada`, `Bloques 1, 2, 2.5, 2.6, 3, 4 y 5` completados, `subbloque 12.0 de consolidacion Cloudflare` completado y `deuda critica de ingesta autonoma en produccion resuelta`.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: `https://alabiblio.org` (runtime `alabiblio-prod` activo).
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-- Version desplegada (preview): `305d2b9e`
-- Version desplegada (produccion): `01cedcfa`
+- Version desplegada (preview): `e3685499`
+- Version desplegada (produccion): `d77b94d1`
 
 # Lo que funciona ya de verdad
 
@@ -50,6 +50,7 @@
 - Saneo de transporte por modo aplicado en snapshot: si existe opcion `official_structured` para un modo, no se mantiene activa una competidora `official_text_parsed` del mismo modo.
 - Lote de snapshots de transporte regenerado a `snapshot_version` uniforme `2026-04-19.v3` para `115/115` centros en preview.
 - Coherencia catalogo/detalle en transporte validada en muestreo: ambos endpoints leen snapshot persistido en D1 y devuelven firmas de opciones equivalentes para los slugs auditados.
+- Reconstruccion completa de produccion validada desde cero sin import desde preview: `centers=115`, `center_transport_snapshots=115`, `snapshot_version=2026-04-19.v3` uniforme y `emt=4926` en `transport_source_runs`.
 
 ## Cierre formal trazable. Correccion global del motor operativo (2026-04-19)
 
@@ -92,6 +93,15 @@
   - Restituir ruta `alabiblio.org/*` a un Worker anterior versionado (si se conserva) o redeploy de version previa conocida.
   - Mantener `alabiblio-preview` como superficie de continuidad durante recuperacion.
   - En caso de regresion de datos, reimportar dump validado desde preview a `alabiblio-prod` y revalidar smoke.
+
+## Cierre trazable. Resolucion de deuda critica de ingesta autonoma (2026-04-20)
+
+- Endpoint exacto con `403` identificado en runtime Worker: fuente EMT CSV de transporte (`source_code=emt`) durante generacion de snapshots (`transport_source_unavailable`).
+- Clasificacion de causa: restriccion de acceso HTTP sobre la URL legacy de EMT en runtime Worker; mitigado con cliente de descarga reforzado (headers completos, `user-agent` comun, `referer`, timeout y reintentos) y fallback a URL oficial directa de EMT.
+- Paridad preview/prod verificada: mismo cliente HTTP, mismo `user-agent`, mismos headers, mismo timeout y misma configuracion de fetch tras despliegue en ambos entornos.
+- Validacion de fuentes oficiales en produccion tras fix: `libraries=50`, `study_rooms=72`, `emt=4926`, `crtm_metro=291`, `crtm_cercanias=111`, `crtm_interurbanos=8683`, `bicimad=631`, `ser=67`.
+- Regeneracion completa de `alabiblio-prod` ejecutada desde cero sin export/import desde preview.
+- Smoke API produccion repetido en dominio real con `200`: `/api/public/catalog`, `/api/public/filters`, `/api/public/centers/:slug`.
 
 # Reglas de ejecución continua
 

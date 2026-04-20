@@ -38,8 +38,10 @@ export interface CrtmStop {
   lines: string[];
 }
 
-const EMT_STOPS_URL =
-  "https://datos.madrid.es/dataset/900023-0-emt-paradas-autobus/resource/900023-0-emt-paradas-autobus/download/900023-0-emt-paradas-autobus.csv";
+const EMT_STOPS_URLS = [
+  "https://datos.emtmadrid.es/dataset/7b4a2c0a-eece-4a5a-9094-bf9444824d86/resource/4f0736a9-865c-428f-8719-128c805baa2e/download/stopsemt.csv",
+  "https://datos.madrid.es/dataset/900023-0-emt-paradas-autobus/resource/900023-0-emt-paradas-autobus/download/900023-0-emt-paradas-autobus.csv",
+] as const;
 const BICIMAD_GEOJSON_URL =
   "https://datos.emtmadrid.es/dataset/5fcc0945-2cbd-46c3-801a-6a83f4167c11/resource/105ce5df-793f-4e0a-a88e-5d3b3f024a5d/download/bikestationbicimad_geojson.json";
 const SER_GEOJSON_URL =
@@ -59,6 +61,81 @@ const runtimeCache: {
   crtmCercaniasStops?: Promise<CrtmStop[]>;
   crtmInterurbanStops?: Promise<CrtmStop[]>;
 } = {};
+
+const INGEST_REQUEST_USER_AGENT = "alabiblio-ingest/1.0 (+https://alabiblio.org)";
+const INGEST_REQUEST_TIMEOUT_MS = 20000;
+
+function ingestHeaders(accept: string): HeadersInit {
+  return {
+    accept,
+    "accept-language": "es-ES,es;q=0.9,en;q=0.8",
+    "cache-control": "no-cache",
+    pragma: "no-cache",
+    referer: "https://datos.madrid.es/",
+    "user-agent": INGEST_REQUEST_USER_AGENT,
+  };
+}
+
+function shouldRetryStatus(status: number): boolean {
+  return status === 403 || status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+async function fetchWithFallback(urlOrUrls: string | readonly string[], accept: string): Promise<Response> {
+  const candidates = Array.isArray(urlOrUrls) ? [...urlOrUrls] : [urlOrUrls];
+  let lastError: Error | null = null;
+
+  for (const url of candidates) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), INGEST_REQUEST_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(url, {
+          headers: ingestHeaders(accept),
+          redirect: "follow",
+          signal: controller.signal,
+        });
+
+        if (response.ok) {
+          return response;
+        }
+
+        const retriable = shouldRetryStatus(response.status);
+        console.warn(
+          JSON.stringify({
+            event: "transport_source_http_error",
+            source_url: url,
+            status: response.status,
+            attempt,
+            retriable,
+          }),
+        );
+
+        if (!retriable || attempt === 2) {
+          break;
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(
+          JSON.stringify({
+            event: "transport_source_fetch_exception",
+            source_url: url,
+            attempt,
+            message: lastError.message,
+          }),
+        );
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error("transport_source_http_unavailable");
+}
 
 function parseCsvRows(input: string): string[][] {
   const rows: string[][] = [];
@@ -112,12 +189,8 @@ function parseCsvRows(input: string): string[][] {
   return rows;
 }
 
-async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      accept: "*/*",
-    },
-  });
+async function fetchText(urlOrUrls: string | readonly string[]): Promise<string> {
+  const response = await fetchWithFallback(urlOrUrls, "text/csv,text/plain,*/*");
 
   if (!response.ok) {
     throw new Error(`transport_source_http_${response.status}`);
@@ -126,12 +199,8 @@ async function fetchText(url: string): Promise<string> {
   return response.text();
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: {
-      accept: "application/json,*/*",
-    },
-  });
+async function fetchJson<T>(urlOrUrls: string | readonly string[]): Promise<T> {
+  const response = await fetchWithFallback(urlOrUrls, "application/json,text/plain,*/*");
 
   if (!response.ok) {
     throw new Error(`transport_source_http_${response.status}`);
@@ -197,7 +266,7 @@ async function buildCrtmStops(mode: CrtmStopMode, sourceUrl: string): Promise<Cr
 }
 
 async function buildEmtStops(): Promise<EmtStop[]> {
-  const csv = await fetchText(EMT_STOPS_URL);
+  const csv = await fetchText(EMT_STOPS_URLS);
   const rows = parseCsvRows(csv);
   const [header, ...body] = rows;
 
