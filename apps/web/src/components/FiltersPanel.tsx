@@ -1,4 +1,4 @@
-import type { PublicFiltersResponse, TransportMode } from "@alabiblio/contracts";
+﻿import type { PublicFiltersResponse, TransportMode } from "@alabiblio/contracts";
 import {
   Bike,
   Bus,
@@ -26,7 +26,7 @@ import {
   type PublicFiltersState,
 } from "../lib/publicCatalog";
 
-type TabId = "general" | "horarios";
+type TabId = "general" | "zona" | "ordenar" | "horarios";
 
 function transportIcon(mode: TransportMode) {
   switch (mode) {
@@ -93,7 +93,7 @@ function TabButton({
   return (
     <button
       className={cn(
-        "inline-flex h-9 items-center justify-center gap-2 rounded-2xl px-4 text-[14px] font-medium transition",
+        "inline-flex h-8 items-center justify-center gap-1.5 rounded-xl px-3 text-[12px] font-medium transition",
         active
           ? "bg-card text-foreground shadow-sm"
           : "text-foreground/80 hover:bg-card/50",
@@ -103,7 +103,7 @@ function TabButton({
       onClick={onClick}
       type="button"
     >
-      <Icon className="size-4" />
+      <Icon className="size-3.5" />
       {children}
     </button>
   );
@@ -123,7 +123,7 @@ function ToggleChip({
   return (
     <button
       className={cn(
-        "inline-flex h-10 items-center gap-2 rounded-full border px-4 text-[13px] font-medium transition",
+        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium transition",
         active
           ? "border-primary bg-primary text-primary-foreground shadow-sm"
           : "border-border bg-card text-foreground hover:border-primary/35 hover:bg-muted/35",
@@ -131,7 +131,7 @@ function ToggleChip({
       onClick={onClick}
       type="button"
     >
-      {Icon ? <Icon className="size-4" /> : null}
+      {Icon ? <Icon className="size-3.5" /> : null}
       {children}
     </button>
   );
@@ -186,40 +186,18 @@ function SettingCard({
   onCheckedChange: (value: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-[18px] border border-border bg-card px-4 py-4">
-      <div className="flex items-center gap-3">
-        <div className="flex size-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-          <Icon className="size-5" />
+    <div className="flex items-center justify-between rounded-[14px] border border-border bg-card px-3.5 py-3">
+      <div className="flex items-center gap-2.5">
+        <div className="flex size-8 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <Icon className="size-4" />
         </div>
         <div>
-          <p className="text-[14px] font-medium text-foreground">{title}</p>
-          <p className="text-[12px] text-muted-foreground">{subtitle}</p>
+          <p className="text-[13px] font-medium text-foreground">{title}</p>
+          <p className="text-[11px] text-muted-foreground">{subtitle}</p>
         </div>
       </div>
       <Switch checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
     </div>
-  );
-}
-
-function SelectLike({
-  value,
-  disabled = false,
-}: {
-  value: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      className={cn(
-        "flex h-11 w-full items-center justify-between rounded-xl border border-border bg-card px-4 text-[14px] text-foreground",
-        disabled && "cursor-not-allowed opacity-70",
-      )}
-      disabled={disabled}
-      type="button"
-    >
-      <span>{value}</span>
-      <ChevronDown className="size-4 text-muted-foreground" />
-    </button>
   );
 }
 
@@ -260,7 +238,6 @@ export function FiltersPanel({
         filters.kinds.length > 0,
         filters.transportModes.length > 0,
         filters.districts.length > 0,
-        filters.neighborhoods.length > 0,
         filters.openNow,
         filters.accessible,
         filters.withWifi,
@@ -330,28 +307,22 @@ export function FiltersPanel({
       {isOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/36 p-4">
           <div className="flex max-h-[86vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[22px] border border-border bg-card shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
-            <div className="flex items-start justify-between border-b border-border px-5 py-4">
-              <div className="flex items-start gap-4">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-accent text-primary">
-                  <SlidersHorizontal className="size-5" />
+            <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+              <div className="flex items-center gap-3">
+                <div className="flex size-8 items-center justify-center rounded-xl bg-accent text-primary">
+                  <SlidersHorizontal className="size-4" />
                 </div>
-                <div>
-                  <h3 className="text-[1.6rem] font-semibold leading-none text-foreground">
-                    Filtros avanzados
-                  </h3>
-                  <p className="mt-1.5 text-[13px] text-muted-foreground">
-                    Personaliza tu busqueda para encontrar el espacio perfecto
-                  </p>
-                </div>
+                <h3 className="text-[1.15rem] font-semibold text-foreground">
+                  Filtros
+                </h3>
               </div>
-
-              <div className="flex items-center gap-5">
+              <div className="flex items-center gap-4">
                 <button
-                  className="inline-flex items-center gap-2 text-[14px] text-muted-foreground transition hover:text-foreground"
+                  className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition hover:text-foreground"
                   onClick={handleClear}
                   type="button"
                 >
-                  <RotateCcw className="size-4" />
+                  <RotateCcw className="size-3.5" />
                   Limpiar
                 </button>
                 <button
@@ -364,12 +335,18 @@ export function FiltersPanel({
               </div>
             </div>
 
-            <div className="px-5 pt-4">
-              <div className="grid grid-cols-2 rounded-2xl bg-muted p-1">
-                <TabButton active={activeTab === "general"} icon={MapPin} onClick={() => setActiveTab("general")}> 
+            <div className="px-5 pt-3.5">
+              <div className="grid grid-cols-4 rounded-2xl bg-muted p-1">
+                <TabButton active={activeTab === "general"} icon={SlidersHorizontal} onClick={() => setActiveTab("general")}>
                   General
                 </TabButton>
-                <TabButton active={activeTab === "horarios"} icon={Calendar} onClick={() => setActiveTab("horarios")}> 
+                <TabButton active={activeTab === "zona"} icon={MapPin} onClick={() => setActiveTab("zona")}>
+                  Zona
+                </TabButton>
+                <TabButton active={activeTab === "ordenar"} icon={ChevronDown} onClick={() => setActiveTab("ordenar")}>
+                  Ordenar
+                </TabButton>
+                <TabButton active={activeTab === "horarios"} icon={Calendar} onClick={() => setActiveTab("horarios")}>
                   Horarios
                 </TabButton>
               </div>
@@ -377,60 +354,12 @@ export function FiltersPanel({
 
             <div className="flex-1 overflow-y-auto px-5 py-4">
               {activeTab === "general" ? (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   <section>
-                    <h4 className="text-[1rem] font-semibold text-foreground">
-                      Distancia maxima
-                    </h4>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Por defecto se muestra toda la Comunidad de Madrid.
-                    </p>
-
-                    <div className="mt-3 rounded-[18px] border border-border bg-card px-4 py-3.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="inline-flex items-center gap-2 text-[14px] text-muted-foreground">
-                          <MapPin className="size-4" />
-                          Radio de busqueda
-                        </span>
-                        <span className="text-[1.7rem] font-bold leading-none text-primary">
-                          {Math.round(localFilters.radiusMeters / 1000)} km
-                        </span>
-                      </div>
-
-                      <div className="mt-4">
-                        <input
-                          className="w-full accent-primary"
-                          disabled={!metadata?.canUseDistanceFilter}
-                          max={120000}
-                          min={5000}
-                          onChange={(event) =>
-                            setLocalFilters((current) => ({
-                              ...current,
-                              radiusMeters: Number(event.target.value),
-                            }))
-                          }
-                          step={1000}
-                          type="range"
-                          value={localFilters.radiusMeters}
-                        />
-                        <div className="mt-3 flex justify-between text-[12px] text-muted-foreground">
-                          <span>5 km</span>
-                          <span>60 km</span>
-                          <span>120 km</span>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section>
-                    <h4 className="text-[1rem] font-semibold text-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Tipo de espacio
                     </h4>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Selecciona el tipo de establecimiento
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2.5">
+                    <div className="flex flex-wrap gap-2">
                       <ToggleChip
                         active={localFilters.kinds.includes("library")}
                         onClick={() => toggleKind("library")}
@@ -441,27 +370,23 @@ export function FiltersPanel({
                         active={localFilters.kinds.includes("study_room")}
                         onClick={() => toggleKind("study_room")}
                       >
-                        Sala de Estudio
+                        Sala de estudio
                       </ToggleChip>
                     </div>
                   </section>
 
                   <section>
-                    <h4 className="text-[1rem] font-semibold text-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Caracteristicas
                     </h4>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Activa solo filtros soportados extremo a extremo.
-                    </p>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-2 sm:grid-cols-2">
                       <SettingCard
                         checked={localFilters.accessible}
                         icon={MapPin}
                         onCheckedChange={(value) =>
                           setLocalFilters((current) => ({ ...current, accessible: value }))
                         }
-                        subtitle="Centros con accesibilidad indicada"
+                        subtitle="Accesibilidad indicada"
                         title="Accesible"
                       />
                       <SettingCard
@@ -470,7 +395,7 @@ export function FiltersPanel({
                         onCheckedChange={(value) =>
                           setLocalFilters((current) => ({ ...current, withWifi: value }))
                         }
-                        subtitle="Centros con WiFi disponible"
+                        subtitle="WiFi disponible"
                         title="Con WiFi"
                       />
                       <SettingCard
@@ -479,7 +404,7 @@ export function FiltersPanel({
                         onCheckedChange={(value) =>
                           setLocalFilters((current) => ({ ...current, withCapacity: value }))
                         }
-                        subtitle="Centros con aforo informado"
+                        subtitle="Aforo informado"
                         title="Con aforo"
                       />
                       <SettingCard
@@ -488,61 +413,17 @@ export function FiltersPanel({
                         onCheckedChange={(value) =>
                           setLocalFilters((current) => ({ ...current, withSer: value }))
                         }
-                        subtitle="Centros en zona con cobertura SER"
+                        subtitle="Cobertura SER cercana"
                         title="Con SER"
                       />
                     </div>
                   </section>
 
                   <section>
-                    <h4 className="text-[1rem] font-semibold text-foreground">
-                      Distrito
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      Transporte cercano
                     </h4>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Filtra por distrito operativo real.
-                    </p>
-                    <div className="mt-4 flex max-h-32 flex-wrap gap-2.5 overflow-y-auto pr-1">
-                      {(metadata?.availableDistricts ?? []).map((option) => (
-                        <ToggleChip
-                          active={localFilters.districts.includes(option.value)}
-                          key={option.value}
-                          onClick={() => toggleStringValue("districts", option.value)}
-                        >
-                          {option.label} ({option.count})
-                        </ToggleChip>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section>
-                    <h4 className="text-[1rem] font-semibold text-foreground">
-                      Barrio
-                    </h4>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Filtra por barrio operativo real.
-                    </p>
-                    <div className="mt-4 flex max-h-32 flex-wrap gap-2.5 overflow-y-auto pr-1">
-                      {(metadata?.availableNeighborhoods ?? []).map((option) => (
-                        <ToggleChip
-                          active={localFilters.neighborhoods.includes(option.value)}
-                          key={option.value}
-                          onClick={() => toggleStringValue("neighborhoods", option.value)}
-                        >
-                          {option.label} ({option.count})
-                        </ToggleChip>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section>
-                    <h4 className="text-[1rem] font-semibold text-foreground">
-                      Transporte disponible
-                    </h4>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Filtra por opciones de transporte cercanas
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2.5">
+                    <div className="flex flex-wrap gap-2">
                       {(metadata?.availableTransportModes ?? []).map((option) => {
                         const Icon = transportIcon(option.mode);
                         return (
@@ -558,16 +439,76 @@ export function FiltersPanel({
                       })}
                     </div>
                   </section>
+                </div>
+              ) : null}
+
+              {activeTab === "zona" ? (
+                <div className="space-y-5">
+                  <section>
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      Radio de busqueda
+                    </h4>
+                    <div className="rounded-[16px] border border-border bg-card px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-2 text-[13px] text-muted-foreground">
+                          <MapPin className="size-3.5" />
+                          Radio
+                        </span>
+                        <span className="text-[1.4rem] font-bold leading-none text-primary">
+                          {Math.round(localFilters.radiusMeters / 1000)} km
+                        </span>
+                      </div>
+                      <div className="mt-3">
+                        <input
+                          className="w-full accent-primary"
+                          disabled={!metadata?.canUseDistanceFilter}
+                          max={120000}
+                          min={5000}
+                          onChange={(event) =>
+                            setLocalFilters((current) => ({
+                              ...current,
+                              radiusMeters: Number(event.target.value),
+                            }))
+                          }
+                          step={1000}
+                          type="range"
+                          value={localFilters.radiusMeters}
+                        />
+                        <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+                          <span>5 km</span>
+                          <span>60 km</span>
+                          <span>120 km</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
 
                   <section>
-                    <h4 className="text-[1rem] font-semibold text-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      Distrito
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {(metadata?.availableDistricts ?? []).map((option) => (
+                        <ToggleChip
+                          active={localFilters.districts.includes(option.value)}
+                          key={option.value}
+                          onClick={() => toggleStringValue("districts", option.value)}
+                        >
+                          {option.label}
+                        </ToggleChip>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              ) : null}
+
+              {activeTab === "ordenar" ? (
+                <div className="space-y-5">
+                  <section>
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Ordenacion
                     </h4>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Selecciona un orden soportado por la API.
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2.5">
+                    <div className="flex flex-wrap gap-2">
                       {(metadata?.availableSortModes ?? []).map((option) => (
                         <ToggleChip
                           active={localFilters.sort === option.value}
@@ -585,31 +526,26 @@ export function FiltersPanel({
               ) : null}
 
               {activeTab === "horarios" ? (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   <section>
-                    <h4 className="text-[1rem] font-semibold text-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Estado actual
                     </h4>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Filtra espacios que ahora mismo están abiertos.
-                    </p>
-                    <div className="mt-4">
-                      <SettingCard
-                        checked={localFilters.openNow}
-                        icon={Clock}
-                        onCheckedChange={(value) =>
-                          setLocalFilters((current) => ({ ...current, openNow: value }))
-                        }
-                        subtitle="Solo espacios abiertos"
-                        title="Abierta ahora"
-                      />
-                    </div>
+                    <SettingCard
+                      checked={localFilters.openNow}
+                      icon={Clock}
+                      onCheckedChange={(value) =>
+                        setLocalFilters((current) => ({ ...current, openNow: value }))
+                      }
+                      subtitle="Solo espacios abiertos ahora"
+                      title="Abierta ahora"
+                    />
                   </section>
                 </div>
               ) : null}
             </div>
 
-            <div className="border-t border-border bg-muted/35 px-5 py-4">
+            <div className="border-t border-border bg-muted/35 px-5 py-3.5">
               <p className="mb-3 text-center text-[13px] text-muted-foreground">
                 <span className="font-semibold text-foreground">
                   {loading ? "..." : resultCount}
@@ -618,14 +554,14 @@ export function FiltersPanel({
               </p>
               <div className="flex gap-3">
                 <button
-                  className="flex-1 rounded-2xl border border-border bg-card px-4 py-3 text-[14px] font-medium text-foreground transition hover:bg-muted/40"
+                  className="flex-1 rounded-2xl border border-border bg-card px-4 py-2.5 text-[14px] font-medium text-foreground transition hover:bg-muted/40"
                   onClick={() => setIsOpen(false)}
                   type="button"
                 >
                   Cancelar
                 </button>
                 <button
-                  className="flex-1 rounded-2xl bg-primary px-4 py-3 text-[14px] font-medium text-primary-foreground transition hover:opacity-90"
+                  className="flex-1 rounded-2xl bg-primary px-4 py-2.5 text-[14px] font-medium text-primary-foreground transition hover:opacity-90"
                   onClick={handleApply}
                   type="button"
                 >
