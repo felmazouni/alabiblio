@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Clock,
   MapPin,
+  Minus,
   RotateCcw,
   Search,
   SlidersHorizontal,
@@ -96,17 +97,17 @@ function TabButton({
   return (
     <button
       className={cn(
-        "inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-medium transition",
+        "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-semibold transition-all duration-200",
         active
-          ? "bg-card text-foreground"
-          : "text-foreground/75 hover:bg-card/40",
+          ? "bg-card text-foreground shadow-[0_6px_20px_rgba(15,23,42,0.15)]"
+          : "text-foreground/70 hover:bg-card/50 hover:text-foreground",
         disabled && "cursor-not-allowed text-muted-foreground/60 hover:bg-transparent",
       )}
       disabled={disabled}
       onClick={onClick}
       type="button"
     >
-      <Icon className="size-3" />
+      <Icon className="size-3.5" />
       {children}
     </button>
   );
@@ -126,15 +127,15 @@ function ToggleChip({
   return (
     <button
       className={cn(
-        "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11px] font-medium transition",
+        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-medium transition-all duration-150",
         active
-          ? "border-primary bg-primary text-primary-foreground shadow-sm"
-          : "border-border bg-card text-foreground hover:border-primary/35 hover:bg-muted/35",
+          ? "border-primary bg-primary text-primary-foreground shadow-[0_8px_24px_rgba(15,91,167,0.28)]"
+          : "border-border bg-card text-foreground hover:border-primary/30 hover:bg-muted/35",
       )}
       onClick={onClick}
       type="button"
     >
-      {Icon ? <Icon className="size-3" /> : null}
+      {Icon ? <Icon className="size-3.5" /> : null}
       {children}
     </button>
   );
@@ -189,17 +190,145 @@ function SettingCard({
   onCheckedChange: (value: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-[12px] border border-border bg-card px-3 py-2.5">
+    <div className="flex items-center justify-between rounded-[14px] border border-border bg-card px-3.5 py-3">
       <div className="flex items-center gap-2.5">
-        <div className="flex size-7 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        <div className="flex size-8 items-center justify-center rounded-xl bg-muted text-muted-foreground">
           <Icon className="size-3.5" />
         </div>
         <div>
-          <p className="text-[12px] font-medium text-foreground">{title}</p>
+          <p className="text-[12px] font-semibold text-foreground">{title}</p>
           <p className="text-[10px] text-muted-foreground">{subtitle}</p>
         </div>
       </div>
       <Switch checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+}
+
+function SelectionBadge({
+  label,
+  onRemove,
+}: {
+  label: string;
+  onRemove: () => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[10px] font-medium text-foreground">
+      {label}
+      <button
+        aria-label={`Quitar ${label}`}
+        className="inline-flex size-4 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        onClick={onRemove}
+        type="button"
+      >
+        <Minus className="size-3" />
+      </button>
+    </span>
+  );
+}
+
+function SearchableMultiSelect({
+  title,
+  placeholder,
+  emptyLabel,
+  query,
+  onQueryChange,
+  isOpen,
+  onToggle,
+  onClear,
+  selectedCount,
+  options,
+  isSelected,
+  onSelect,
+}: {
+  title: string;
+  placeholder: string;
+  emptyLabel: string;
+  query: string;
+  onQueryChange: (value: string) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClear: () => void;
+  selectedCount: number;
+  options: Array<{ value: string; label: string; count?: number }>;
+  isSelected: (value: string) => boolean;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+          {title}
+        </p>
+        {selectedCount > 0 ? (
+          <button
+            className="text-[11px] font-medium text-muted-foreground transition hover:text-foreground"
+            onClick={onClear}
+            type="button"
+          >
+            Limpiar
+          </button>
+        ) : null}
+      </div>
+
+      <div className="relative">
+        <button
+          className="flex h-10 w-full items-center justify-between rounded-xl border border-border bg-card px-3 text-[12px] text-foreground shadow-[0_6px_18px_rgba(15,23,42,0.08)]"
+          onClick={onToggle}
+          type="button"
+        >
+          <span className="truncate text-left">
+            {selectedCount > 0 ? `${selectedCount} seleccionados` : placeholder}
+          </span>
+          <ChevronDown className={cn("size-3.5 text-muted-foreground transition", isOpen && "rotate-180")} />
+        </button>
+
+        {isOpen ? (
+          <div className="mt-2 w-full rounded-2xl border border-border bg-card p-2.5 shadow-[0_24px_56px_rgba(15,23,42,0.24)]">
+            <div className="flex h-9 items-center gap-2 rounded-lg border border-border bg-muted/45 px-2.5">
+              <Search className="size-3.5 text-muted-foreground" />
+              <input
+                className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground"
+                onChange={(event) => onQueryChange(event.target.value)}
+                placeholder="Buscar"
+                type="text"
+                value={query}
+              />
+            </div>
+
+            <div className="mt-2 max-h-48 overflow-y-auto pr-1">
+              {options.length > 0 ? (
+                options.map((option) => {
+                  const selected = isSelected(option.value);
+                  return (
+                    <button
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[12px] text-left transition",
+                        selected
+                          ? "bg-primary/10 text-foreground"
+                          : "text-foreground hover:bg-muted/45",
+                      )}
+                      key={option.value}
+                      onClick={() => onSelect(option.value)}
+                      type="button"
+                    >
+                      <span className="truncate">{option.label}</span>
+                      <span className="ml-2 inline-flex items-center gap-2">
+                        {typeof option.count === "number" ? (
+                          <span className="text-[10px] text-muted-foreground">{option.count}</span>
+                        ) : null}
+                        {selected ? <Check className="size-3.5 text-primary" /> : null}
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="px-2.5 py-2 text-[11px] text-muted-foreground">{emptyLabel}</p>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -230,7 +359,9 @@ export function FiltersPanel({
   const [activeTab, setActiveTab] = useState<TabId>("general");
   const [localFilters, setLocalFilters] = useState(filters);
   const [districtQuery, setDistrictQuery] = useState("");
+  const [neighborhoodQuery, setNeighborhoodQuery] = useState("");
   const [isDistrictComboboxOpen, setIsDistrictComboboxOpen] = useState(false);
+  const [isNeighborhoodComboboxOpen, setIsNeighborhoodComboboxOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -247,7 +378,9 @@ export function FiltersPanel({
   useEffect(() => {
     if (activeTab !== "zona") {
       setDistrictQuery("");
+      setNeighborhoodQuery("");
       setIsDistrictComboboxOpen(false);
+      setIsNeighborhoodComboboxOpen(false);
     }
   }, [activeTab]);
 
@@ -274,14 +407,42 @@ export function FiltersPanel({
 
   const selectedDistrictLabels = useMemo(
     () =>
-      localFilters.districts
-        .map(
-          (value) =>
-            districtOptions.find((option) => option.value === value)?.label ??
-            normalizeZoneLabel(value),
-        )
-        .join(", "),
+      localFilters.districts.map(
+        (value) =>
+          districtOptions.find((option) => option.value === value)?.label ??
+          normalizeZoneLabel(value),
+      ),
     [districtOptions, localFilters.districts],
+  );
+
+  const neighborhoodOptions = useMemo(
+    () =>
+      (metadata?.availableNeighborhoods ?? []).map((option) => ({
+        ...option,
+        label: normalizeZoneLabel(option.label || option.value),
+      })),
+    [metadata?.availableNeighborhoods],
+  );
+
+  const filteredNeighborhoodOptions = useMemo(() => {
+    const needle = normalizeSearchText(neighborhoodQuery.trim());
+    if (!needle) {
+      return neighborhoodOptions;
+    }
+
+    return neighborhoodOptions.filter((option) =>
+      normalizeSearchText(`${option.label} ${option.value}`).includes(needle),
+    );
+  }, [neighborhoodOptions, neighborhoodQuery]);
+
+  const selectedNeighborhoodLabels = useMemo(
+    () =>
+      localFilters.neighborhoods.map(
+        (value) =>
+          neighborhoodOptions.find((option) => option.value === value)?.label ??
+          normalizeZoneLabel(value),
+      ),
+    [localFilters.neighborhoods, neighborhoodOptions],
   );
 
   const activeFiltersCount = useMemo(
@@ -343,40 +504,43 @@ export function FiltersPanel({
   return (
     <>
       <button
-        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3.5 text-[12px] font-medium text-foreground shadow-sm transition hover:bg-muted/55"
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-[12px] font-semibold text-foreground shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition hover:bg-muted/55"
         onClick={() => setIsOpen(true)}
         type="button"
       >
-        <SlidersHorizontal className="size-3.5" />
+        <SlidersHorizontal className="size-4" />
         Filtros
         {activeFiltersCount > 0 ? (
-          <span className="inline-flex size-[18px] items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+          <span className="inline-flex size-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
             {activeFiltersCount}
           </span>
         ) : null}
       </button>
 
       {isOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/36 p-4">
-          <div className="flex max-h-[82vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[20px] border border-border bg-card shadow-[0_20px_64px_rgba(15,23,42,0.25)]">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[3px]">
+          <div className="flex max-h-[88vh] w-full max-w-[780px] flex-col overflow-hidden rounded-[26px] border border-border/90 bg-card shadow-[0_36px_100px_rgba(2,6,23,0.42)]">
+            <div className="flex items-center justify-between border-b border-border/80 px-5 py-4">
               <div className="flex items-center gap-3">
-                <div className="flex size-7 items-center justify-center rounded-lg bg-accent text-primary">
-                  <SlidersHorizontal className="size-3.5" />
+                <div className="flex size-9 items-center justify-center rounded-xl bg-accent text-primary">
+                  <SlidersHorizontal className="size-4" />
                 </div>
-                <h3 className="text-[1rem] font-semibold text-foreground">Filtros</h3>
+                <div>
+                  <h3 className="text-[1.05rem] font-semibold text-foreground">Filtros</h3>
+                  <p className="text-[11px] text-muted-foreground">Ajusta la busqueda con precision</p>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  className="inline-flex items-center gap-1 text-[12px] text-muted-foreground transition hover:text-foreground"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/30 px-2.5 py-1.5 text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
                   onClick={handleClear}
                   type="button"
                 >
-                  <RotateCcw className="size-3" />
+                  <RotateCcw className="size-3.5" />
                   Limpiar
                 </button>
                 <button
-                  className="text-muted-foreground transition hover:text-foreground"
+                  className="rounded-lg border border-border bg-card p-1.5 text-muted-foreground transition hover:text-foreground"
                   onClick={() => setIsOpen(false)}
                   type="button"
                 >
@@ -385,8 +549,8 @@ export function FiltersPanel({
               </div>
             </div>
 
-            <div className="px-4 pt-3">
-              <div className="grid grid-cols-4 rounded-xl bg-muted/75 p-0.5">
+            <div className="px-5 pt-4">
+              <div className="grid grid-cols-2 rounded-2xl border border-border bg-muted/65 p-1 sm:grid-cols-4">
                 <TabButton
                   active={activeTab === "general"}
                   icon={SlidersHorizontal}
@@ -418,14 +582,14 @@ export function FiltersPanel({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-3">
+            <div className="flex-1 overflow-y-auto px-5 py-4">
               {activeTab === "general" ? (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <section>
-                    <h4 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Tipo de espacio
                     </h4>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       <ToggleChip
                         active={localFilters.kinds.includes("library")}
                         onClick={() => toggleKind("library")}
@@ -442,10 +606,10 @@ export function FiltersPanel({
                   </section>
 
                   <section>
-                    <h4 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Caracteristicas
                     </h4>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-2.5 sm:grid-cols-2">
                       <SettingCard
                         checked={localFilters.accessible}
                         icon={MapPin}
@@ -486,10 +650,10 @@ export function FiltersPanel({
                   </section>
 
                   <section>
-                    <h4 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Transporte cercano
                     </h4>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {(metadata?.availableTransportModes ?? []).map((option) => {
                         const Icon = transportIcon(option.mode);
                         return (
@@ -509,22 +673,22 @@ export function FiltersPanel({
               ) : null}
 
               {activeTab === "zona" ? (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <section>
-                    <h4 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Radio de busqueda
                     </h4>
-                    <div className="rounded-[14px] border border-border bg-card px-3 py-2.5">
+                    <div className="rounded-[18px] border border-border bg-card px-4 py-3.5 shadow-[0_12px_26px_rgba(15,23,42,0.08)]">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                          <MapPin className="size-3" />
-                          Radio
+                        <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
+                          <MapPin className="size-3.5" />
+                          Cobertura
                         </span>
-                        <span className="text-[1.2rem] font-bold leading-none text-primary">
+                        <span className="rounded-lg bg-accent px-2.5 py-1 text-[1.05rem] font-semibold leading-none text-primary">
                           {Math.round(localFilters.radiusMeters / 1000)} km
                         </span>
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-3">
                         <input
                           className="w-full accent-primary"
                           disabled={!metadata?.canUseDistanceFilter}
@@ -540,7 +704,7 @@ export function FiltersPanel({
                           type="range"
                           value={localFilters.radiusMeters}
                         />
-                        <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
+                        <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
                           <span>5 km</span>
                           <span>60 km</span>
                           <span>120 km</span>
@@ -550,82 +714,94 @@ export function FiltersPanel({
                   </section>
 
                   <section>
-                    <h4 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                      Distrito
-                    </h4>
-                    <div className="relative">
-                      <button
-                        className="flex h-8 w-full items-center justify-between rounded-lg border border-border bg-card px-2.5 text-[12px] text-foreground"
-                        onClick={() => setIsDistrictComboboxOpen((current) => !current)}
-                        type="button"
-                      >
-                        <span className="truncate text-left">
-                          {localFilters.districts.length > 0
-                            ? `${localFilters.districts.length} seleccionados`
-                            : "Seleccionar distritos"}
-                        </span>
-                        <ChevronDown className="size-3 text-muted-foreground" />
-                      </button>
+                    <SearchableMultiSelect
+                      emptyLabel="No hay coincidencias."
+                      isOpen={isDistrictComboboxOpen}
+                      isSelected={(value) => localFilters.districts.includes(value)}
+                      onClear={() =>
+                        setLocalFilters((current) => ({ ...current, districts: [] }))
+                      }
+                      onQueryChange={setDistrictQuery}
+                      onSelect={(value) => toggleStringValue("districts", value)}
+                      onToggle={() => {
+                        setIsNeighborhoodComboboxOpen(false);
+                        setIsDistrictComboboxOpen((current) => !current);
+                      }}
+                      options={filteredDistrictOptions}
+                      placeholder="Seleccionar distritos"
+                      query={districtQuery}
+                      selectedCount={localFilters.districts.length}
+                      title="Distrito"
+                    />
 
-                      {isDistrictComboboxOpen ? (
-                        <div className="mt-1 w-full rounded-lg border border-border bg-card p-2 shadow-[0_10px_30px_rgba(15,23,42,0.18)]">
-                          <div className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2">
-                            <Search className="size-3 text-muted-foreground" />
-                            <input
-                              className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground"
-                              onChange={(event) => setDistrictQuery(event.target.value)}
-                              placeholder="Buscar distrito"
-                              type="text"
-                              value={districtQuery}
-                            />
-                          </div>
+                    {selectedDistrictLabels.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {selectedDistrictLabels.map((label, index) => (
+                          <SelectionBadge
+                            key={`${label}:${index}`}
+                            label={label}
+                            onRemove={() =>
+                              setLocalFilters((current) => ({
+                                ...current,
+                                districts: current.districts.filter((_, currentIndex) => currentIndex !== index),
+                              }))
+                            }
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
 
-                          <div className="mt-2 max-h-44 overflow-y-auto">
-                            {filteredDistrictOptions.length > 0 ? (
-                              filteredDistrictOptions.map((option) => {
-                                const selected = localFilters.districts.includes(option.value);
-                                return (
-                                  <button
-                                    className={cn(
-                                      "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[12px] text-left transition",
-                                      selected
-                                        ? "bg-primary/10 text-foreground"
-                                        : "text-foreground hover:bg-muted/45",
-                                    )}
-                                    key={option.value}
-                                    onClick={() => toggleStringValue("districts", option.value)}
-                                    type="button"
-                                  >
-                                    <span className="truncate">{option.label}</span>
-                                    {selected ? <Check className="size-3 text-primary" /> : null}
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <p className="px-2 py-1 text-[11px] text-muted-foreground">
-                                No hay coincidencias.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                    {selectedDistrictLabels ? (
-                      <p className="mt-2 text-[11px] text-muted-foreground">
-                        {selectedDistrictLabels}
-                      </p>
+                  <section>
+                    <SearchableMultiSelect
+                      emptyLabel="No hay barrios disponibles con ese termino."
+                      isOpen={isNeighborhoodComboboxOpen}
+                      isSelected={(value) => localFilters.neighborhoods.includes(value)}
+                      onClear={() =>
+                        setLocalFilters((current) => ({ ...current, neighborhoods: [] }))
+                      }
+                      onQueryChange={setNeighborhoodQuery}
+                      onSelect={(value) => toggleStringValue("neighborhoods", value)}
+                      onToggle={() => {
+                        setIsDistrictComboboxOpen(false);
+                        setIsNeighborhoodComboboxOpen((current) => !current);
+                      }}
+                      options={filteredNeighborhoodOptions}
+                      placeholder="Seleccionar barrios"
+                      query={neighborhoodQuery}
+                      selectedCount={localFilters.neighborhoods.length}
+                      title="Barrio"
+                    />
+
+                    {selectedNeighborhoodLabels.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {selectedNeighborhoodLabels.map((label, index) => (
+                          <SelectionBadge
+                            key={`${label}:${index}`}
+                            label={label}
+                            onRemove={() =>
+                              setLocalFilters((current) => ({
+                                ...current,
+                                neighborhoods: current.neighborhoods.filter(
+                                  (_, currentIndex) => currentIndex !== index,
+                                ),
+                              }))
+                            }
+                          />
+                        ))}
+                      </div>
                     ) : null}
                   </section>
                 </div>
               ) : null}
 
               {activeTab === "ordenar" ? (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <section>
-                    <h4 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Ordenacion
                     </h4>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {(metadata?.availableSortModes ?? []).map((option) => (
                         <ToggleChip
                           active={localFilters.sort === option.value}
@@ -643,9 +819,9 @@ export function FiltersPanel({
               ) : null}
 
               {activeTab === "horarios" ? (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <section>
-                    <h4 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       Estado actual
                     </h4>
                     <SettingCard
@@ -662,20 +838,31 @@ export function FiltersPanel({
               ) : null}
             </div>
 
-            <div className="border-t border-border bg-muted/35 px-4 py-2.5">
-              <p className="mb-2 text-[12px] text-muted-foreground">
-                {loading ? "..." : resultCount} resultados
-              </p>
-              <div className="flex gap-2">
+            <div className="border-t border-border/80 bg-muted/35 px-5 py-4">
+              <div className="mb-3 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                    Resultado estimado
+                  </p>
+                  <p className="mt-0.5 text-[1.2rem] font-semibold leading-none text-foreground">
+                    {loading ? "..." : resultCount}
+                  </p>
+                </div>
+                <p className="text-right text-[11px] text-muted-foreground">
+                  Ajusta filtros y aplica para actualizar el listado.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <button
-                  className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[13px] font-medium text-foreground transition hover:bg-muted/40"
+                  className="flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-[13px] font-semibold text-foreground transition hover:bg-muted/40"
                   onClick={() => setIsOpen(false)}
                   type="button"
                 >
                   Cancelar
                 </button>
                 <button
-                  className="flex-1 rounded-xl bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground transition hover:opacity-90"
+                  className="flex-1 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-[0_14px_26px_rgba(15,91,167,0.32)] transition hover:opacity-90"
                   onClick={handleApply}
                   type="button"
                 >

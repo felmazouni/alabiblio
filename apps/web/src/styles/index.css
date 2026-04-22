@@ -38,7 +38,7 @@
   --transport-car-bg: #fff9eb;
   --transport-car-border: #fcd34d;
   --transport-car-text: #b45309;
-  --radius: 0.875rem;
+  --radius: 0.95rem;
 }
 
 .dark {
@@ -80,7 +80,7 @@
 }
 
 @theme inline {
-  --font-sans: "Inter", "Geist", system-ui, sans-serif;
+  --font-sans: "Manrope", "IBM Plex Sans", "Segoe UI", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -133,6 +133,10 @@
     transition:
       background-color 180ms ease,
       color 180ms ease;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 26%, transparent);
   }
 
   a {

@@ -183,8 +183,8 @@ function VoteStarsRow({
   onChange: (next: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/25 px-3 py-2.5">
-      <span className="text-[13px] font-medium text-foreground">{label}</span>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/25 px-3.5 py-3">
+      <span className="text-[13px] font-semibold text-foreground">{label}</span>
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((score) => (
           <button
@@ -195,10 +195,10 @@ function VoteStarsRow({
           >
             <Star
               className={cn(
-                "size-5",
+                "size-5 transition",
                 value >= score
                   ? "fill-amber-400 text-amber-400"
-                  : "text-muted-foreground/40",
+                  : "text-muted-foreground/35",
               )}
             />
           </button>
@@ -215,7 +215,10 @@ function GoogleLogo({ className }: { className?: string }) {
       className={className}
       viewBox="0 0 24 24"
     >
-      <path d="M21.35 11.1H12v2.93h5.35c-.5 2.87-2.93 4.2-5.33 4.2a6.2 6.2 0 1 1 0-12.4c1.37 0 2.64.48 3.63 1.29l2.12-2.12A9.2 9.2 0 1 0 12 21.2c4.6 0 8.82-3.33 8.82-9.2 0-.6-.07-.9-.17-.9Z" fill="currentColor"/>
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.05 5.05 0 0 1-2.2 3.31v2.74h3.57c2.08-1.92 3.27-4.74 3.27-8.06Z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.99 7.28-2.69l-3.57-2.74c-.99.66-2.26 1.06-3.71 1.06-2.85 0-5.27-1.93-6.14-4.52H2.18v2.82A11 11 0 0 0 12 23Z" fill="#34A853"/>
+      <path d="M5.86 14.11a6.61 6.61 0 0 1 0-4.22V7.07H2.18a11 11 0 0 0 0 9.86l3.68-2.82Z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.2 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.07l3.68 2.82c.87-2.59 3.29-4.51 6.14-4.51Z" fill="#EA4335"/>
     </svg>
   );
 }
@@ -571,12 +574,12 @@ export function CenterDetailRoute() {
                   Valoraciones
                 </h2>
                 <button
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/45 px-3 py-1.5 text-[12px] font-medium text-foreground transition hover:bg-muted/65"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-semibold text-foreground transition hover:bg-muted/45"
                   onClick={() => setIsVoteModalOpen(true)}
                   type="button"
                 >
                   {!googleIdToken ? (
-                    <GoogleLogo className="size-3.5 text-slate-700 dark:text-slate-200" />
+                    <GoogleLogo className="size-4" />
                   ) : (
                     <Star className="size-3.5" />
                   )}
@@ -585,24 +588,62 @@ export function CenterDetailRoute() {
               </div>
 
               {ratingSummary.ratingCount > 0 && ratingSummary.ratingAverage !== null ? (
-                <p className="mt-2 text-[15px] font-semibold text-foreground">
-                  <span className="text-amber-500">★</span> {ratingSummary.ratingAverage.toFixed(1)}
-                  <span className="ml-2 text-[13px] font-normal text-muted-foreground">
-                    ({ratingSummary.ratingCount} votos)
+                <div className="mt-2 flex items-end gap-3">
+                  <p className="text-[1.7rem] font-semibold leading-none text-foreground">
+                    {ratingSummary.ratingAverage.toFixed(1)}
+                  </p>
+                  <p className="pb-0.5 text-[12px] text-muted-foreground">{ratingSummary.ratingCount} votos</p>
+                  <span className="inline-flex pb-0.5">
+                    {[1, 2, 3, 4, 5].map((score) => (
+                      <Star
+                        className={cn(
+                          "size-4",
+                          (ratingSummary.ratingAverage ?? 0) >= score
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-muted-foreground/30",
+                        )}
+                        key={score}
+                      />
+                    ))}
                   </span>
-                </p>
+                </div>
               ) : (
-                <p className="mt-2 text-[13px] text-muted-foreground">Sin valoraciones</p>
+                <div className="mt-2 rounded-xl border border-border bg-muted/25 px-3 py-2.5">
+                  <div className="flex items-center gap-1 text-muted-foreground/35">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <Star className="size-4" key={index} />
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[12px] text-muted-foreground">
+                    Sin valoraciones. Se el primero en opinar.
+                  </p>
+                </div>
               )}
 
               {ratingSummary.ratingCount > 0 && ratingSummary.attributes ? (
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
                   {ratingLabels.map((key) => (
-                    <div className="rounded-xl border border-border bg-muted/35 px-3 py-2" key={key}>
+                    <div className="rounded-xl border border-border bg-muted/20 px-3 py-2.5" key={key}>
                       <p className="text-[12px] font-medium text-foreground">{ratingLabelText[key]}</p>
-                      <p className="mt-1 text-[12px] text-muted-foreground">
-                        <span className="text-amber-500">★</span> {averageLabel(ratingSummary.attributes[key])}
-                      </p>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800/80">
+                          <div
+                            className="h-full rounded-full bg-emerald-500"
+                            style={{
+                              width: `${Math.max(
+                                0,
+                                Math.min(
+                                  100,
+                                  ((ratingSummary.attributes[key] ?? 0) / 5) * 100,
+                                ),
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="w-8 text-right text-[12px] font-semibold text-foreground">
+                          {averageLabel(ratingSummary.attributes[key])}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -726,9 +767,12 @@ export function CenterDetailRoute() {
 
         {isVoteModalOpen ? (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4">
-            <div className="w-full max-w-[520px] rounded-2xl border border-border bg-card p-4 shadow-[0_20px_60px_rgba(2,6,23,0.35)]">
+            <div className="w-full max-w-[560px] rounded-[22px] border border-border bg-card p-4 shadow-[0_28px_80px_rgba(2,6,23,0.4)]">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-[1rem] font-semibold text-foreground">Tu valoracion</h3>
+                <div>
+                  <h3 className="text-[1rem] font-semibold text-foreground">Tu valoracion</h3>
+                  <p className="text-[11px] text-muted-foreground">Valora 6 aspectos para construir el score global</p>
+                </div>
                 <button
                   className="rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground"
                   onClick={() => setIsVoteModalOpen(false)}
@@ -750,11 +794,11 @@ export function CenterDetailRoute() {
                     Inicia sesion con Google para votar.
                   </p>
                   <button
-                    className="mb-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[13px] font-medium text-foreground transition hover:bg-muted/40"
+                    className="mb-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-[13px] font-semibold text-foreground transition hover:bg-muted/40"
                     onClick={requestGoogleSignIn}
                     type="button"
                   >
-                    <GoogleLogo className="size-4 text-slate-700 dark:text-slate-200" />
+                    <GoogleLogo className="size-4" />
                     Continuar con Google
                   </button>
                   <div ref={googleButtonHostRef} />
@@ -768,7 +812,7 @@ export function CenterDetailRoute() {
 
               {googleIdToken ? (
                 <button
-                  className="mb-3 text-[12px] text-muted-foreground underline"
+                  className="mb-3 text-[12px] font-medium text-muted-foreground underline"
                   onClick={logoutGoogle}
                   type="button"
                 >
@@ -798,14 +842,14 @@ export function CenterDetailRoute() {
 
               <div className="mt-4 flex gap-2">
                 <button
-                  className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[13px] font-medium text-foreground"
+                  className="flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-[13px] font-semibold text-foreground"
                   onClick={() => setIsVoteModalOpen(false)}
                   type="button"
                 >
                   Cancelar
                 </button>
                 <button
-                  className="flex-1 rounded-xl bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground disabled:opacity-60"
+                  className="flex-1 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-[0_12px_24px_rgba(15,91,167,0.28)] disabled:opacity-60"
                   disabled={voteSubmitting || !googleIdToken}
                   onClick={submitVote}
                   type="button"

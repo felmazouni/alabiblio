@@ -6,9 +6,10 @@
 - URL de produccion: `https://alabiblio.org` (runtime `alabiblio-prod` activo).
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-  - Version desplegada (preview): `e9029026`
-  - Version desplegada (produccion): `cff65c63`
+  - Version desplegada (preview): `9b4527c4`
+  - Version desplegada (produccion): `0082454a`
 - Cierre Tramo 1 (ejecucion directa): normalizacion de etiquetas de zona, persistencia completa de filtros en URL y restauracion de contexto de listado (scroll + back) validadas en preview y promovidas a produccion.
+- Cierre Tramo 2 (ejecucion directa): rediseño premium transversal de filtros, cards, ratings y estados vacios con consistencia visual en light/dark y mobile/desktop, validado en preview y promovido a produccion.
 
 # Lo que funciona ya de verdad
 
