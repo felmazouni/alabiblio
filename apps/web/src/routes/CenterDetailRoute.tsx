@@ -1,4 +1,4 @@
-﻿import type { TransportOption } from "@alabiblio/contracts";
+﻿import type { CenterRatingVoteInput, TransportOption } from "@alabiblio/contracts";
 import {
   ArrowLeft,
   Bike,
@@ -8,15 +8,82 @@ import {
   ExternalLink,
   MapPin,
   Navigation,
+  Star,
   Train,
   Users,
   Wifi,
+  X,
 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PublicChrome } from "../components/PublicChrome";
 import { cn } from "../lib/cn";
-import { usePublicCenterDetail } from "../lib/publicCatalog";
+import {
+  fetchGoogleAuthConfig,
+  submitCenterRating,
+  useCenterRatings,
+  usePublicCenterDetail,
+} from "../lib/publicCatalog";
+import { formatNeighborhoodDistrict } from "../lib/presentationText";
 import { useUserLocation } from "../lib/userLocation";
+
+interface GoogleIdApi {
+  accounts: {
+    id: {
+      initialize: (config: {
+        client_id: string;
+        callback: (response: { credential?: string }) => void;
+      }) => void;
+      renderButton: (
+        parent: HTMLElement,
+        options: Record<string, string | number>,
+      ) => void;
+      prompt: () => void;
+      cancel: () => void;
+    };
+  };
+}
+
+declare global {
+  interface Window {
+    google?: GoogleIdApi;
+  }
+}
+
+const ratingLabels: Array<keyof CenterRatingVoteInput> = [
+  "silence",
+  "wifi",
+  "cleanliness",
+  "plugs",
+  "temperature",
+  "lighting",
+];
+
+const ratingLabelText: Record<keyof CenterRatingVoteInput, string> = {
+  silence: "Silencio",
+  wifi: "WiFi",
+  cleanliness: "Limpieza",
+  plugs: "Enchufes",
+  temperature: "Temperatura",
+  lighting: "Iluminacion",
+};
+
+const emptyVote: CenterRatingVoteInput = {
+  silence: 0,
+  wifi: 0,
+  cleanliness: 0,
+  plugs: 0,
+  temperature: 0,
+  lighting: 0,
+};
+
+function averageLabel(value: number | null): string {
+  if (value === null) {
+    return "Sin valoraciones";
+  }
+
+  return value.toFixed(1);
+}
 
 function ScheduleRulesBlock({
   rules,
@@ -74,10 +141,317 @@ function statusBadge(status: string) {
   return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-600/40 dark:bg-amber-950/45 dark:text-amber-200";
 }
 
+function loadGoogleScript(): Promise<void> {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("window_unavailable"));
+  }
+
+  if (window.google?.accounts?.id) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
+
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("google_script_failed")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("google_script_failed"));
+    document.head.appendChild(script);
+  });
+}
+
+function VoteStarsRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/25 px-3 py-2.5">
+      <span className="text-[13px] font-medium text-foreground">{label}</span>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((score) => (
+          <button
+            className="inline-flex items-center justify-center"
+            key={score}
+            onClick={() => onChange(score)}
+            type="button"
+          >
+            <Star
+              className={cn(
+                "size-5",
+                value >= score
+                  ? "fill-amber-400 text-amber-400"
+                  : "text-muted-foreground/40",
+              )}
+            />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GoogleLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+    >
+      <path d="M21.35 11.1H12v2.93h5.35c-.5 2.87-2.93 4.2-5.33 4.2a6.2 6.2 0 1 1 0-12.4c1.37 0 2.64.48 3.63 1.29l2.12-2.12A9.2 9.2 0 1 0 12 21.2c4.6 0 8.82-3.33 8.82-9.2 0-.6-.07-.9-.17-.9Z" fill="currentColor"/>
+    </svg>
+  );
+}
+
 export function CenterDetailRoute() {
   const { slug } = useParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { location } = useUserLocation();
   const { center, data, error, loading } = usePublicCenterDetail(slug, location);
+
+  const [isVoteModalOpen, setIsVoteModalOpen] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+  const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false);
+  const [googleIdToken, setGoogleIdToken] = useState<string | null>(null);
+  const [voteDraft, setVoteDraft] = useState<CenterRatingVoteInput>(emptyVote);
+  const [voteSubmitting, setVoteSubmitting] = useState(false);
+  const [voteError, setVoteError] = useState<string | null>(null);
+  const googleButtonHostRef = useRef<HTMLDivElement | null>(null);
+  const [isGoogleReady, setIsGoogleReady] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const storedToken = window.localStorage.getItem("alabiblio_google_id_token");
+    if (storedToken) {
+      setGoogleIdToken(storedToken);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchGoogleAuthConfig(controller.signal)
+      .then((payload) => {
+        setGoogleAuthEnabled(payload.enabled);
+        setGoogleClientId(payload.clientId);
+      })
+      .catch(() => {
+        setGoogleAuthEnabled(false);
+        setGoogleClientId(null);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const {
+    data: ratingsData,
+    refresh: refreshRatings,
+  } = useCenterRatings(slug, googleIdToken);
+
+  useEffect(() => {
+    const userVote = ratingsData?.item.userVote;
+    if (userVote) {
+      setVoteDraft({
+        silence: userVote.silence,
+        wifi: userVote.wifi,
+        cleanliness: userVote.cleanliness,
+        plugs: userVote.plugs,
+        temperature: userVote.temperature,
+        lighting: userVote.lighting,
+      });
+      return;
+    }
+
+    setVoteDraft(emptyVote);
+  }, [ratingsData?.item.userVote]);
+
+  useEffect(() => {
+    if (searchParams.get("opinar") !== "1") {
+      return;
+    }
+
+    setIsVoteModalOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("opinar");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!isVoteModalOpen || googleIdToken || !googleAuthEnabled || !googleClientId) {
+      return;
+    }
+
+    if (!googleButtonHostRef.current) {
+      return;
+    }
+
+    let mounted = true;
+
+    loadGoogleScript()
+      .then(() => {
+        if (!mounted || !googleButtonHostRef.current || !window.google?.accounts?.id) {
+          return;
+        }
+
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: (response) => {
+            if (!response.credential) {
+              setVoteError("No se pudo completar el login de Google.");
+              return;
+            }
+
+            setGoogleIdToken(response.credential);
+            window.localStorage.setItem("alabiblio_google_id_token", response.credential);
+            setVoteError(null);
+          },
+        });
+
+        googleButtonHostRef.current.innerHTML = "";
+        window.google.accounts.id.renderButton(googleButtonHostRef.current, {
+          type: "standard",
+          shape: "pill",
+          theme: "outline",
+          text: "signin_with",
+          size: "large",
+          locale: "es",
+        });
+        setIsGoogleReady(true);
+      })
+      .catch(() => {
+        setIsGoogleReady(false);
+        setVoteError("No se pudo cargar Google Sign-In.");
+      });
+
+    return () => {
+      mounted = false;
+      window.google?.accounts?.id?.cancel();
+      setIsGoogleReady(false);
+    };
+  }, [isVoteModalOpen, googleAuthEnabled, googleClientId, googleIdToken]);
+
+  const requestGoogleSignIn = async () => {
+    setVoteError(null);
+
+    if (!googleAuthEnabled || !googleClientId) {
+      setVoteError("Google no esta configurado.");
+      return;
+    }
+
+    try {
+      await loadGoogleScript();
+      if (!window.google?.accounts?.id) {
+        setVoteError("Google Sign-In no disponible.");
+        return;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response) => {
+          if (!response.credential) {
+            setVoteError("No se pudo completar el login de Google.");
+            return;
+          }
+
+          setGoogleIdToken(response.credential);
+          window.localStorage.setItem("alabiblio_google_id_token", response.credential);
+          setVoteError(null);
+        },
+      });
+
+      if (googleButtonHostRef.current) {
+        googleButtonHostRef.current.innerHTML = "";
+        window.google.accounts.id.renderButton(googleButtonHostRef.current, {
+          type: "standard",
+          shape: "pill",
+          theme: "outline",
+          text: "signin_with",
+          size: "large",
+          locale: "es",
+        });
+      }
+
+      window.google.accounts.id.prompt();
+      setIsGoogleReady(true);
+    } catch {
+      setVoteError("No se pudo cargar Google Sign-In.");
+    }
+  };
+
+  const ratingSummary = useMemo(() => {
+    const item = ratingsData?.item;
+    if (!item) {
+      return {
+        ratingAverage: center?.ratingAverage ?? null,
+        ratingCount: center?.ratingCount ?? 0,
+        attributes: null,
+      };
+    }
+
+    return {
+      ratingAverage: item.ratingAverage,
+      ratingCount: item.ratingCount,
+      attributes: item.attributes,
+    };
+  }, [ratingsData?.item, center?.ratingAverage, center?.ratingCount]);
+
+  const submitVote = async () => {
+    if (!slug || !googleIdToken) {
+      setVoteError("Inicia sesion con Google para votar.");
+      return;
+    }
+
+    const completed = ratingLabels.every((key) => voteDraft[key] >= 1 && voteDraft[key] <= 5);
+    if (!completed) {
+      setVoteError("Completa las 6 valoraciones (1 a 5). ");
+      return;
+    }
+
+    setVoteSubmitting(true);
+    setVoteError(null);
+    try {
+      await submitCenterRating(slug, voteDraft, googleIdToken);
+      await refreshRatings();
+      setIsVoteModalOpen(false);
+    } catch {
+      setVoteError("No se pudo guardar tu voto.");
+    } finally {
+      setVoteSubmitting(false);
+    }
+  };
+
+  const logoutGoogle = () => {
+    setGoogleIdToken(null);
+    window.localStorage.removeItem("alabiblio_google_id_token");
+  };
+
+  const handleBackToListing = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/listado");
+  };
 
   return (
     <PublicChrome backTo="/listado" compact>
@@ -96,7 +470,6 @@ export function CenterDetailRoute() {
           </div>
         ) : (
           <>
-            {/* Header */}
             <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-border px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
@@ -127,9 +500,9 @@ export function CenterDetailRoute() {
                   <span className="font-medium text-primary">{center.distanceLabel}</span>
                 ) : null}
               </div>
-              {[center.neighborhood, center.district].filter(Boolean).length > 0 ? (
+              {formatNeighborhoodDistrict(center.neighborhood, center.district) ? (
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {[center.neighborhood, center.district].filter(Boolean).join(" - ")}
+                  {formatNeighborhoodDistrict(center.neighborhood, center.district)}
                 </p>
               ) : null}
 
@@ -192,7 +565,50 @@ export function CenterDetailRoute() {
               </div>
             </div>
 
-            {/* Transporte */}
+            <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  Valoraciones
+                </h2>
+                <button
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/45 px-3 py-1.5 text-[12px] font-medium text-foreground transition hover:bg-muted/65"
+                  onClick={() => setIsVoteModalOpen(true)}
+                  type="button"
+                >
+                  {!googleIdToken ? (
+                    <GoogleLogo className="size-3.5 text-slate-700 dark:text-slate-200" />
+                  ) : (
+                    <Star className="size-3.5" />
+                  )}
+                  {!googleIdToken ? "Opinar con Google" : "Opinar"}
+                </button>
+              </div>
+
+              {ratingSummary.ratingCount > 0 && ratingSummary.ratingAverage !== null ? (
+                <p className="mt-2 text-[15px] font-semibold text-foreground">
+                  <span className="text-amber-500">★</span> {ratingSummary.ratingAverage.toFixed(1)}
+                  <span className="ml-2 text-[13px] font-normal text-muted-foreground">
+                    ({ratingSummary.ratingCount} votos)
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-2 text-[13px] text-muted-foreground">Sin valoraciones</p>
+              )}
+
+              {ratingSummary.ratingCount > 0 && ratingSummary.attributes ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                  {ratingLabels.map((key) => (
+                    <div className="rounded-xl border border-border bg-muted/35 px-3 py-2" key={key}>
+                      <p className="text-[12px] font-medium text-foreground">{ratingLabelText[key]}</p>
+                      <p className="mt-1 text-[12px] text-muted-foreground">
+                        <span className="text-amber-500">★</span> {averageLabel(ratingSummary.attributes[key])}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
             {center.transportOptions.filter((o) => o.mode !== "car").length > 0 ? (
               <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
                 <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
@@ -241,7 +657,6 @@ export function CenterDetailRoute() {
               </div>
             ) : null}
 
-            {/* Horario detallado */}
             <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
               <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                 Horario
@@ -259,7 +674,6 @@ export function CenterDetailRoute() {
               ) : null}
             </div>
 
-            {/* Equipamiento */}
             {data.item.equipment.length > 0 ? (
               <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
                 <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
@@ -281,7 +695,6 @@ export function CenterDetailRoute() {
               </div>
             ) : null}
 
-            {/* Contacto */}
             {(data.item.contact.phone || data.item.contact.email) ? (
               <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
                 <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
@@ -298,18 +711,111 @@ export function CenterDetailRoute() {
               </div>
             ) : null}
 
-            {/* Back */}
             <div className="pb-2">
-              <Link
+              <button
                 className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[13px] font-medium text-foreground transition hover:bg-muted/55"
-                to="/listado"
+                onClick={handleBackToListing}
+                type="button"
               >
                 <ArrowLeft className="size-4" />
                 Volver al listado
-              </Link>
+              </button>
             </div>
           </>
         )}
+
+        {isVoteModalOpen ? (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4">
+            <div className="w-full max-w-[520px] rounded-2xl border border-border bg-card p-4 shadow-[0_20px_60px_rgba(2,6,23,0.35)]">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-[1rem] font-semibold text-foreground">Tu valoracion</h3>
+                <button
+                  className="rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground"
+                  onClick={() => setIsVoteModalOpen(false)}
+                  type="button"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              {!googleAuthEnabled ? (
+                <p className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                  Login Google no configurado en este entorno.
+                </p>
+              ) : null}
+
+              {googleAuthEnabled && !googleIdToken ? (
+                <div className="mb-3 rounded-xl border border-border bg-muted/25 px-3 py-3">
+                  <p className="mb-2 text-[12px] text-muted-foreground">
+                    Inicia sesion con Google para votar.
+                  </p>
+                  <button
+                    className="mb-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[13px] font-medium text-foreground transition hover:bg-muted/40"
+                    onClick={requestGoogleSignIn}
+                    type="button"
+                  >
+                    <GoogleLogo className="size-4 text-slate-700 dark:text-slate-200" />
+                    Continuar con Google
+                  </button>
+                  <div ref={googleButtonHostRef} />
+                  {!isGoogleReady ? (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Si no se abre Google, pulsa de nuevo el boton.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {googleIdToken ? (
+                <button
+                  className="mb-3 text-[12px] text-muted-foreground underline"
+                  onClick={logoutGoogle}
+                  type="button"
+                >
+                  Cerrar sesion Google
+                </button>
+              ) : null}
+
+              <div className="space-y-2.5">
+                {ratingLabels.map((key) => (
+                  <VoteStarsRow
+                    key={key}
+                    label={ratingLabelText[key]}
+                    onChange={(next) =>
+                      setVoteDraft((current) => ({
+                        ...current,
+                        [key]: next,
+                      }))
+                    }
+                    value={voteDraft[key]}
+                  />
+                ))}
+              </div>
+
+              {voteError ? (
+                <p className="mt-3 text-[12px] text-destructive">{voteError}</p>
+              ) : null}
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[13px] font-medium text-foreground"
+                  onClick={() => setIsVoteModalOpen(false)}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="flex-1 rounded-xl bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground disabled:opacity-60"
+                  disabled={voteSubmitting || !googleIdToken}
+                  onClick={submitVote}
+                  type="button"
+                >
+                  {voteSubmitting ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </PublicChrome>
   );

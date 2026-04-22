@@ -1,6 +1,6 @@
 import { ArrowLeft, BookOpen, LayoutGrid, List, Moon, Sun } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../lib/theme";
 import { cn } from "../lib/cn";
 import { BackgroundIllustration } from "./BackgroundIllustration";
@@ -15,6 +15,20 @@ export function PublicChrome({
   backTo?: string;
 }) {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (!backTo) {
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(backTo);
+  };
 
   return (
     <div className="relative min-h-screen bg-background text-foreground transition-colors">
@@ -29,12 +43,13 @@ export function PublicChrome({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {backTo ? (
-                <Link
+                <button
                   className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-card hover:text-foreground"
-                  to={backTo}
+                  onClick={handleBack}
+                  type="button"
                 >
                   <ArrowLeft className="size-4" />
-                </Link>
+                </button>
               ) : null}
               <Link className="flex items-center gap-3" to="/">
                 <div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_22px_rgba(15,91,167,0.18)]">

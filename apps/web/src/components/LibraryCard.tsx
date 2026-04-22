@@ -12,6 +12,7 @@ import {
   Navigation,
   PersonStanding,
   ShieldCheck,
+  Star,
   Train,
   TriangleAlert,
   Users,
@@ -21,6 +22,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/cn";
+import { formatNeighborhoodDistrict } from "../lib/presentationText";
 import {
   fetchBicimadAvailability,
   type BicimadAvailabilityResponse,
@@ -119,7 +121,7 @@ function originTone(origin: DataOrigin) {
 }
 
 function joinPlace(center: PublicCenterPresentation) {
-  return [center.neighborhood, center.district].filter(Boolean).join(" - ");
+  return formatNeighborhoodDistrict(center.neighborhood, center.district);
 }
 
 
@@ -512,9 +514,22 @@ function MetaLine({
         )}
       >
         {center.addressLine ? (
-          <span className="inline-flex items-center gap-1">
-            <MapPin className="size-3.5" />
-            {center.addressLine}
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="size-3.5" />
+              {center.addressLine}
+            </span>
+            {center.mapsUrl ? (
+              <a
+                className="inline-flex items-center gap-1 rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground transition hover:opacity-90"
+                href={center.mapsUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <Navigation className="size-3" />
+                Ir
+              </a>
+            ) : null}
           </span>
         ) : null}
         {center.distanceLabel && center.distanceOrigin !== "not_available" ? (
@@ -528,14 +543,61 @@ function MetaLine({
   );
 }
 
+const ratingAttributeEntries: Array<{
+  key: keyof PublicCenterPresentation["ratingAttributes"];
+  label: string;
+}> = [
+  { key: "silence", label: "Ruido" },
+  { key: "wifi", label: "WiFi" },
+  { key: "cleanliness", label: "Limpieza" },
+  { key: "plugs", label: "Enchufes" },
+  { key: "temperature", label: "Temperatura" },
+  { key: "lighting", label: "Iluminacion" },
+];
+
+function RatingStars({ value, className }: { value: number; className?: string }) {
+  const percentage = `${Math.max(0, Math.min(100, (value / 5) * 100))}%`;
+
+  return (
+    <span className={cn("relative inline-flex", className)}>
+      <span className="flex text-slate-300 dark:text-slate-700">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <Star className="size-3.5" key={`empty-${index}`} />
+        ))}
+      </span>
+      <span className="absolute inset-0 overflow-hidden text-amber-500" style={{ width: percentage }}>
+        <span className="flex">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Star className="size-3.5 fill-current" key={`filled-${index}`} />
+          ))}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+function GoogleLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+    >
+      <path d="M21.35 11.1H12v2.93h5.35c-.5 2.87-2.93 4.2-5.33 4.2a6.2 6.2 0 1 1 0-12.4c1.37 0 2.64.48 3.63 1.29l2.12-2.12A9.2 9.2 0 1 0 12 21.2c4.6 0 8.82-3.33 8.82-9.2 0-.6-.07-.9-.17-.9Z" fill="currentColor"/>
+    </svg>
+  );
+}
+
 export function LibraryCard({
   center,
   viewMode = "card",
   density = "default",
+  onNavigateToDetail,
 }: {
   center: PublicCenterPresentation;
   viewMode?: "card" | "list";
   density?: "default" | "compact";
+  onNavigateToDetail?: () => void;
 }) {
   const [isTransportExpanded, setIsTransportExpanded] = useState(
     viewMode === "card",
@@ -670,27 +732,25 @@ export function LibraryCard({
                       ? `${center.capacityValue} plazas`
                       : "Aforo no disponible"}
                   </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Star className="size-3.5 text-amber-500" />
+                    {center.ratingAverage !== null && center.ratingCount > 0
+                      ? `${center.ratingAverage.toFixed(1)} (${center.ratingCount})`
+                      : "Sin valoraciones"}
+                  </span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
                 <Link
                   className="inline-flex size-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition hover:text-foreground"
+                  onClick={onNavigateToDetail}
+                  onMouseDown={onNavigateToDetail}
+                  onTouchStart={onNavigateToDetail}
                   to={`/centros/${center.slug}`}
                 >
                   <ExternalLink className="size-4" />
                 </Link>
-                <a
-                  className={cn(
-                    "inline-flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:opacity-90",
-                    !center.mapsUrl && "pointer-events-none opacity-40",
-                  )}
-                  href={center.mapsUrl ?? "#"}
-                  rel="noreferrer"
-                  target={center.mapsUrl ? "_blank" : undefined}
-                >
-                  <Navigation className="size-4" />
-                </a>
               </div>
             </div>
 
@@ -738,39 +798,109 @@ export function LibraryCard({
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className={cn("flex flex-wrap items-center", compact ? "gap-1" : "gap-1.5")}>
-              <span className={cn("rounded-full border border-border font-medium text-muted-foreground", compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]")}>
-                {center.kindLabel}
-              </span>
-              <span
-                className={cn(
-                  compact ? "rounded-full border px-1.5 py-0.5 text-[9px] font-medium" : "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                  statusBadge(center.headlineStatus),
-                )}
+            <div className="flex items-start justify-between gap-3">
+              <div className={cn("flex flex-wrap items-center", compact ? "gap-1" : "gap-1.5")}>
+                <span className={cn("rounded-full border border-border font-medium text-muted-foreground", compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]")}>
+                  {center.kindLabel}
+                </span>
+                <span
+                  className={cn(
+                    compact ? "rounded-full border px-1.5 py-0.5 text-[9px] font-medium" : "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    statusBadge(center.headlineStatus),
+                  )}
+                >
+                  {center.headlineStatus}
+                </span>
+              </div>
+
+              <Link
+                className="inline-flex shrink-0 items-center justify-center rounded-xl border border-border bg-card px-2.5 py-1.5 text-[11px] font-medium text-foreground transition hover:bg-muted/40"
+                onClick={onNavigateToDetail}
+                onMouseDown={onNavigateToDetail}
+                onTouchStart={onNavigateToDetail}
+                to={`/centros/${center.slug}`}
               >
-                {center.headlineStatus}
-              </span>
+                Detalles
+              </Link>
             </div>
 
-            <h3 className={cn("font-semibold leading-tight text-foreground", compact ? "mt-1.5 text-[0.96rem] md:text-[1rem]" : "mt-2 text-[1rem] md:text-[1.08rem]")}>
-              {center.name}
-            </h3>
-            <MetaLine center={center} compact={compact} />
+            <div className="mt-2 flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className={cn("font-semibold leading-tight text-foreground", compact ? "text-[0.96rem] md:text-[1rem]" : "text-[1rem] md:text-[1.08rem]")}>
+                    {center.name}
+                  </h3>
+                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground">
+                    {center.scheduleLabel}
+                  </span>
+                </div>
+                <MetaLine center={center} compact={compact} />
+              </div>
+
+              <div className={cn("shrink-0 rounded-[14px] border border-border bg-muted/28", compact ? "w-full max-w-none px-2.5 py-2" : "w-[190px] px-3 py-2.5")}>
+                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Users className="size-3.5" />
+                    Aforo
+                  </span>
+                  <span className="font-medium text-foreground">0/{center.capacityValue ?? 0}</span>
+                </div>
+                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800/80">
+                  <div className="h-full w-0 rounded-full bg-amber-500" />
+                </div>
+                <Link
+                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[10px] font-medium text-foreground transition hover:bg-muted/35"
+                  onClick={onNavigateToDetail}
+                  onMouseDown={onNavigateToDetail}
+                  onTouchStart={onNavigateToDetail}
+                  to={`/centros/${center.slug}?opinar=1`}
+                >
+                  <GoogleLogo className="size-3 text-slate-700 dark:text-slate-200" />
+                  Opinar
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-0.5 text-muted-foreground", compact ? "px-3 pb-2.5 text-[11px]" : "px-4 pb-3 text-[12px]")}>
         <span className="inline-flex items-center gap-1.5">
-          <Clock className="size-3.5" />
-          <span className="font-medium text-foreground">{center.scheduleLabel}</span>
-        </span>
-        {center.capacityOrigin !== "not_available" && center.capacityValue !== null ? (
-          <span className="inline-flex items-center gap-1.5">
-            <Users className="size-3.5" />
-            <span className="font-medium text-foreground">{center.capacityValue} plazas</span>
+          <RatingStars value={center.ratingAverage ?? 0} />
+          <span className="font-medium text-foreground">
+            {center.ratingAverage !== null && center.ratingCount > 0
+              ? `${center.ratingAverage.toFixed(1)} (${center.ratingCount})`
+              : "Sin valoraciones"}
           </span>
-        ) : null}
+        </span>
+      </div>
+
+      <div className={cn(compact ? "px-3 pb-2.5" : "px-4 pb-3")}>
+        {center.ratingCount > 0 ? (
+          <div className="grid gap-x-5 gap-y-2 sm:grid-cols-2">
+            {ratingAttributeEntries.map((item) => {
+              const value = center.ratingAttributes[item.key] ?? 0;
+              return (
+                <div className="flex items-center gap-2" key={item.key}>
+                  <span className="min-w-0 flex-1 text-[12px] text-foreground">{item.label}</span>
+                  <div className="flex w-[78px] items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800/80">
+                      <div
+                        className="h-full rounded-full bg-emerald-500"
+                        style={{ width: `${Math.max(0, Math.min(100, (value / 5) * 100))}%` }}
+                      />
+                    </div>
+                    <span className="w-7 text-right text-[12px] font-medium text-foreground">
+                      {value.toFixed(1)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[12px] text-muted-foreground">Sin valoraciones</p>
+        )}
       </div>
 
       {center.operationalNote && center.operationalNoteOrigin !== "not_available" ? (
@@ -991,29 +1121,6 @@ export function LibraryCard({
             document.body,
           )
         : null}
-
-      <div className={cn("flex gap-2", compact ? "px-3 pb-2.5" : "px-4 pb-4")}>
-        <Link
-          className={cn("inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card font-medium text-foreground transition hover:bg-muted/40", compact ? "h-9 text-[11px]" : "h-10 text-[13px]")}
-          to={`/centros/${center.slug}`}
-        >
-          <ExternalLink className="size-4" />
-          Ver detalles
-        </Link>
-        <a
-          className={cn(
-            "inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary font-medium text-primary-foreground transition hover:opacity-90",
-            compact ? "h-9 text-[11px]" : "h-10 text-[13px]",
-            !center.mapsUrl && "pointer-events-none opacity-40",
-          )}
-          href={center.mapsUrl ?? "#"}
-          rel="noreferrer"
-          target={center.mapsUrl ? "_blank" : undefined}
-        >
-          <Navigation className="size-4" />
-          Ir ahora
-        </a>
-      </div>
 
       <div className={cn("flex flex-wrap gap-1.5", compact ? "px-3 pb-2.5" : "px-4 pb-4")}>
         {center.wifi ? (

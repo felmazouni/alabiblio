@@ -1,18 +1,22 @@
-import { ArrowLeft, BookOpen, LayoutGrid, List, MapPin, Moon, Search, Sun, X } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { ArrowLeft, BookOpen, MapPin, Moon, Search, Sun, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigationType, useSearchParams } from "react-router-dom";
 import { BackgroundIllustration } from "../components/BackgroundIllustration";
 import { FiltersPanel } from "../components/FiltersPanel";
 import { LibraryCard } from "../components/LibraryCard";
+import { MotionCarousel } from "../components/animate-ui/components/community/motion-carousel";
 import { cn } from "../lib/cn";
 import {
   defaultPublicFilters,
+  parsePublicFiltersFromSearchParams,
   usePublicCatalog,
   usePublicFilters,
+  writePublicFiltersToSearchParams,
   type PublicFiltersState,
 } from "../lib/publicCatalog";
 import { useTheme } from "../lib/theme";
 import { useUserLocation } from "../lib/userLocation";
+import { normalizeZoneLabel } from "../lib/presentationText";
 
 function Button({
   children,
@@ -44,20 +48,128 @@ function Button({
 }
 
 export function PublicCatalogRoute() {
-  const [viewMode, setViewMode] = useState<"card" | "list">("card");
-  const [draftQuery, setDraftQuery] = useState("");
-  const [filters, setFilters] = useState<PublicFiltersState>(defaultPublicFilters);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const locationState = useLocation();
+  const navigationType = useNavigationType();
+  const filters = useMemo(
+    () => parsePublicFiltersFromSearchParams(searchParams),
+    [searchParams],
+  );
+  const [draftQuery, setDraftQuery] = useState(filters.query);
   const { location, requestLocation, requesting } = useUserLocation();
   const { theme, toggleTheme } = useTheme();
   const { error, items, loading, total } = usePublicCatalog(filters, location);
   const { data: filterMetadata, loading: filtersLoading } = usePublicFilters(filters, location);
+  const restoredScrollKeyRef = useRef<string | null>(null);
 
   const results = useMemo(
     () => items.map((item, index) => ({ ...item, rankingPosition: index + 1 })),
     [items],
   );
   const forceOpenFilters = searchParams.get("filters") === "open";
+
+  useEffect(() => {
+    setDraftQuery(filters.query);
+  }, [filters.query]);
+
+  const updateFilters = (
+    next:
+      | PublicFiltersState
+      | ((current: PublicFiltersState) => PublicFiltersState),
+  ) => {
+    const resolved = typeof next === "function" ? next(filters) : next;
+    const nextParams = writePublicFiltersToSearchParams(searchParams, resolved);
+    setSearchParams(nextParams);
+  };
+
+  const scrollStorageKey = `alabiblio:listado:scroll:${locationState.pathname}${locationState.search}`;
+
+  const persistListingContext = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const next = { y: window.scrollY, ts: Date.now() };
+    const currentRaw = sessionStorage.getItem(scrollStorageKey);
+    if (currentRaw) {
+      try {
+        const current = JSON.parse(currentRaw) as { y?: number; ts?: number };
+        // Avoid overwriting a recently captured non-zero scroll with a late zero during unmount.
+        if (
+          typeof current.y === "number" &&
+          current.y > 0 &&
+          next.y === 0 &&
+          typeof current.ts === "number" &&
+          next.ts - current.ts < 3000
+        ) {
+          return;
+        }
+      } catch {
+        // Ignore malformed session payload and proceed with overwrite.
+      }
+    }
+
+    sessionStorage.setItem(scrollStorageKey, JSON.stringify(next));
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    let rafId = 0;
+    const handleScroll = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        persistListingContext();
+      });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    const pollId = window.setInterval(() => {
+      persistListingContext();
+    }, 300);
+    persistListingContext();
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.clearInterval(pollId);
+      window.removeEventListener("scroll", handleScroll);
+      persistListingContext();
+    };
+  }, [scrollStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (navigationType !== "POP") {
+      return;
+    }
+    if (loading) {
+      return;
+    }
+    if (restoredScrollKeyRef.current === scrollStorageKey) {
+      return;
+    }
+
+    const raw = sessionStorage.getItem(scrollStorageKey);
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const payload = JSON.parse(raw) as { y?: number };
+      if (typeof payload.y === "number") {
+        restoredScrollKeyRef.current = scrollStorageKey;
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: payload.y, behavior: "auto" });
+        });
+      }
+    } catch {
+      sessionStorage.removeItem(scrollStorageKey);
+    }
+  }, [loading, navigationType, scrollStorageKey]);
 
   const activeFilterLabels = useMemo(() => {
     const labels: Array<{ key: string; label: string; clear: () => void }> = [];
@@ -66,42 +178,42 @@ export function PublicCatalogRoute() {
       labels.push({
         key: "query",
         label: `Busqueda: ${filters.query}`,
-        clear: () => setFilters((current) => ({ ...current, query: "" })),
+        clear: () => updateFilters((current) => ({ ...current, query: "" })),
       });
     }
     if (filters.openNow) {
       labels.push({
         key: "openNow",
         label: "Abierta ahora",
-        clear: () => setFilters((current) => ({ ...current, openNow: false })),
+        clear: () => updateFilters((current) => ({ ...current, openNow: false })),
       });
     }
     if (filters.accessible) {
       labels.push({
         key: "accessible",
         label: "Accesible",
-        clear: () => setFilters((current) => ({ ...current, accessible: false })),
+        clear: () => updateFilters((current) => ({ ...current, accessible: false })),
       });
     }
     if (filters.withWifi) {
       labels.push({
         key: "withWifi",
         label: "Con WiFi",
-        clear: () => setFilters((current) => ({ ...current, withWifi: false })),
+        clear: () => updateFilters((current) => ({ ...current, withWifi: false })),
       });
     }
     if (filters.withCapacity) {
       labels.push({
         key: "withCapacity",
         label: "Con aforo",
-        clear: () => setFilters((current) => ({ ...current, withCapacity: false })),
+        clear: () => updateFilters((current) => ({ ...current, withCapacity: false })),
       });
     }
     if (filters.withSer) {
       labels.push({
         key: "withSer",
         label: "Con cobertura SER",
-        clear: () => setFilters((current) => ({ ...current, withSer: false })),
+        clear: () => updateFilters((current) => ({ ...current, withSer: false })),
       });
     }
     if (location && filters.radiusMeters !== defaultPublicFilters.radiusMeters) {
@@ -109,7 +221,7 @@ export function PublicCatalogRoute() {
         key: "radius",
         label: `Radio ${Math.round(filters.radiusMeters / 1000)} km`,
         clear: () =>
-          setFilters((current) => ({
+          updateFilters((current) => ({
             ...current,
             radiusMeters: defaultPublicFilters.radiusMeters,
           })),
@@ -121,7 +233,7 @@ export function PublicCatalogRoute() {
         key: `kind:${kind}`,
         label: kind === "library" ? "Biblioteca" : "Sala de estudio",
         clear: () =>
-          setFilters((current) => ({
+          updateFilters((current) => ({
             ...current,
             kinds: current.kinds.filter((value) => value !== kind),
           })),
@@ -132,9 +244,9 @@ export function PublicCatalogRoute() {
       const option = filterMetadata?.availableDistricts.find((value) => value.value === district);
       labels.push({
         key: `district:${district}`,
-        label: option?.label ?? district,
+        label: normalizeZoneLabel(option?.label ?? district),
         clear: () =>
-          setFilters((current) => ({
+          updateFilters((current) => ({
             ...current,
             districts: current.districts.filter((value) => value !== district),
           })),
@@ -147,9 +259,9 @@ export function PublicCatalogRoute() {
       );
       labels.push({
         key: `neighborhood:${neighborhood}`,
-        label: option?.label ?? neighborhood,
+        label: normalizeZoneLabel(option?.label ?? neighborhood),
         clear: () =>
-          setFilters((current) => ({
+          updateFilters((current) => ({
             ...current,
             neighborhoods: current.neighborhoods.filter((value) => value !== neighborhood),
           })),
@@ -162,7 +274,7 @@ export function PublicCatalogRoute() {
         key: `transport:${mode}`,
         label: option?.label ?? mode,
         clear: () =>
-          setFilters((current) => ({
+          updateFilters((current) => ({
             ...current,
             transportModes: current.transportModes.filter((value) => value !== mode),
           })),
@@ -176,6 +288,7 @@ export function PublicCatalogRoute() {
     filterMetadata?.availableTransportModes,
     filters,
     location,
+    searchParams,
   ]);
 
   return (
@@ -202,33 +315,6 @@ export function PublicCatalogRoute() {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center rounded-2xl border border-border bg-card p-1 shadow-sm">
-                <button
-                  className={cn(
-                    "rounded-xl px-2.5 py-2 transition",
-                    viewMode === "card"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground",
-                  )}
-                  onClick={() => setViewMode("card")}
-                  type="button"
-                >
-                  <LayoutGrid className="size-3.5" />
-                </button>
-                <button
-                  className={cn(
-                    "rounded-xl px-2.5 py-2 transition",
-                    viewMode === "list"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground",
-                  )}
-                  onClick={() => setViewMode("list")}
-                  type="button"
-                >
-                  <List className="size-3.5" />
-                </button>
-              </div>
-
               <button
                 className="rounded-2xl border border-border bg-card p-2.5 text-muted-foreground shadow-sm transition hover:text-foreground"
                 onClick={toggleTheme}
@@ -244,7 +330,7 @@ export function PublicCatalogRoute() {
               className="relative flex-1"
               onSubmit={(event) => {
                 event.preventDefault();
-                setFilters((current) => ({ ...current, query: draftQuery.trim() }));
+                updateFilters((current) => ({ ...current, query: draftQuery.trim() }));
               }}
             >
               <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -260,7 +346,7 @@ export function PublicCatalogRoute() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
                   onClick={() => {
                     setDraftQuery("");
-                    setFilters((current) => ({ ...current, query: "" }));
+                    updateFilters((current) => ({ ...current, query: "" }));
                   }}
                   type="button"
                 >
@@ -279,7 +365,7 @@ export function PublicCatalogRoute() {
                 forceOpen={forceOpenFilters}
                 loading={filtersLoading}
                 metadata={filterMetadata}
-                onChange={setFilters}
+                onChange={updateFilters}
                 resultCount={total}
               />
             </div>
@@ -301,7 +387,7 @@ export function PublicCatalogRoute() {
               <button
                 className="text-[11px] font-medium text-muted-foreground"
                 onClick={() => {
-                  setFilters(defaultPublicFilters);
+                  updateFilters(defaultPublicFilters);
                   setDraftQuery("");
                 }}
                 type="button"
@@ -333,11 +419,16 @@ export function PublicCatalogRoute() {
             {error}
           </div>
         ) : results.length > 0 ? (
-          <div className="space-y-3">
-            {results.map((center) => (
-              <LibraryCard center={center} key={center.id} viewMode={viewMode} />
-            ))}
-          </div>
+          <MotionCarousel
+            renderSlide={(center, index) => (
+              <LibraryCard
+                center={{ ...center, rankingPosition: index + 1 }}
+                key={center.id}
+                onNavigateToDetail={persistListingContext}
+              />
+            )}
+            slides={results}
+          />
         ) : (
           <div className="rounded-[24px] border border-border bg-card p-8 text-center shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
             <h2 className="text-[1.45rem] font-semibold text-foreground">
@@ -349,7 +440,7 @@ export function PublicCatalogRoute() {
             <button
               className="mt-4 rounded-2xl border border-border bg-card px-4 py-3 text-[13px] font-medium text-foreground shadow-sm"
               onClick={() => {
-                setFilters(defaultPublicFilters);
+                updateFilters(defaultPublicFilters);
                 setDraftQuery("");
               }}
               type="button"
