@@ -190,13 +190,11 @@ function SettingCard({
   onCheckedChange: (value: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-[14px] border border-border bg-card px-3.5 py-3">
-      <div className="flex items-center gap-2.5">
-        <div className="flex size-8 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-          <Icon className="size-3.5" />
-        </div>
+    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <Icon className="size-3.5 text-muted-foreground" />
         <div>
-          <p className="text-[12px] font-semibold text-foreground">{title}</p>
+          <p className="text-[12px] font-medium text-foreground">{title}</p>
           <p className="text-[10px] text-muted-foreground">{subtitle}</p>
         </div>
       </div>
@@ -257,7 +255,7 @@ function SearchableMultiSelect({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+        <p className="text-[11px] font-medium text-muted-foreground">
           {title}
         </p>
         {selectedCount > 0 ? (
@@ -586,7 +584,7 @@ export function FiltersPanel({
               {activeTab === "general" ? (
                 <div className="space-y-5">
                   <section>
-                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-medium text-muted-foreground">
                       Tipo de espacio
                     </h4>
                     <div className="flex flex-wrap gap-2">
@@ -606,7 +604,7 @@ export function FiltersPanel({
                   </section>
 
                   <section>
-                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-medium text-muted-foreground">
                       Caracteristicas
                     </h4>
                     <div className="grid gap-2.5 sm:grid-cols-2">
@@ -650,7 +648,7 @@ export function FiltersPanel({
                   </section>
 
                   <section>
-                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-medium text-muted-foreground">
                       Transporte cercano
                     </h4>
                     <div className="flex flex-wrap gap-2">
@@ -675,7 +673,7 @@ export function FiltersPanel({
               {activeTab === "zona" ? (
                 <div className="space-y-5">
                   <section>
-                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-medium text-muted-foreground">
                       Radio de busqueda
                     </h4>
                     <div className="rounded-[18px] border border-border bg-card px-4 py-3.5 shadow-[0_12px_26px_rgba(15,23,42,0.08)]">
@@ -798,7 +796,7 @@ export function FiltersPanel({
               {activeTab === "ordenar" ? (
                 <div className="space-y-5">
                   <section>
-                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-medium text-muted-foreground">
                       Ordenacion
                     </h4>
                     <div className="flex flex-wrap gap-2">
@@ -821,7 +819,7 @@ export function FiltersPanel({
               {activeTab === "horarios" ? (
                 <div className="space-y-5">
                   <section>
-                    <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    <h4 className="mb-3 text-[11px] font-medium text-muted-foreground">
                       Estado actual
                     </h4>
                     <SettingCard

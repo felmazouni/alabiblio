@@ -1,12 +1,10 @@
-import type { DataOrigin, TransportOption } from "@alabiblio/contracts";
+﻿import type { DataOrigin, TransportOption } from "@alabiblio/contracts";
 import {
   Bike,
   Bus,
-  Clock,
   ExternalLink,
   MapPin,
   Navigation,
-  ShieldCheck,
   Star,
   Train,
   TriangleAlert,
@@ -44,26 +42,19 @@ function statusBadge(status: PublicCenterPresentation["headlineStatus"]) {
   if (status === "Abierta") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-600/40 dark:bg-emerald-950/45 dark:text-emerald-200";
   }
-
   if (status === "Cerrada") {
     return "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-600/40 dark:bg-rose-950/45 dark:text-rose-200";
   }
-
   return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-600/40 dark:bg-amber-950/45 dark:text-amber-200";
 }
 
 function originLabel(origin: DataOrigin) {
   switch (origin) {
-    case "realtime":
-      return "EN VIVO";
-    case "official_structured":
-      return "OFICIAL";
-    case "official_text_parsed":
-      return "TEXTO OFICIAL";
-    case "heuristic":
-      return "ESTIMADO";
-    case "not_available":
-      return "N/D";
+    case "realtime":          return "EN VIVO";
+    case "official_structured": return "OFICIAL";
+    case "official_text_parsed": return "TEXTO";
+    case "heuristic":         return "ESTIMADO";
+    case "not_available":     return "N/D";
   }
 }
 
@@ -73,18 +64,17 @@ function joinPlace(center: PublicCenterPresentation) {
 
 function RatingStars({ value, className }: { value: number; className?: string }) {
   const percentage = `${Math.max(0, Math.min(100, (value / 5) * 100))}%`;
-
   return (
     <span className={cn("relative inline-flex", className)}>
       <span className="flex text-slate-300 dark:text-slate-700">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <Star className="size-3.5" key={`empty-${index}`} />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Star className="size-3" key={`e${i}`} />
         ))}
       </span>
       <span className="absolute inset-0 overflow-hidden text-amber-500" style={{ width: percentage }}>
         <span className="flex">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <Star className="size-3.5 fill-current" key={`filled-${index}`} />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star className="size-3 fill-current" key={`f${i}`} />
           ))}
         </span>
       </span>
@@ -107,7 +97,6 @@ function extractStationId(option: TransportOption): string | null {
   if (option.destinationNodeId && /^\d+$/.test(option.destinationNodeId)) {
     return option.destinationNodeId;
   }
-
   const fallback = option.id.match(/bicimad[:_-](\d+)$/i);
   return fallback?.[1] ?? null;
 }
@@ -122,12 +111,12 @@ const ratingAttributeEntries: Array<{
   key: keyof PublicCenterPresentation["ratingAttributes"];
   label: string;
 }> = [
-  { key: "silence", label: "Ruido" },
-  { key: "wifi", label: "WiFi" },
+  { key: "silence",     label: "Silencio" },
+  { key: "wifi",        label: "WiFi"     },
   { key: "cleanliness", label: "Limpieza" },
-  { key: "plugs", label: "Enchufes" },
-  { key: "temperature", label: "Temperatura" },
-  { key: "lighting", label: "Iluminacion" },
+  { key: "plugs",       label: "Enchufes" },
+  { key: "temperature", label: "Temp."    },
+  { key: "lighting",    label: "Luz"      },
 ];
 
 export function LibraryCard({
@@ -145,292 +134,261 @@ export function LibraryCard({
   const [bicimadState, setBicimadState] = useState<Record<string, BicimadState>>({});
 
   useEffect(() => {
-    if (!isTransportDialogOpen) {
-      return;
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsTransportDialogOpen(false);
-      }
+    if (!isTransportDialogOpen) return;
+    const handle = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsTransportDialogOpen(false);
     };
-
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+    document.addEventListener("keydown", handle);
+    return () => document.removeEventListener("keydown", handle);
   }, [isTransportDialogOpen]);
 
   const visibleTransport = useMemo(
     () =>
       center.transportOptions
-        .filter((option) => option.mode !== "car")
-        .filter((option) => option.metrics.walkDistanceMeters === null || option.metrics.walkDistanceMeters <= 500)
-        .slice(0, compact ? 3 : 4),
+        .filter((o) => o.mode !== "car")
+        .filter((o) => o.metrics.walkDistanceMeters === null || o.metrics.walkDistanceMeters <= 500)
+        .slice(0, compact ? 3 : 5),
     [center.transportOptions, compact],
   );
 
   const hasRatings = center.ratingAverage !== null && center.ratingCount > 0;
   const hasNotice = Boolean(center.operationalNote && center.operationalNoteOrigin !== "not_available");
+  const place = joinPlace(center);
 
   const loadBicimad = async (option: TransportOption) => {
     const stationId = extractStationId(option);
-    if (!stationId) {
-      return;
-    }
-
-    setBicimadState((current) => ({ ...current, [stationId]: { status: "loading" } }));
-
+    if (!stationId) return;
+    setBicimadState((s) => ({ ...s, [stationId]: { status: "loading" } }));
     try {
-      const payload = await fetchBicimadAvailability(stationId, option.destinationNodeName ?? option.stationName ?? null);
+      const payload = await fetchBicimadAvailability(
+        stationId,
+        option.destinationNodeName ?? option.stationName ?? null,
+      );
       if (payload.dataOrigin === "realtime") {
-        setBicimadState((current) => ({ ...current, [stationId]: { status: "success", payload } }));
+        setBicimadState((s) => ({ ...s, [stationId]: { status: "success", payload } }));
       } else {
-        setBicimadState((current) => ({
-          ...current,
+        setBicimadState((s) => ({
+          ...s,
           [stationId]: { status: "error", message: "Sin disponibilidad en este momento." },
         }));
       }
     } catch {
-      setBicimadState((current) => ({
-        ...current,
+      setBicimadState((s) => ({
+        ...s,
         [stationId]: { status: "error", message: "No se pudo consultar ahora mismo." },
       }));
     }
   };
 
-  const capacityLabel =
-    center.capacityOrigin !== "not_available" && center.capacityValue !== null
-      ? `${center.capacityValue} plazas`
-      : "No disponible";
-
   return (
-    <article className="overflow-hidden rounded-[24px] border border-border bg-card shadow-[0_14px_36px_rgba(15,23,42,0.09)]">
-      <div className={cn(compact ? "p-3.5" : "p-4") }>
-        <div className={cn("flex items-start", compact ? "gap-3" : "gap-3.5")}>
-          <div className={cn("flex shrink-0 items-center justify-center rounded-[14px] bg-primary font-bold text-primary-foreground shadow-[0_12px_24px_rgba(15,91,167,0.28)]", compact ? "size-9 text-[1.05rem]" : "size-10 text-[1.18rem]")}>
-            {center.rankingPosition ?? "1"}
+    <article className="overflow-hidden rounded-[20px] border border-border bg-card shadow-[0_4px_20px_rgba(15,23,42,0.065)]">
+      {/* ── BODY ─────────────────────────────────── */}
+      <div className={compact ? "px-3.5 pt-3.5 pb-3" : "px-4 pt-4 pb-3.5"}>
+        <div className="flex items-start gap-3">
+          {/* Rank */}
+          <div
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-[11px] bg-primary font-bold text-primary-foreground shadow-[0_4px_12px_rgba(15,91,167,0.20)]",
+              compact ? "size-8 text-[0.88rem]" : "size-9 text-[1rem]",
+            )}
+          >
+            {center.rankingPosition ?? "·"}
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className={cn("flex flex-wrap items-center", compact ? "gap-1" : "gap-1.5")}>
-                <span className={cn("rounded-full border border-border font-medium text-muted-foreground", compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]")}>
+            {/* Badges + link */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                   {center.kindLabel}
                 </span>
                 <span
                   className={cn(
-                    compact ? "rounded-full border px-1.5 py-0.5 text-[9px] font-medium" : "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    "rounded-full border px-2 py-0.5 text-[10px] font-medium",
                     statusBadge(center.headlineStatus),
                   )}
                 >
                   {center.headlineStatus}
                 </span>
               </div>
-
               <Link
-                className="inline-flex shrink-0 items-center justify-center rounded-xl border border-border bg-card px-3 py-1.5 text-[11px] font-semibold text-foreground transition hover:bg-muted/40"
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-transparent px-2.5 py-1 text-[11px] font-semibold text-foreground transition hover:bg-muted/45"
                 onClick={onNavigateToDetail}
                 onMouseDown={onNavigateToDetail}
                 onTouchStart={onNavigateToDetail}
                 to={`/centros/${center.slug}`}
               >
-                <ExternalLink className="mr-1 size-3.5" />
-                Detalles
+                <ExternalLink className="size-3" />
+                Ver
               </Link>
             </div>
 
-            <div className="mt-2 flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <h3 className={cn("font-semibold leading-tight text-foreground", compact ? "text-[0.96rem] md:text-[1rem]" : "text-[1rem] md:text-[1.08rem]")}>
-                    {center.name}
-                  </h3>
-                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground">
-                    {center.scheduleLabel}
-                  </span>
-                </div>
-
-                <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground", compact ? "mt-1 text-[11px]" : "mt-1.5 text-[12px]")}>
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="size-3.5" />
-                    {center.addressLine ?? "Direccion no disponible"}
-                  </span>
-                  {center.distanceLabel && center.distanceOrigin !== "not_available" ? (
-                    <span className="font-medium text-primary">{center.distanceLabel}</span>
-                  ) : null}
-                  {center.mapsUrl ? (
-                    <a
-                      className="inline-flex items-center gap-1 rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground transition hover:opacity-90"
-                      href={center.mapsUrl}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      <Navigation className="size-3" />
-                      Ir
-                    </a>
-                  ) : null}
-                </div>
-
-                {joinPlace(center) ? (
-                  <p className={cn("text-muted-foreground", compact ? "mt-0.5 text-[10px]" : "mt-1 text-[11px]")}>{joinPlace(center)}</p>
-                ) : (
-                  <p className={cn("text-muted-foreground", compact ? "mt-0.5 text-[10px]" : "mt-1 text-[11px]")}>Barrio/distrito no disponible</p>
+            {/* Name + schedule */}
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <h3
+                className={cn(
+                  "font-semibold leading-tight text-foreground",
+                  compact ? "text-[0.93rem]" : "text-[0.975rem]",
                 )}
-              </div>
+              >
+                {center.name}
+              </h3>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground">
+                {center.scheduleLabel}
+              </span>
+            </div>
 
-              <div className={cn("shrink-0 rounded-[14px] border border-border bg-muted/28", compact ? "w-[145px] px-2.5 py-2" : "w-[196px] px-3 py-2.5")}>
-                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Users className="size-3.5" />
-                    Aforo
+            {/* Rating inline */}
+            <div className="mt-1 flex items-center gap-2">
+              {hasRatings ? (
+                <>
+                  <RatingStars value={center.ratingAverage ?? 0} />
+                  <span className="text-[12px] font-semibold text-foreground">
+                    {center.ratingAverage?.toFixed(1)}
                   </span>
-                  <span className="font-medium text-foreground">{capacityLabel}</span>
-                </div>
-                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800/80">
-                  <div
-                    className={cn(
-                      "h-full rounded-full",
-                      center.capacityValue ? "bg-emerald-500" : "w-full bg-slate-300/80 dark:bg-slate-700",
-                    )}
-                    style={center.capacityValue ? { width: "44%" } : undefined}
-                  />
-                </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    {center.ratingCount} {center.ratingCount === 1 ? "voto" : "votos"}
+                  </span>
+                </>
+              ) : (
+                <Link
+                  className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition hover:text-foreground"
+                  onClick={onNavigateToDetail}
+                  onMouseDown={onNavigateToDetail}
+                  onTouchStart={onNavigateToDetail}
+                  to={`/centros/${center.slug}?opinar=1`}
+                >
+                  <GoogleLogo className="size-3" />
+                  Sin valoraciones · Sé el primero
+                </Link>
+              )}
+            </div>
+
+            {/* Address + distance */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="size-3" />
+                {center.addressLine ?? "Dirección no disponible"}
+              </span>
+              {center.distanceLabel && center.distanceOrigin !== "not_available" ? (
+                <span className="font-medium text-primary">{center.distanceLabel}</span>
+              ) : null}
+              {center.mapsUrl ? (
+                <a
+                  className="inline-flex items-center gap-1 rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground transition hover:opacity-90"
+                  href={center.mapsUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <Navigation className="size-2.5" />
+                  Ir
+                </a>
+              ) : null}
+            </div>
+
+            {/* Barrio + features inline */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {place ? (
+                <span className="text-[10.5px] text-muted-foreground">{place}</span>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-1">
+                {center.wifi ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-sky-200/80 bg-sky-50/70 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:border-sky-600/30 dark:bg-sky-950/25 dark:text-sky-300">
+                    <Wifi className="size-2.5" />
+                    WiFi
+                  </span>
+                ) : null}
+                {center.accessibility ? (
+                  <span className="inline-flex rounded-full border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-600/30 dark:bg-emerald-950/25 dark:text-emerald-300">
+                    Accesible
+                  </span>
+                ) : null}
+                {center.capacityOrigin !== "not_available" && center.capacityValue !== null ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Users className="size-2.5" />
+                    {center.capacityValue} plazas
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className={cn("rounded-xl border border-border bg-muted/22", compact ? "mx-3 mb-2.5 px-3 py-2.5" : "mx-4 mb-3 px-3.5 py-3")}>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Rating global</p>
-        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-2">
-            <RatingStars value={center.ratingAverage ?? 0} />
-            <span className="text-[13px] font-semibold text-foreground">
-              {hasRatings ? center.ratingAverage?.toFixed(1) : "Sin valoraciones"}
-            </span>
-          </span>
-          <span className="text-[11px] text-muted-foreground">
-            {hasRatings ? `${center.ratingCount} votos` : "Se el primero en opinar"}
-          </span>
-        </div>
-        {!hasRatings ? (
-          <Link
-            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-foreground transition hover:bg-muted/35"
-            onClick={onNavigateToDetail}
-            onMouseDown={onNavigateToDetail}
-            onTouchStart={onNavigateToDetail}
-            to={`/centros/${center.slug}?opinar=1`}
-          >
-            <GoogleLogo className="size-3.5" />
-            Sin valoraciones � Se el primero en opinar
-          </Link>
+        {/* Subratings — compact 3-col, only when ratings exist */}
+        {hasRatings ? (
+          <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-1.5 border-t border-border/35 pt-2.5">
+            {ratingAttributeEntries.map((item) => {
+              const value = center.ratingAttributes[item.key];
+              const pct =
+                typeof value === "number" ? Math.max(0, Math.min(100, (value / 5) * 100)) : 0;
+              return (
+                <div className="flex items-center gap-1.5" key={item.key}>
+                  <span className="w-[50px] shrink-0 text-[9.5px] text-muted-foreground">
+                    {item.label}
+                  </span>
+                  <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70">
+                    <div
+                      className={cn(
+                        "h-full rounded-full",
+                        typeof value === "number"
+                          ? "bg-emerald-500"
+                          : "bg-slate-300/60 dark:bg-slate-700/60",
+                      )}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="w-6 text-right text-[9.5px] font-medium text-foreground">
+                    {typeof value === "number" ? value.toFixed(1) : "—"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {/* Aviso — thin strip, only when present */}
+        {hasNotice ? (
+          <div className="mt-2.5 flex items-start gap-1.5 rounded-lg border border-amber-200/60 bg-amber-50/50 px-2.5 py-1.5 dark:border-amber-600/25 dark:bg-amber-950/15">
+            <TriangleAlert className="mt-0.5 size-3 shrink-0 text-amber-500 dark:text-amber-400" />
+            <p className="text-[10.5px] leading-4 text-amber-900 dark:text-amber-200">
+              {center.operationalNote}
+            </p>
+          </div>
         ) : null}
       </div>
 
-      <div className={cn("rounded-xl border border-border bg-card", compact ? "mx-3 mb-2.5 px-3 py-2.5" : "mx-4 mb-3 px-3.5 py-3")}>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Subratings</p>
-        <div className="mt-2 grid gap-x-5 gap-y-2 sm:grid-cols-2">
-          {ratingAttributeEntries.map((item) => {
-            const value = center.ratingAttributes[item.key];
-            const progress = typeof value === "number" ? Math.max(0, Math.min(100, (value / 5) * 100)) : 0;
-            return (
-              <div className="flex items-center gap-2" key={item.key}>
-                <span className="min-w-0 flex-1 text-[12px] text-foreground">{item.label}</span>
-                <div className="flex w-[95px] items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800/80">
-                    <div
-                      className={cn("h-full rounded-full", typeof value === "number" ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700")}
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <span className="w-9 text-right text-[11px] font-medium text-foreground">
-                    {typeof value === "number" ? value.toFixed(1) : "N/D"}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className={cn(compact ? "px-3 pb-2.5" : "px-4 pb-3")}>
-        <div
-          className={cn(
-            "rounded-[16px] border px-3 py-2.5",
-            hasNotice
-              ? "border-amber-300 bg-amber-50 dark:border-amber-600/40 dark:bg-amber-950/30"
-              : "border-border bg-muted/28",
-          )}
-        >
-          <div className="flex items-start gap-2.5">
-            <TriangleAlert
-              className={cn(
-                "mt-0.5 size-4 shrink-0",
-                hasNotice ? "text-amber-600 dark:text-amber-300" : "text-muted-foreground",
-              )}
-            />
-            <div className="min-w-0">
-              <p
-                className={cn(
-                  "text-[10px] font-semibold uppercase tracking-[0.12em]",
-                  hasNotice ? "text-amber-700 dark:text-amber-200" : "text-muted-foreground",
-                )}
-              >
-                Aviso
-              </p>
-              <p
-                className={cn(
-                  compact ? "text-[10px] leading-4" : "text-[11px] leading-5",
-                  hasNotice ? "text-amber-900 dark:text-amber-100" : "text-muted-foreground",
-                )}
-              >
-                {hasNotice ? center.operationalNote : "Sin avisos"}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className={cn(compact ? "px-3 pb-2" : "px-4 pb-3")}>
-        <button
-          className={cn("flex w-full items-center justify-between rounded-[14px] border border-border bg-muted/35", compact ? "px-2.5 py-2" : "px-3 py-2.5")}
-          onClick={() => setIsTransportDialogOpen(true)}
-          type="button"
-        >
-          <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>
-            <Train className="size-3.5 text-muted-foreground" />
-            <span className={cn("font-medium text-foreground", compact ? "text-[11px]" : "text-[12px]")}>Transporte</span>
-            <span className={cn("text-muted-foreground", compact ? "text-[9px]" : "text-[10px]")}>
-              ({visibleTransport.length} opciones)
-            </span>
-          </div>
-          <span className={cn("rounded-md border border-border bg-card font-medium text-foreground", compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[10px]")}>
-            Abrir
-          </span>
-        </button>
-
-        <div className="mt-2 rounded-xl border border-border bg-card px-3 py-2">
+      {/* ── TRANSPORT FOOTER ──────────────────────── */}
+      <div className="flex items-center justify-between gap-2 border-t border-border/35 bg-muted/12 px-4 py-2.5">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {visibleTransport.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {visibleTransport.map((option) => {
-                const Icon = modeIcon(option.mode);
-                return (
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/35 px-2 py-0.5 text-[10px] font-medium text-foreground"
-                    key={option.id}
-                  >
-                    <Icon className="size-3" />
-                    {option.title}
-                  </span>
-                );
-              })}
-            </div>
+            visibleTransport.map((option) => {
+              const Icon = modeIcon(option.mode);
+              return (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border border-border/55 bg-card px-2 py-0.5 text-[10px] font-medium text-foreground"
+                  key={option.id}
+                >
+                  <Icon className="size-2.5" />
+                  {option.title}
+                </span>
+              );
+            })
           ) : (
-            <p className="text-[11px] text-muted-foreground">Sin datos de transporte cercanos publicados.</p>
+            <span className="text-[10.5px] text-muted-foreground">Sin transporte cercano publicado</span>
           )}
         </div>
+        {visibleTransport.length > 0 ? (
+          <button
+            className="shrink-0 rounded-lg border border-border/60 bg-card px-2.5 py-1 text-[10.5px] font-medium text-muted-foreground transition hover:bg-muted/45 hover:text-foreground"
+            onClick={() => setIsTransportDialogOpen(true)}
+            type="button"
+          >
+            Ver todo
+          </button>
+        ) : null}
       </div>
 
+      {/* Transport dialog */}
       {isTransportDialogOpen && typeof document !== "undefined"
         ? createPortal(
             <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
@@ -440,84 +398,93 @@ export function LibraryCard({
                 onClick={() => setIsTransportDialogOpen(false)}
                 type="button"
               />
-              <div className="relative z-[91] w-full max-w-[540px] rounded-2xl border border-border bg-card shadow-[0_24px_60px_rgba(2,6,23,0.45)]">
-                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div className="relative z-[91] w-full max-w-[520px] rounded-[22px] border border-border bg-card shadow-[0_24px_60px_rgba(2,6,23,0.45)]">
+                <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
                   <div className="flex items-center gap-2">
                     <Train className="size-4 text-muted-foreground" />
-                    <h4 className="text-[14px] font-semibold text-foreground">Transporte</h4>
-                    <span className="text-[11px] text-muted-foreground">{visibleTransport.length} opciones � =500 m</span>
+                    <h4 className="text-[14px] font-semibold text-foreground">Cómo llegar</h4>
+                    <span className="text-[11px] text-muted-foreground">
+                      {visibleTransport.length} opciones · ≤500 m
+                    </span>
                   </div>
                   <button
-                    className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                    className="rounded-lg border border-border/60 px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
                     onClick={() => setIsTransportDialogOpen(false)}
                     type="button"
                   >
                     Cerrar
                   </button>
                 </div>
-
-                <div className="max-h-[60vh] overflow-y-auto divide-y divide-border">
+                <div className="max-h-[60vh] divide-y divide-border/40 overflow-y-auto">
                   {visibleTransport.length > 0 ? (
                     visibleTransport.map((option) => {
                       const Icon = modeIcon(option.mode);
-                      const stationId = option.mode === "bicimad" ? extractStationId(option) : null;
-                      const state = stationId ? bicimadState[stationId] ?? { status: "idle" } : null;
-
+                      const stationId =
+                        option.mode === "bicimad" ? extractStationId(option) : null;
+                      const state = stationId
+                        ? (bicimadState[stationId] ?? { status: "idle" })
+                        : null;
                       return (
-                        <div className="px-4 py-3" key={option.id}>
-                          <div className="flex items-start gap-3">
-                            <div className="flex size-8 items-center justify-center rounded-lg border border-border bg-muted/25 text-muted-foreground">
-                              <Icon className="size-4" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="text-[13px] font-semibold text-foreground">{option.title}</p>
-                                <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[9px] font-medium text-muted-foreground">
-                                  {originLabel(option.dataOrigin)}
-                                </span>
-                              </div>
-                              <p className="mt-0.5 text-[12px] text-muted-foreground">{option.summary}</p>
-
-                              {option.lines.length > 0 ? (
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                  {option.lines.map((line) => (
-                                    <span
-                                      className="inline-flex items-center rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-foreground"
-                                      key={line}
-                                    >
-                                      {line}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : null}
-
-                              {stationId ? (
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                  <button
-                                    className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100"
-                                    disabled={state?.status === "loading"}
-                                    onClick={() => loadBicimad(option)}
-                                    type="button"
-                                  >
-                                    {state?.status === "loading" ? "Consultando..." : "Ver disponibilidad"}
-                                  </button>
-                                  {state?.status === "success" ? (
-                                    <span className="text-[11px] text-foreground">
-                                      {state.payload.bikesAvailable ?? 0} bicis � {state.payload.docksAvailable ?? 0} anclajes
-                                    </span>
-                                  ) : null}
-                                  {state?.status === "error" ? (
-                                    <span className="text-[11px] text-muted-foreground">{state.message}</span>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </div>
-                            <span className="text-[11px] text-muted-foreground">
-                              {option.metrics.walkDistanceMeters !== null
-                                ? `${Math.round(option.metrics.walkDistanceMeters)} m`
-                                : "N/D"}
-                            </span>
+                        <div className="flex items-start gap-3 px-4 py-3" key={option.id}>
+                          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted/45 text-muted-foreground">
+                            <Icon className="size-3.5" />
                           </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-[13px] font-semibold text-foreground">
+                                {option.title}
+                              </p>
+                              <span className="rounded-full border border-border/60 bg-muted/55 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
+                                {originLabel(option.dataOrigin)}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                              {option.summary}
+                            </p>
+                            {option.lines.length > 0 ? (
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {option.lines.map((line) => (
+                                  <span
+                                    className="inline-flex items-center rounded-md border border-border/60 bg-card px-1.5 py-0.5 text-[10px] font-medium text-foreground"
+                                    key={line}
+                                  >
+                                    {line}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                            {stationId ? (
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <button
+                                  className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-600/30 dark:bg-blue-950/25 dark:text-blue-300"
+                                  disabled={state?.status === "loading"}
+                                  onClick={() => loadBicimad(option)}
+                                  type="button"
+                                >
+                                  {state?.status === "loading"
+                                    ? "Consultando..."
+                                    : "Ver disponibilidad"}
+                                </button>
+                                {state?.status === "success" ? (
+                                  <span className="text-[11px] text-foreground">
+                                    {state.payload.bikesAvailable ?? 0} bicis ·{" "}
+                                    {state.payload.docksAvailable ?? 0} anclajes
+                                  </span>
+                                ) : null}
+                                {state?.status === "error" ? (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {state.message}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                          {option.metrics.walkDistanceMeters !== null &&
+                          option.metrics.walkDistanceMeters > 0 ? (
+                            <span className="shrink-0 text-[11px] text-muted-foreground">
+                              {Math.round(option.metrics.walkDistanceMeters)} m
+                            </span>
+                          ) : null}
                         </div>
                       );
                     })
@@ -532,38 +499,6 @@ export function LibraryCard({
             document.body,
           )
         : null}
-
-      <div className={cn("rounded-xl border border-border bg-muted/22", compact ? "mx-3 mb-3 px-3 py-2.5" : "mx-4 mb-4 px-3.5 py-3")}>
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Features</p>
-        <div className="flex flex-wrap gap-1.5">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-              center.wifi
-                ? "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-600/40 dark:bg-sky-950/35 dark:text-sky-200"
-                : "border-border bg-card text-muted-foreground",
-            )}
-          >
-            <Wifi className="size-3" />
-            {center.wifi ? "WiFi" : "WiFi no disponible"}
-          </span>
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-              center.accessibility
-                ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-600/40 dark:bg-emerald-950/35 dark:text-emerald-200"
-                : "border-border bg-card text-muted-foreground",
-            )}
-          >
-            <ShieldCheck className="size-3" />
-            {center.accessibility ? "Accesible" : "Accesibilidad no informada"}
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            <Clock className="size-3" />
-            {center.phone ? `Tel. ${center.phone}` : "Telefono no disponible"}
-          </span>
-        </div>
-      </div>
     </article>
   );
 }

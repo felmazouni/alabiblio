@@ -1,15 +1,16 @@
 ﻿# Estado actual
 
-  - Fecha de corte: `2026-04-21`
-  - Estado del proyecto: `produccion activa en alabiblio.org` con `preview de contingencia separada`, `Bloques 1, 2, 2.5, 2.6, 3, 4, 5, 6 y 7` completados, `subbloque 12.0 de consolidacion Cloudflare` completado y `deuda critica de ingesta autonoma en produccion resuelta`.
+  - Fecha de corte: `2026-04-22`
+  - Estado del proyecto: `produccion activa en alabiblio.org` con `preview de contingencia separada`, `Bloques 1, 2, 2.5, 2.6, 3, 4, 5, 6 y 7` completados, `subbloque 12.0 de consolidacion Cloudflare` completado, `deuda critica de ingesta autonoma en produccion resuelta`, `Tramo 2B refinado visual duro completado`.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: `https://alabiblio.org` (runtime `alabiblio-prod` activo).
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-  - Version desplegada (preview): `9b4527c4`
-  - Version desplegada (produccion): `0082454a`
+  - Version desplegada (preview): `92e1f820`
+  - Version desplegada (produccion): `8151e33d`
 - Cierre Tramo 1 (ejecucion directa): normalizacion de etiquetas de zona, persistencia completa de filtros en URL y restauracion de contexto de listado (scroll + back) validadas en preview y promovidas a produccion.
 - Cierre Tramo 2 (ejecucion directa): rediseño premium transversal de filtros, cards, ratings y estados vacios con consistencia visual en light/dark y mobile/desktop, validado en preview y promovido a produccion.
+- Cierre Tramo 2B (refinado visual duro): LibraryCard reescrita a layout 2 areas (cuerpo compacto + footer de transporte); rating inline con estrellas y numero; subratings en grid 3 columnas con barras; aviso tira fina; headers de seccion sin uppercase ni letter-spacing en FiltersPanel y CenterDetailRoute; ScheduleRulesBlock con divide-y y dots de estado; SettingCard sin caja de icono pesada; equipamiento como chips pill; transporte en divide-y limpio. Typecheck y build limpios. Preview (92e1f820) y produccion (8151e33d) verificadas.
 
 # Lo que funciona ya de verdad
 

@@ -90,25 +90,33 @@ function ScheduleRulesBlock({
 }: {
   rules: Array<{ weekday: number; opensAt: string; closesAt: string }>;
 }) {
-  const labels = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
+  const labels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
   const grouped = labels.map((label, weekday) => ({
     label,
     entries: rules.filter((rule) => rule.weekday === weekday),
   }));
 
   return (
-    <div className="space-y-1.5">
+    <div className="divide-y divide-border/40">
       {grouped.map((group) => (
         <div
-          className="flex items-center justify-between rounded-xl border border-border bg-muted/35 px-3 py-2"
+          className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
           key={group.label}
         >
-          <span className="text-[12px] font-medium text-foreground">{group.label}</span>
-          <span className="text-[12px] text-muted-foreground">
+          <span className="w-7 text-[12px] font-medium text-foreground">{group.label}</span>
+          <span className="flex-1 text-[12px] text-muted-foreground">
             {group.entries.length > 0
-              ? group.entries.map((entry) => `${entry.opensAt} - ${entry.closesAt}`).join(", ")
+              ? group.entries.map((entry) => `${entry.opensAt}–${entry.closesAt}`).join(", ")
               : "Cerrado"}
           </span>
+          <span
+            className={cn(
+              "size-1.5 rounded-full",
+              group.entries.length > 0
+                ? "bg-emerald-400 dark:bg-emerald-500"
+                : "bg-rose-400/50 dark:bg-rose-500/35",
+            )}
+          />
         </div>
       ))}
     </div>
@@ -570,7 +578,7 @@ export function CenterDetailRoute() {
 
             <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                <h2 className="text-[11px] font-medium text-muted-foreground">
                   Valoraciones
                 </h2>
                 <button
@@ -621,41 +629,37 @@ export function CenterDetailRoute() {
               )}
 
               {ratingSummary.ratingCount > 0 && ratingSummary.attributes ? (
-                <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-                  {ratingLabels.map((key) => (
-                    <div className="rounded-xl border border-border bg-muted/20 px-3 py-2.5" key={key}>
-                      <p className="text-[12px] font-medium text-foreground">{ratingLabelText[key]}</p>
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800/80">
+                <div className="mt-4 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
+                  {ratingLabels.map((key) => {
+                    const val = ratingSummary.attributes![key] ?? null;
+                    const pct = val !== null ? Math.max(0, Math.min(100, (val / 5) * 100)) : 0;
+                    return (
+                      <div className="flex items-center gap-3" key={key}>
+                        <span className="w-20 shrink-0 text-[12px] text-muted-foreground">
+                          {ratingLabelText[key]}
+                        </span>
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70">
                           <div
                             className="h-full rounded-full bg-emerald-500"
-                            style={{
-                              width: `${Math.max(
-                                0,
-                                Math.min(
-                                  100,
-                                  ((ratingSummary.attributes[key] ?? 0) / 5) * 100,
-                                ),
-                              )}%`,
-                            }}
+                            style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <span className="w-8 text-right text-[12px] font-semibold text-foreground">
-                          {averageLabel(ratingSummary.attributes[key])}
+                        <span className="w-8 shrink-0 text-right text-[12px] font-semibold text-foreground">
+                          {val !== null ? val.toFixed(1) : "—"}
                         </span>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
 
             {center.transportOptions.filter((o) => o.mode !== "car").length > 0 ? (
               <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
-                <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                  Como llegar
+                <h2 className="mb-4 text-[11px] font-medium text-muted-foreground">
+                  Cómo llegar
                 </h2>
-                <div className="space-y-2">
+                <div className="divide-y divide-border/40">
                   {center.transportOptions
                     .filter((o) => o.mode !== "car")
                     .filter((o) => o.metrics.walkDistanceMeters === null || o.metrics.walkDistanceMeters <= 500)
@@ -664,20 +668,20 @@ export function CenterDetailRoute() {
                       const Icon = transportModeIcon(option.mode);
                       return (
                         <div
-                          className="flex items-start gap-3 rounded-xl border border-border bg-muted/25 px-3.5 py-2.5"
+                          className="flex items-start gap-3 py-2.5 first:pt-0"
                           key={option.id}
                         >
-                          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-card text-muted-foreground">
+                          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted/45 text-muted-foreground">
                             <Icon className="size-3.5" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-[13px] font-medium text-foreground">{option.title}</p>
                             <p className="mt-0.5 text-[11px] text-muted-foreground">{option.summary}</p>
                             {option.lines.length > 0 ? (
-                              <div className="mt-1.5 flex flex-wrap gap-1">
+                              <div className="mt-1 flex flex-wrap gap-1">
                                 {option.lines.map((line) => (
                                   <span
-                                    className="inline-flex h-5 items-center rounded-md border border-border bg-card px-1.5 text-[10px] font-medium text-foreground"
+                                    className="inline-flex h-5 items-center rounded-md border border-border/60 bg-card px-1.5 text-[10px] font-medium text-foreground"
                                     key={line}
                                   >
                                     {line}
@@ -699,7 +703,7 @@ export function CenterDetailRoute() {
             ) : null}
 
             <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
-              <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+              <h2 className="mb-4 text-[11px] font-medium text-muted-foreground">
                 Horario
               </h2>
               {center.schedule.displayText || center.schedule.rawText ? (
@@ -717,20 +721,25 @@ export function CenterDetailRoute() {
 
             {data.item.equipment.length > 0 ? (
               <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
-                <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                <h2 className="mb-4 text-[11px] font-medium text-muted-foreground">
                   Equipamiento
                 </h2>
-                <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                <div className="flex flex-wrap gap-2">
                   {data.item.equipment.map((equipment) => (
-                    <div
-                      className="rounded-xl border border-border bg-muted/35 px-3 py-2.5"
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full border px-3 py-1 text-[12px] font-medium",
+                        equipment.available
+                          ? "border-border bg-muted/45 text-foreground"
+                          : "border-border/40 bg-transparent text-muted-foreground/50",
+                      )}
                       key={equipment.key}
                     >
-                      <p className="text-[12px] font-medium text-foreground">{equipment.label}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {equipment.available ? equipment.value : "No disponible"}
-                      </p>
-                    </div>
+                      {equipment.label}
+                      {equipment.available && equipment.value ? (
+                        <span className="ml-1 font-normal text-muted-foreground">· {equipment.value}</span>
+                      ) : null}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -738,7 +747,7 @@ export function CenterDetailRoute() {
 
             {(data.item.contact.phone || data.item.contact.email) ? (
               <div className="rounded-[22px] border border-border bg-card p-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]">
-                <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                <h2 className="mb-3 text-[11px] font-medium text-muted-foreground">
                   Contacto
                 </h2>
                 <div className="space-y-1.5">
