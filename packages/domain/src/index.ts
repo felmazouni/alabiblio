@@ -17,4 +17,10 @@ export {
   repairSourceText,
   slugify,
 } from "./text";
+export {
+  buildRatingPresentationMeta,
+  getRatingSampleLabel,
+  getRatingSampleState,
+  type RatingPresentationMeta,
+} from "./ratings";
 export { hasTransportMode, parseOfficialTransportText } from "./transport";

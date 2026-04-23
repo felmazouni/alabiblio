@@ -82,13 +82,7 @@ const emptyVote: CenterRatingVoteInput = {
   lighting: 0,
 };
 
-function averageLabel(value: number | null): string {
-  if (value === null) {
-    return "Sin valoraciones";
-  }
-
-  return value.toFixed(1);
-}
+const GOOGLE_TOKEN_STORAGE_KEY = "alabiblio_google_id_token";
 
 function ScheduleRulesBlock({
   rows,
@@ -291,9 +285,13 @@ export function CenterDetailRoute() {
     if (typeof window === "undefined") {
       return;
     }
-    const storedToken = window.localStorage.getItem("alabiblio_google_id_token");
+    const storedToken =
+      window.sessionStorage.getItem(GOOGLE_TOKEN_STORAGE_KEY) ??
+      window.localStorage.getItem(GOOGLE_TOKEN_STORAGE_KEY);
     if (storedToken) {
       setGoogleIdToken(storedToken);
+      window.sessionStorage.setItem(GOOGLE_TOKEN_STORAGE_KEY, storedToken);
+      window.localStorage.removeItem(GOOGLE_TOKEN_STORAGE_KEY);
     }
   }, []);
 
@@ -371,7 +369,7 @@ export function CenterDetailRoute() {
             }
 
             setGoogleIdToken(response.credential);
-            window.localStorage.setItem("alabiblio_google_id_token", response.credential);
+            window.sessionStorage.setItem(GOOGLE_TOKEN_STORAGE_KEY, response.credential);
             setVoteError(null);
           },
         });
@@ -399,54 +397,6 @@ export function CenterDetailRoute() {
     };
   }, [isVoteModalOpen, googleAuthEnabled, googleClientId, googleIdToken]);
 
-  const requestGoogleSignIn = async () => {
-    setVoteError(null);
-
-    if (!googleAuthEnabled || !googleClientId) {
-      setVoteError("Google no esta configurado.");
-      return;
-    }
-
-    try {
-      await loadGoogleScript();
-      if (!window.google?.accounts?.id) {
-        setVoteError("Google Sign-In no disponible.");
-        return;
-      }
-
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: (response) => {
-          if (!response.credential) {
-            setVoteError("No se pudo completar el login de Google.");
-            return;
-          }
-
-          setGoogleIdToken(response.credential);
-          window.localStorage.setItem("alabiblio_google_id_token", response.credential);
-          setVoteError(null);
-        },
-      });
-
-      if (googleButtonHostRef.current) {
-        googleButtonHostRef.current.innerHTML = "";
-        window.google.accounts.id.renderButton(googleButtonHostRef.current, {
-          type: "standard",
-          shape: "pill",
-          theme: "outline",
-          text: "signin_with",
-          size: "large",
-          locale: "es",
-        });
-      }
-
-      window.google.accounts.id.prompt();
-      setIsGoogleReady(true);
-    } catch {
-      setVoteError("No se pudo cargar Google Sign-In.");
-    }
-  };
-
   const ratingSummary = useMemo(() => {
     const item = ratingsData?.item;
     if (!item) {
@@ -454,6 +404,8 @@ export function CenterDetailRoute() {
         ratingAverage: center?.ratingAverage ?? null,
         ratingCount: center?.ratingCount ?? 0,
         attributes: null,
+        ratingSourceLabel: center?.ratingSourceLabel ?? null,
+        ratingSampleLabel: center?.ratingSampleLabel ?? null,
       };
     }
 
@@ -461,8 +413,16 @@ export function CenterDetailRoute() {
       ratingAverage: item.ratingAverage,
       ratingCount: item.ratingCount,
       attributes: item.attributes,
+      ratingSourceLabel: item.ratingSourceLabel,
+      ratingSampleLabel: item.ratingSampleLabel,
     };
-  }, [ratingsData?.item, center?.ratingAverage, center?.ratingCount]);
+  }, [
+    ratingsData?.item,
+    center?.ratingAverage,
+    center?.ratingCount,
+    center?.ratingSourceLabel,
+    center?.ratingSampleLabel,
+  ]);
 
   const hasUserVote = Boolean(ratingsData?.item?.userVote);
   const schedulePresentation = useMemo(
@@ -497,7 +457,8 @@ export function CenterDetailRoute() {
 
   const logoutGoogle = () => {
     setGoogleIdToken(null);
-    window.localStorage.removeItem("alabiblio_google_id_token");
+    window.sessionStorage.removeItem(GOOGLE_TOKEN_STORAGE_KEY);
+    window.localStorage.removeItem(GOOGLE_TOKEN_STORAGE_KEY);
   };
 
   const handleBackToListing = () => {
@@ -553,7 +514,11 @@ export function CenterDetailRoute() {
                   </span>
                 ) : null}
                 {center.distanceLabel && center.distanceOrigin !== "not_available" ? (
-                  <span className="font-medium text-primary">{center.distanceLabel}</span>
+                  <span className="font-medium text-primary">
+                    {center.distanceOrigin === "heuristic"
+                      ? `Aprox. ${center.distanceLabel}`
+                      : center.distanceLabel}
+                  </span>
                 ) : null}
               </div>
               {formatNeighborhoodDistrict(center.neighborhood, center.district) ? (
@@ -639,6 +604,13 @@ export function CenterDetailRoute() {
                       <span className="text-[12px] text-muted-foreground">
                         {ratingSummary.ratingCount} {ratingSummary.ratingCount === 1 ? "opinión" : "opiniones"}
                       </span>
+                      {(ratingSummary.ratingSourceLabel || ratingSummary.ratingSampleLabel) ? (
+                        <span className="text-[11px] text-muted-foreground">
+                          {[ratingSummary.ratingSourceLabel, ratingSummary.ratingSampleLabel]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 ) : (
@@ -648,7 +620,7 @@ export function CenterDetailRoute() {
                       <span className="text-[12px] font-medium text-foreground">Sin opiniones</span>
                     </div>
                     <p className="mt-1.5 text-[12px] text-muted-foreground">
-                      Sé el primero en valorar este centro.
+                      Sé la primera persona en valorar este centro en AlaBiblio.
                     </p>
                   </div>
                 )}
@@ -662,9 +634,13 @@ export function CenterDetailRoute() {
                   ) : (
                     <Pencil className="size-3.5" />
                   )}
-                  {hasUserVote ? "Editar mi valoración" : "Valorar con Google"}
+                  {hasUserVote ? "Editar mi valoración" : "Valorar en AlaBiblio"}
                 </button>
               </div>
+
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Valoraciones internas de AlaBiblio. Google solo se usa para verificar que cada voto pertenece a una persona real.
+              </p>
 
               {ratingSummary.ratingCount > 0 && ratingSummary.attributes ? (
                 <div className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2">
@@ -866,8 +842,8 @@ export function CenterDetailRoute() {
             <div className="w-full max-w-[480px] rounded-[22px] border border-border bg-card p-4 shadow-[0_28px_80px_rgba(2,6,23,0.4)]">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <h3 className="text-[1rem] font-semibold text-foreground">Tu valoracion</h3>
-                  <p className="text-[11px] text-muted-foreground">Valora 6 aspectos para construir el score global</p>
+                  <h3 className="text-[1rem] font-semibold text-foreground">Tu valoración en AlaBiblio</h3>
+                  <p className="text-[11px] text-muted-foreground">Valora 6 aspectos. Google solo verifica tu identidad; no importamos reseñas externas.</p>
                 </div>
                 <button
                   className="rounded-md border border-border px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground"
@@ -887,7 +863,7 @@ export function CenterDetailRoute() {
               {googleAuthEnabled && !googleIdToken ? (
                 <div className="mb-3 rounded-xl border border-border bg-muted/20 px-3 py-4">
                   <p className="mb-3 text-center text-[12px] text-muted-foreground">
-                    Accede con Google para enviar tu voto.
+                    Accede con Google para enviar tu voto en AlaBiblio.
                   </p>
                   <div ref={googleButtonHostRef} className="flex justify-center" />
                   {!isGoogleReady ? (
@@ -904,7 +880,7 @@ export function CenterDetailRoute() {
                   onClick={logoutGoogle}
                   type="button"
                 >
-                  Cerrar sesion Google
+                  Cerrar sesión Google
                 </button>
               ) : null}
 

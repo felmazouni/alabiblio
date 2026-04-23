@@ -1,17 +1,18 @@
 ﻿# Estado actual
 
-  - Fecha de corte: `2026-04-22`
-  - Estado del proyecto: `produccion activa en alabiblio.org` con `preview de contingencia separada`, `Bloques 1, 2, 2.5, 2.6, 3, 4, 5, 6 y 7` completados, `subbloque 12.0 de consolidacion Cloudflare` completado, `deuda critica de ingesta autonoma en produccion resuelta`, `Tramo 2B refinado visual duro completado`, `Tramo 2C correcciones criticas UI completado`.
+  - Fecha de corte: `2026-04-23`
+  - Estado del proyecto: `produccion activa en alabiblio.org` con `preview de contingencia separada`, `Bloques 1, 2, 2.5, 2.6, 3, 4, 5, 6 y 7` completados, `subbloque 12.0 de consolidacion Cloudflare` completado, `deuda critica de ingesta autonoma en produccion resuelta`, `Tramo 2B refinado visual duro completado`, `release de endurecimiento honesto 2026-04-23 desplegada y validada en preview y produccion`.
 - URL de preview: `https://alabiblio-preview.ttefmb.workers.dev`
 - URL de produccion: `https://alabiblio.org` (runtime `alabiblio-prod` activo).
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-  - Version desplegada (preview): `c1159744-d567-4ee8-9254-c263e4d2d5fc`
-  - Version desplegada (produccion): `6c28f173-23e8-4ab7-b3a6-b92b5083ff97`
+  - Version desplegada (preview): `afd63119-d7cc-4f87-9224-9dc6068872cb`
+  - Version desplegada (produccion): `7b0930ad-11c6-4dfd-9984-7112004321bf`
 - Cierre Tramo 1 (ejecucion directa): normalizacion de etiquetas de zona, persistencia completa de filtros en URL y restauracion de contexto de listado (scroll + back) validadas en preview y promovidas a produccion.
 - Cierre Tramo 2 (ejecucion directa): rediseño premium transversal de filtros, cards, ratings y estados vacios con consistencia visual en light/dark y mobile/desktop, validado en preview y promovido a produccion.
 - Cierre Tramo 2B (refinado visual duro): LibraryCard reescrita a layout 2 areas (cuerpo compacto + footer de transporte); rating inline con estrellas y numero; subratings en grid 3 columnas con barras; aviso tira fina; headers de seccion sin uppercase ni letter-spacing en FiltersPanel y CenterDetailRoute; ScheduleRulesBlock con divide-y y dots de estado; SettingCard sin caja de icono pesada; equipamiento como chips pill; transporte en divide-y limpio. Typecheck y build limpios. Preview (92e1f820) y produccion (8151e33d) verificadas.
 - Cierre Tramo 2C (correcciones criticas UI): (1) Boton Google duplicado en modal de valoracion eliminado — queda solo el boton oficial renderizado por Google SDK; (2) Modales compactados en desktop — FiltersPanel max-w-[580px]/max-h-[82vh], modal de voto max-w-[480px]; (3) interurban_bus reparado en chips de filtros — transportIcon y transportLabel cubren el caso; (4) Pestana Horarios reconstruida con secciones Estado/Dias/Franja horaria; (5) Busqueda reactiva con debounce 300ms via useRef sin rerender espurio; (6) Iconografia de transporte cromatica por modo — metro=rojo, cercanias=azul, emt_bus=cyan, interurban_bus=ambar, bicimad=esmeralda, metro_ligero=purpura, car=neutro; (7) Boton "Ver" renombrado a "Ver detalle"; (8) Bloque de horario en detalle con aviso de confianza baja y sin tabla vacia cuando rules=[]; (9) Modal de transporte con iconos cromaticos; (10) Consistencia LibraryCard/CenterDetailRoute. Nuevos filtros weekdays/timeSlot aplicados en cliente via useMemo. Typecheck y build limpios. Preview (a46322c8) y produccion (e518f850) verificadas.
+- Cierre trazable. Release de endurecimiento honesto (2026-04-23): ratings mantenidos visibles y etiquetados como internos de AlaBiblio; retirada la pestana `Horarios` y neutralizados `weekdays/timeSlot`; copy publica sin claims de realtime engañosos; distancia heuristica marcada como aproximada; filtro de transporte alineado con opciones realmente visibles en payload; `/api/health` validado como health real. Preview `afd63119-d7cc-4f87-9224-9dc6068872cb` y produccion `7b0930ad-11c6-4dfd-9984-7112004321bf` verificadas. Ver `docs/RELEASE-2026-04-23.md`.
 
 # Lo que funciona ya de verdad
 
@@ -118,6 +119,13 @@
 - Commits: 75c4aed (tramo 1), 5f230de (tramo 2), de6ebef (tramo 3).
 
 ## Cierre trazable. Despliegue puntual de cards y smoke minimo en produccion (2026-04-23)
+
+## Cierre trazable. Repo, preview y produccion alineados para release endurecida (2026-04-23)
+
+- Estado publicado a fijar en `main` sin depender de workspace local no versionado.
+- Preview y produccion validadas sobre el mismo corte funcional endurecido.
+- Comprobaciones funcionales exigidas para este cierre: ratings internos visibles, sin filtros publicos de horario, sin distancia usable sin ubicacion real, filtro de transporte coherente con opciones visibles y `/api/health` con checks reales.
+- Nota de release creada en `docs/RELEASE-2026-04-23.md`.
 
 - Version de produccion desplegada: `6c28f173-23e8-4ab7-b3a6-b92b5083ff97`.
 - Smoke minimo ejecutado sobre `alabiblio.org` con `200` en: `/api/health`, `/api/public/catalog` y `/api/public/centers/:slug`.

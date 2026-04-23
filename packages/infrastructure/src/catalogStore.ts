@@ -14,6 +14,7 @@ import type {
   TransportOption,
 } from "@alabiblio/contracts";
 import {
+  buildRatingPresentationMeta,
   buildCenterSlug,
   formatDistance,
   haversineDistanceMeters,
@@ -556,6 +557,15 @@ const TRANSPORT_SOURCE_URLS = {
 const transportResolutionCache = new Map<string, UserResolvedTransportCacheEntry>();
 const inflightTransportResolutions = new Map<string, Promise<UserResolvedTransportCacheEntry>>();
 let transportSnapshotRefreshPromise: Promise<void> | null = null;
+const PUBLIC_TRANSPORT_VISIBILITY_MAX_WALK_METERS = 500;
+const FILTERABLE_TRANSPORT_MODES: TransportMode[] = [
+  "metro",
+  "cercanias",
+  "metro_ligero",
+  "emt_bus",
+  "interurban_bus",
+  "bicimad",
+];
 
 function normalizeFacetValue(value: string): string {
   return normalizeSearch(value).replace(/\s+/g, " ").trim();
@@ -612,6 +622,130 @@ function ttlSecondsForOrigin(origin: CenterCatalogItem["ratingOrigin"], mode: Tr
 
 function transportNodeRowId(centerId: string, option: StoredTransportOption): string {
   return `${centerId}:${option.destinationNodeId ?? option.optionId}`;
+}
+
+function isPubliclyVisibleTransportOption(
+  option: Pick<TransportOption, "mode" | "metrics">,
+): boolean {
+  if (option.mode === "car") {
+    return false;
+  }
+
+  return (
+    option.metrics.walkDistanceMeters === null ||
+    option.metrics.walkDistanceMeters <= PUBLIC_TRANSPORT_VISIBILITY_MAX_WALK_METERS
+  );
+}
+
+function hasVisibleTransportMode(
+  item: Pick<EnrichedCenterRecord, "transportOptions">,
+  mode: TransportMode,
+): boolean {
+  return item.transportOptions.some(
+    (option) => option.mode === mode && isPubliclyVisibleTransportOption(option),
+  );
+}
+
+interface BackedUpRatingVoteRow {
+  id: string;
+  center_id: string;
+  user_id: string;
+  silence: number;
+  wifi: number;
+  cleanliness: number;
+  plugs: number;
+  temperature: number;
+  lighting: number;
+  created_at: string;
+  updated_at: string;
+}
+
+async function backupCenterAttributeVotes(
+  database: D1LikeDatabase,
+): Promise<BackedUpRatingVoteRow[]> {
+  const rows = await database
+    .prepare(
+      `SELECT
+        id,
+        center_id,
+        user_id,
+        silence,
+        wifi,
+        cleanliness,
+        plugs,
+        temperature,
+        lighting,
+        created_at,
+        updated_at
+      FROM center_attribute_votes`,
+    )
+    .all<BackedUpRatingVoteRow>();
+
+  return rows.results;
+}
+
+function buildRestoreCenterAttributeVoteStatements(
+  database: D1LikeDatabase,
+  votes: BackedUpRatingVoteRow[],
+): D1Statement[] {
+  return votes.map((vote) =>
+    database
+      .prepare(
+        `INSERT INTO center_attribute_votes (
+          id,
+          center_id,
+          user_id,
+          silence,
+          wifi,
+          cleanliness,
+          plugs,
+          temperature,
+          lighting,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        vote.id,
+        vote.center_id,
+        vote.user_id,
+        vote.silence,
+        vote.wifi,
+        vote.cleanliness,
+        vote.plugs,
+        vote.temperature,
+        vote.lighting,
+        vote.created_at,
+        vote.updated_at,
+      ),
+  );
+}
+
+interface TransportDatasetSummary {
+  emtStops: EmtStop[];
+  crtmMetroStops: CrtmStop[];
+  crtmCercaniasStops: CrtmStop[];
+  crtmInterurbanStops: CrtmStop[];
+  bicimadStations: BicimadStation[];
+  serZones: SerZone[];
+}
+
+function assertTransportDatasetsHealthy(dataset: TransportDatasetSummary): void {
+  const checks = [
+    ["emt", dataset.emtStops.length],
+    ["crtm_metro", dataset.crtmMetroStops.length],
+    ["crtm_cercanias", dataset.crtmCercaniasStops.length],
+    ["crtm_interurbanos", dataset.crtmInterurbanStops.length],
+    ["bicimad", dataset.bicimadStations.length],
+    ["ser", dataset.serZones.length],
+  ] as const;
+
+  const failed = checks.filter(([, count]) => count <= 0);
+  if (failed.length > 0) {
+    throw new Error(
+      `transport_snapshot_refresh_aborted:${failed.map(([source]) => source).join(",")}`,
+    );
+  }
 }
 
 function inferWifi(servicesText: string | null, transportText: string | null): boolean {
@@ -833,6 +967,9 @@ async function replaceCatalog(
   rejections: RejectedCenter[],
   sources: SourceConfig,
 ) {
+  const existingAttributeVotes = await backupCenterAttributeVotes(database);
+  const nextCenterIds = new Set(centers.map((center) => center.id));
+
   await database.prepare("DELETE FROM center_ingestion_rejections").run();
   await database.prepare("DELETE FROM center_schedule_rules").run();
   await database.prepare("DELETE FROM center_schedule_overrides").run();
@@ -979,6 +1116,13 @@ async function replaceCatalog(
         ),
     );
   }
+
+  statements.push(
+    ...buildRestoreCenterAttributeVoteStatements(
+      database,
+      existingAttributeVotes.filter((vote) => nextCenterIds.has(vote.center_id)),
+    ),
+  );
 
   await runStatementsInChunks(database, statements);
 
@@ -1682,14 +1826,15 @@ async function replaceTransportSnapshots(
   }
 
   transportSnapshotRefreshPromise = (async () => {
-    await database.prepare("DELETE FROM center_transport_relevance").run();
-    await database.prepare("DELETE FROM center_transport_options").run();
-    await database.prepare("DELETE FROM center_transport_nodes").run();
-    await database.prepare("DELETE FROM center_transport_snapshots").run();
-    await database.prepare("DELETE FROM center_ser_coverage").run();
-
     const fetchedAt = new Date().toISOString();
-    const [emtStops, crtmMetroStops, crtmCercaniasStops, crtmInterurbanStops, bicimadStations, serZones] = await Promise.all([
+    const [
+      emtStops,
+      crtmMetroStops,
+      crtmCercaniasStops,
+      crtmInterurbanStops,
+      bicimadStations,
+      serZones,
+    ] = await Promise.all([
       loadEmtStops(),
       loadCrtmMetroStops(),
       loadCrtmCercaniasStops(),
@@ -1697,6 +1842,23 @@ async function replaceTransportSnapshots(
       loadBicimadStations(),
       loadSerZones(),
     ]);
+    const transportDataset = {
+      emtStops,
+      crtmMetroStops,
+      crtmCercaniasStops,
+      crtmInterurbanStops,
+      bicimadStations,
+      serZones,
+    } satisfies TransportDatasetSummary;
+
+    assertTransportDatasetsHealthy(transportDataset);
+
+    await database.prepare("DELETE FROM center_transport_relevance").run();
+    await database.prepare("DELETE FROM center_transport_options").run();
+    await database.prepare("DELETE FROM center_transport_nodes").run();
+    await database.prepare("DELETE FROM center_transport_snapshots").run();
+    await database.prepare("DELETE FROM center_ser_coverage").run();
+
     const statements: D1Statement[] = [];
 
     statements.push(
@@ -1754,14 +1916,7 @@ async function replaceTransportSnapshots(
     for (const center of centers) {
       const snapshot = buildPrecomputedTransportSnapshot(
         center,
-        {
-          emtStops,
-          crtmMetroStops,
-          crtmCercaniasStops,
-          crtmInterurbanStops,
-          bicimadStations,
-          serZones,
-        },
+        transportDataset,
         fetchedAt,
       );
 
@@ -2087,12 +2242,17 @@ function buildRanking(item: {
 }
 
 function buildAppliedQuery(input?: PublicCatalogQuery): Required<PublicCatalogQuery> {
+  const lat = input?.lat ?? Number.NaN;
+  const lon = input?.lon ?? Number.NaN;
+  const hasUserLocation = Number.isFinite(lat) && Number.isFinite(lon);
+  const requestedSort = input?.sort ?? "relevance";
+
   return {
     ...DEFAULT_PUBLIC_QUERY,
     ...input,
     q: input?.q?.trim() ?? "",
-    lat: input?.lat ?? Number.NaN,
-    lon: input?.lon ?? Number.NaN,
+    lat,
+    lon,
     radiusMeters:
       typeof input?.radiusMeters === "number" && Number.isFinite(input.radiusMeters)
         ? Math.max(250, input.radiusMeters)
@@ -2106,7 +2266,7 @@ function buildAppliedQuery(input?: PublicCatalogQuery): Required<PublicCatalogQu
     withWifi: Boolean(input?.withWifi),
     withCapacity: Boolean(input?.withCapacity),
     withSer: Boolean(input?.withSer),
-    sort: input?.sort ?? "relevance",
+    sort: requestedSort === "distance" && !hasUserLocation ? "relevance" : requestedSort,
     limit:
       typeof input?.limit === "number" && Number.isFinite(input.limit)
         ? Math.max(1, Math.min(500, input.limit))
@@ -2209,8 +2369,7 @@ async function enrichCenterForPublic(
 
   return {
     ...base,
-    ratingOrigin:
-      base.ratingAverage !== null && base.ratingCount > 0 ? "official_structured" : "not_available",
+    ...buildRatingPresentationMeta(base.ratingCount),
     headlineStatus: buildHeadlineStatus(base.schedule),
     scheduleLabel: buildScheduleLabel(base.schedule),
     occupancyLabel:
@@ -2222,7 +2381,7 @@ async function enrichCenterForPublic(
     capacityOrigin: base.capacityOrigin,
     distanceMeters,
     distanceLabel: formatDistance(distanceMeters),
-    distanceOrigin: distanceMeters !== null ? "official_structured" : "not_available",
+    distanceOrigin: distanceMeters !== null ? "heuristic" : "not_available",
     mapsUrl,
     operationalNote: base.schedule.notesUnparsed,
     operationalNoteOrigin: base.schedule.notesUnparsed ? "official_text_parsed" : "not_available",
@@ -2283,7 +2442,10 @@ function matchesQuery(item: EnrichedCenterRecord, query: Required<PublicCatalogQ
     return false;
   }
 
-  if (query.transportModes.length > 0 && !item.transportOptions.some((option) => query.transportModes.includes(option.mode))) {
+  if (
+    query.transportModes.length > 0 &&
+    !query.transportModes.some((mode) => hasVisibleTransportMode(item, mode))
+  ) {
     return false;
   }
 
@@ -2353,7 +2515,20 @@ async function readBaseCentersFromDatabase(database: D1LikeDatabase): Promise<Ba
       `SELECT
         id, slug, kind, name, address_line, district, neighborhood, postal_code,
         latitude, longitude, phone, email, website_url, accessibility, wifi, open_air,
-        capacity_value, services_text, transport_text, source_code, rating_average, rating_count,
+        capacity_value, services_text, transport_text, source_code,
+        (
+          SELECT ROUND(
+            (
+              AVG(silence) + AVG(wifi) + AVG(cleanliness) + AVG(plugs) + AVG(temperature) + AVG(lighting)
+            ) / 6,
+            1
+          )
+          FROM center_attribute_votes votes
+          WHERE votes.center_id = centers.id
+        ) AS rating_average,
+        (
+          SELECT COUNT(*) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_count,
         (
           SELECT ROUND(AVG(silence), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
         ) AS rating_silence_average,
@@ -2390,7 +2565,20 @@ async function readBaseCenterBySlugFromDatabase(
       `SELECT
         id, slug, kind, name, address_line, district, neighborhood, postal_code,
         latitude, longitude, phone, email, website_url, accessibility, wifi, open_air,
-        capacity_value, services_text, transport_text, source_code, rating_average, rating_count,
+        capacity_value, services_text, transport_text, source_code,
+        (
+          SELECT ROUND(
+            (
+              AVG(silence) + AVG(wifi) + AVG(cleanliness) + AVG(plugs) + AVG(temperature) + AVG(lighting)
+            ) / 6,
+            1
+          )
+          FROM center_attribute_votes votes
+          WHERE votes.center_id = centers.id
+        ) AS rating_average,
+        (
+          SELECT COUNT(*) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_count,
         (
           SELECT ROUND(AVG(silence), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
         ) AS rating_silence_average,
@@ -2777,18 +2965,10 @@ export async function getFiltersFromStore(
         count: matching.filter((item) => item.kind === "study_room").length,
       },
     ],
-    availableTransportModes: ([
-      "metro",
-      "cercanias",
-      "metro_ligero",
-      "emt_bus",
-      "interurban_bus",
-      "bicimad",
-      "car",
-    ] as TransportMode[]).map((mode) => ({
+    availableTransportModes: FILTERABLE_TRANSPORT_MODES.map((mode) => ({
       mode,
       label: labelForTransportMode(mode),
-      count: matching.filter((item) => item.transportOptions.some((option) => option.mode === mode)).length,
+      count: matching.filter((item) => hasVisibleTransportMode(item, mode)).length,
     })),
     availableDistricts: [...districtCounts.entries()]
       .map(([value, payload]) => ({ value, label: payload.label, count: payload.count }))
@@ -2820,7 +3000,7 @@ export async function getFiltersFromStore(
     ],
     availableSortModes: ([
       "relevance",
-      "distance",
+      ...(hasRealUserLocation(query) ? (["distance"] as SortMode[]) : []),
       "closing",
       "capacity",
       "name",

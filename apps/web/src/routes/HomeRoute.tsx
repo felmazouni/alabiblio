@@ -317,7 +317,7 @@ export function HomeRoute() {
               Encuentra tu espacio de estudio ideal
             </h1>
             <p className="mt-1 text-[11px] text-muted-foreground sm:text-[12px]">
-              Las mejores opciones cerca de ti, actualizadas en tiempo real
+              Las mejores opciones cerca de ti, con datos operativos y movilidad publicada
             </p>
 
             <div className="mt-2.5 flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">

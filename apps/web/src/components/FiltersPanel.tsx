@@ -28,10 +28,9 @@ import { normalizeZoneLabel } from "../lib/presentationText";
 import {
   defaultPublicFilters,
   type PublicFiltersState,
-  type TimeSlot,
 } from "../lib/publicCatalog";
 
-type TabId = "general" | "zona" | "ordenar" | "horarios";
+type TabId = "general" | "zona" | "ordenar";
 
 function transportIcon(mode: TransportMode) {
   switch (mode) {
@@ -459,8 +458,6 @@ export function FiltersPanel({
         filters.withWifi,
         filters.withCapacity,
         filters.withSer,
-        filters.weekdays.length > 0,
-        filters.timeSlot !== null,
         metadata?.canUseDistanceFilter &&
           filters.radiusMeters !== defaultPublicFilters.radiusMeters,
       ].filter(Boolean).length,
@@ -491,22 +488,6 @@ export function FiltersPanel({
       transportModes: current.transportModes.includes(mode)
         ? current.transportModes.filter((value) => value !== mode)
         : [...current.transportModes, mode],
-    }));
-  };
-
-  const toggleWeekday = (day: number) => {
-    setLocalFilters((current) => ({
-      ...current,
-      weekdays: current.weekdays.includes(day)
-        ? current.weekdays.filter((d) => d !== day)
-        : [...current.weekdays, day],
-    }));
-  };
-
-  const toggleTimeSlot = (slot: TimeSlot) => {
-    setLocalFilters((current) => ({
-      ...current,
-      timeSlot: current.timeSlot === slot ? null : slot,
     }));
   };
 
@@ -571,7 +552,7 @@ export function FiltersPanel({
             </div>
 
             <div className="px-4 pt-3.5">
-              <div className="grid grid-cols-2 rounded-2xl border border-border bg-muted/65 p-1 sm:grid-cols-4">
+              <div className="grid grid-cols-3 rounded-2xl border border-border bg-muted/65 p-1">
                 <TabButton
                   active={activeTab === "general"}
                   icon={SlidersHorizontal}
@@ -592,13 +573,6 @@ export function FiltersPanel({
                   onClick={() => setActiveTab("ordenar")}
                 >
                   Ordenar
-                </TabButton>
-                <TabButton
-                  active={activeTab === "horarios"}
-                  icon={Calendar}
-                  onClick={() => setActiveTab("horarios")}
-                >
-                  Horarios
                 </TabButton>
               </div>
             </div>
@@ -648,6 +622,15 @@ export function FiltersPanel({
                         }
                         subtitle="WiFi disponible"
                         title="Con WiFi"
+                      />
+                      <SettingCard
+                        checked={localFilters.openNow}
+                        icon={Clock}
+                        onCheckedChange={(value) =>
+                          setLocalFilters((current) => ({ ...current, openNow: value }))
+                        }
+                        subtitle="Solo centros abiertos ahora"
+                        title="Abierta ahora"
                       />
                       <SettingCard
                         checked={localFilters.withCapacity}
@@ -839,75 +822,6 @@ export function FiltersPanel({
                 </div>
               ) : null}
 
-              {activeTab === "horarios" ? (
-                <div className="space-y-5">
-                  <section>
-                    <h4 className="mb-2.5 text-[11px] font-medium text-muted-foreground">
-                      Estado
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      <ToggleChip
-                        active={localFilters.openNow}
-                        icon={Clock}
-                        onClick={() =>
-                          setLocalFilters((current) => ({ ...current, openNow: !current.openNow }))
-                        }
-                      >
-                        Abierta ahora
-                      </ToggleChip>
-                    </div>
-                  </section>
-
-                  <section>
-                    <h4 className="mb-2.5 text-[11px] font-medium text-muted-foreground">
-                      Días
-                    </h4>
-                    <div className="flex gap-1.5">
-                      {(["L", "M", "X", "J", "V", "S", "D"] as const).map((label, idx) => (
-                        <button
-                          className={cn(
-                            "flex size-9 items-center justify-center rounded-full text-[11px] font-semibold transition-all",
-                            localFilters.weekdays.includes(idx)
-                              ? "bg-primary text-primary-foreground shadow-[0_4px_12px_rgba(15,91,167,0.28)]"
-                              : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-muted/45",
-                          )}
-                          key={idx}
-                          onClick={() => toggleWeekday(idx)}
-                          type="button"
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section>
-                    <h4 className="mb-2.5 text-[11px] font-medium text-muted-foreground">
-                      Franja horaria
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      <ToggleChip
-                        active={localFilters.timeSlot === "morning"}
-                        onClick={() => toggleTimeSlot("morning")}
-                      >
-                        Mañana · 08–14h
-                      </ToggleChip>
-                      <ToggleChip
-                        active={localFilters.timeSlot === "afternoon"}
-                        onClick={() => toggleTimeSlot("afternoon")}
-                      >
-                        Tarde · 14–20h
-                      </ToggleChip>
-                      <ToggleChip
-                        active={localFilters.timeSlot === "evening"}
-                        onClick={() => toggleTimeSlot("evening")}
-                      >
-                        Noche · 20–24h
-                      </ToggleChip>
-                    </div>
-                  </section>
-                </div>
-              ) : null}
             </div>
 
             <div className="border-t border-border/80 bg-muted/35 px-4 py-3.5">

@@ -1,4 +1,3 @@
-import type { ScheduleRule } from "@alabiblio/contracts";
 import { ArrowLeft, BookOpen, MapPin, Moon, Search, Sun, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigationType, useSearchParams } from "react-router-dom";
@@ -64,36 +63,10 @@ export function PublicCatalogRoute() {
   const restoredScrollKeyRef = useRef<string | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const results = useMemo(() => {
-    const TIME_RANGES: Record<string, [string, string]> = {
-      morning:   ["08:00", "14:00"],
-      afternoon: ["14:00", "20:00"],
-      evening:   ["20:00", "24:00"],
-    };
-
-    function ruleOverlaps(rule: ScheduleRule, start: string, end: string): boolean {
-      return rule.opensAt < end && rule.closesAt > start;
-    }
-
-    let filtered = items;
-
-    if (filters.weekdays.length > 0) {
-      filtered = filtered.filter((item) =>
-        filters.weekdays.some((day) =>
-          item.schedule.rules.some((rule) => rule.weekday === day),
-        ),
-      );
-    }
-
-    if (filters.timeSlot) {
-      const [rangeStart, rangeEnd] = TIME_RANGES[filters.timeSlot] ?? ["00:00", "24:00"];
-      filtered = filtered.filter((item) =>
-        item.schedule.rules.some((rule) => ruleOverlaps(rule, rangeStart, rangeEnd)),
-      );
-    }
-
-    return filtered.map((item, index) => ({ ...item, rankingPosition: index + 1 }));
-  }, [items, filters.weekdays, filters.timeSlot]);
+  const results = useMemo(
+    () => items.map((item, index) => ({ ...item, rankingPosition: index + 1 })),
+    [items],
+  );
   const forceOpenFilters = searchParams.get("filters") === "open";
 
   useEffect(() => {
@@ -257,31 +230,6 @@ export function PublicCatalogRoute() {
         clear: () => updateFilters((current) => ({ ...current, withSer: false })),
       });
     }
-    if (filters.weekdays.length > 0) {
-      const DAY_LABELS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-      const label = filters.weekdays
-        .slice()
-        .sort((a, b) => a - b)
-        .map((d) => DAY_LABELS[d] ?? d)
-        .join(", ");
-      labels.push({
-        key: "weekdays",
-        label: `Días: ${label}`,
-        clear: () => updateFilters((current) => ({ ...current, weekdays: [] })),
-      });
-    }
-    if (filters.timeSlot) {
-      const SLOT_LABELS: Record<string, string> = {
-        morning: "Mañana · 08–14h",
-        afternoon: "Tarde · 14–20h",
-        evening: "Noche · 20–24h",
-      };
-      labels.push({
-        key: "timeSlot",
-        label: SLOT_LABELS[filters.timeSlot] ?? filters.timeSlot,
-        clear: () => updateFilters((current) => ({ ...current, timeSlot: null })),
-      });
-    }
     if (location && filters.radiusMeters !== defaultPublicFilters.radiusMeters) {
       labels.push({
         key: "radius",
@@ -354,7 +302,6 @@ export function PublicCatalogRoute() {
     filterMetadata?.availableTransportModes,
     filters,
     location,
-    searchParams,
   ]);
 
   return (

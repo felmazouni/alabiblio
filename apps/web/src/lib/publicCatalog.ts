@@ -77,7 +77,6 @@ const ALLOWED_TRANSPORT: TransportMode[] = [
   "emt_bus",
   "interurban_bus",
   "bicimad",
-  "car",
 ];
 const ALLOWED_SORT: SortMode[] = [
   "relevance",
@@ -139,16 +138,6 @@ export function parsePublicFiltersFromSearchParams(
     ? (sortRaw as SortMode)
     : defaultPublicFilters.sort;
 
-  const weekdaysRaw = readCsvParams(searchParams, ["days"]);
-  const weekdays = weekdaysRaw
-    .map(Number)
-    .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
-  const timeSlotRaw = (searchParams.get("time_slot") ?? "").trim();
-  const timeSlot: TimeSlot | null =
-    timeSlotRaw === "morning" || timeSlotRaw === "afternoon" || timeSlotRaw === "evening"
-      ? timeSlotRaw
-      : null;
-
   return {
     query,
     kinds,
@@ -162,8 +151,8 @@ export function parsePublicFiltersFromSearchParams(
     withSer,
     radiusMeters,
     sort,
-    weekdays,
-    timeSlot,
+    weekdays: [],
+    timeSlot: null,
   };
 }
 
@@ -212,14 +201,6 @@ export function writePublicFiltersToSearchParams(
   }
 
   params.set("sort", filters.sort);
-
-  if (filters.weekdays.length > 0) {
-    params.set("days", [...filters.weekdays].sort((a, b) => a - b).join(","));
-  }
-
-  if (filters.timeSlot) {
-    params.set("time_slot", filters.timeSlot);
-  }
 
   return params;
 }

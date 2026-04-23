@@ -5,6 +5,7 @@ import type {
   CenterRatingsSummary,
   PublicCenterRatingsResponse,
 } from "@alabiblio/contracts";
+import { buildRatingPresentationMeta } from "@alabiblio/domain";
 
 interface D1Statement {
   bind(...values: unknown[]): D1Statement;
@@ -218,6 +219,7 @@ export async function getCenterRatingsBySlug(
     ratingAverage: aggregates.ratingAverage,
     ratingCount: aggregates.ratingCount,
     attributes: aggregates.attributes,
+    ...buildRatingPresentationMeta(aggregates.ratingCount),
     userVote,
   };
 
@@ -247,12 +249,6 @@ export async function upsertCenterRatingBySlug(
   }
 
   const now = nowIso();
-  const overall = Math.round(
-    ((vote.silence + vote.wifi + vote.cleanliness + vote.plugs + vote.temperature + vote.lighting) /
-      6) *
-      10,
-  ) / 10;
-
   await database
     .prepare(
       `INSERT INTO center_attribute_votes (
@@ -308,6 +304,7 @@ export async function upsertCenterRatingBySlug(
       temperature: null,
       lighting: null,
     },
+    ...buildRatingPresentationMeta(summary.ratingCount),
     userVote,
   };
 

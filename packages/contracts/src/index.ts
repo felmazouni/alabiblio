@@ -29,6 +29,14 @@ export type TransportMode =
   | "bicimad"
   | "car";
 
+export type RatingSource = "app_users" | "not_available";
+
+export type RatingSampleState =
+  | "no_votes"
+  | "initial"
+  | "limited"
+  | "established";
+
 export interface ScheduleRule {
   weekday: number;
   opensAt: string;
@@ -141,6 +149,10 @@ export interface CenterCatalogItem {
   ratingAttributes: CenterRatingAverages;
   schedule: ScheduleSummary;
   ratingOrigin: DataOrigin;
+  ratingSource: RatingSource;
+  ratingSourceLabel: string | null;
+  ratingSampleState: RatingSampleState;
+  ratingSampleLabel: string | null;
   headlineStatus: "Abierta" | "Cerrada" | "Revision manual";
   scheduleLabel: string;
   occupancyLabel: string | null;
@@ -251,6 +263,11 @@ export interface CenterRatingsSummary {
   ratingAverage: number | null;
   ratingCount: number;
   attributes: CenterRatingAverages;
+  ratingOrigin: DataOrigin;
+  ratingSource: RatingSource;
+  ratingSourceLabel: string | null;
+  ratingSampleState: RatingSampleState;
+  ratingSampleLabel: string | null;
   userVote: CenterRatingVote | null;
 }
 

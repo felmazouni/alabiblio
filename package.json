@@ -10,6 +10,7 @@
     "preview:local": "pnpm build:web && pnpm --dir workers/edge dev",
     "dev:web": "pnpm --dir apps/web dev",
     "dev:edge": "pnpm --dir workers/edge dev",
+    "test": "vitest run",
     "typecheck": "pnpm typecheck:contracts && pnpm typecheck:domain && pnpm typecheck:application && pnpm typecheck:infrastructure && pnpm typecheck:web && pnpm typecheck:edge",
     "typecheck:contracts": "pnpm --dir packages/contracts typecheck",
     "typecheck:domain": "pnpm --dir packages/domain typecheck",
@@ -17,5 +18,8 @@
     "typecheck:infrastructure": "pnpm --dir packages/infrastructure typecheck",
     "typecheck:web": "pnpm --dir apps/web typecheck",
     "typecheck:edge": "pnpm --dir workers/edge typecheck"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   }
 }

@@ -288,6 +288,11 @@ export function LibraryCard({
                   <span className="text-[11px] text-muted-foreground">
                     {center.ratingCount} {center.ratingCount === 1 ? "opinión" : "opiniones"}
                   </span>
+                  {(center.ratingSourceLabel || center.ratingSampleLabel) ? (
+                    <span className="text-[10.5px] text-muted-foreground">
+                      {[center.ratingSourceLabel, center.ratingSampleLabel].filter(Boolean).join(" · ")}
+                    </span>
+                  ) : null}
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-border/60 bg-muted/[0.16] px-3 py-2.5">
@@ -305,7 +310,7 @@ export function LibraryCard({
                     to={`/centros/${center.slug}?opinar=1`}
                   >
                     <GoogleLogo className="size-3.5" />
-                    Sé el primero en valorar
+                    Valora en AlaBiblio
                   </Link>
                 </div>
               )}
@@ -318,7 +323,11 @@ export function LibraryCard({
                 {center.addressLine ?? "Dirección no disponible"}
               </span>
               {center.distanceLabel && center.distanceOrigin !== "not_available" ? (
-                <span className="font-medium text-primary">{center.distanceLabel}</span>
+                <span className="font-medium text-primary">
+                  {center.distanceOrigin === "heuristic"
+                    ? `Aprox. ${center.distanceLabel}`
+                    : center.distanceLabel}
+                </span>
               ) : null}
               {center.mapsUrl ? (
                 <a

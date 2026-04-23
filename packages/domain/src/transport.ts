@@ -21,13 +21,35 @@ function cleanStationName(value: string): string {
     .trim();
 }
 
-function parseLines(raw: string): string[] {
+function parseLines(raw: string, pattern: RegExp): string[] {
   const repaired = repairSourceText(raw) ?? raw;
-  const search = normalizeSearch(repaired);
+  const matches = [...repaired.matchAll(pattern)];
+
   return unique(
-    [...search.matchAll(/\b(?:linea|lineas)?\s*([a-z]?\d+[a-z]?)/gi)].map((match) =>
+    matches.map((match) =>
       match[1]?.toUpperCase() ?? "",
     ),
+  );
+}
+
+function parseMetroLines(raw: string): string[] {
+  return parseLines(
+    raw,
+    /\b(?:l(?:í|i)?neas?\s*|L\s*)(\d{1,2}[A-Z]?)\b/gi,
+  );
+}
+
+function parseCercaniasLines(raw: string): string[] {
+  return parseLines(
+    raw,
+    /\b(C\d{1,2}[A-Z]?)\b/gi,
+  );
+}
+
+function parseMetroLigeroLines(raw: string): string[] {
+  return parseLines(
+    raw,
+    /\b(ML\d{1,2}[A-Z]?)\b/gi,
   );
 }
 
@@ -44,14 +66,16 @@ function parseMetroClause(source: string): ParsedTransportReference[] {
     return [];
   }
 
-  const grouped = [...clause.matchAll(/([^,]+?)\s*\(([^)]+)\)/g)];
+  const grouped = [...clause.matchAll(/([^,]+?)\s*\(([^)]+)\)/g)].filter(
+    (match) => parseMetroLines(match[2] ?? "").length > 0,
+  );
 
   if (grouped.length > 0) {
     return grouped.map((match, index) => ({
       mode: "metro",
       stationName: cleanStationName(match[1] ?? "") || `Metro ${index + 1}`,
       stopName: null,
-      lines: parseLines(match[2] ?? "").map((line) => `L${line.replace(/^L/i, "")}`),
+      lines: parseMetroLines(match[2] ?? "").map((line) => `L${line.replace(/^L/i, "")}`),
       raw: match[0],
     }));
   }
@@ -64,7 +88,7 @@ function parseMetroClause(source: string): ParsedTransportReference[] {
       mode: "metro",
       stationName: cleanStationName(part.replace(/\(.*$/, "").trim()) || `Metro ${index + 1}`,
       stopName: null,
-      lines: parseLines(part).map((line) => `L${line.replace(/^L/i, "")}`),
+      lines: parseMetroLines(part).map((line) => `L${line.replace(/^L/i, "")}`),
       raw: part,
     }));
 }
@@ -78,14 +102,16 @@ function parseCercaniasClause(source: string): ParsedTransportReference[] {
     return [];
   }
 
-  const grouped = [...clause.matchAll(/([^,]+?)\s*\(([^)]+)\)/g)];
+  const grouped = [...clause.matchAll(/([^,]+?)\s*\(([^)]+)\)/g)].filter(
+    (match) => parseCercaniasLines(match[2] ?? "").length > 0,
+  );
 
   if (grouped.length > 0) {
     return grouped.map((match, index) => ({
       mode: "cercanias",
       stationName: cleanStationName(match[1] ?? "") || `Cercanias ${index + 1}`,
       stopName: null,
-      lines: parseLines(match[2] ?? "").map((line) => line.startsWith("C") ? line : `C${line}`),
+      lines: parseCercaniasLines(match[2] ?? "").map((line) => line.startsWith("C") ? line : `C${line}`),
       raw: match[0],
     }));
   }
@@ -94,7 +120,7 @@ function parseCercaniasClause(source: string): ParsedTransportReference[] {
     mode: "cercanias",
     stationName: cleanStationName(part.replace(/\(.*$/, "").trim()) || `Cercanias ${index + 1}`,
     stopName: null,
-    lines: parseLines(part).map((line) => line.startsWith("C") ? line : `C${line}`),
+    lines: parseCercaniasLines(part).map((line) => line.startsWith("C") ? line : `C${line}`),
     raw: part.trim(),
   }));
 }
@@ -113,7 +139,7 @@ function parseMetroLigeroClause(source: string): ParsedTransportReference[] {
       mode: "metro_ligero",
       stationName: cleanStationName(clause.replace(/\(.*$/, "").trim()),
       stopName: null,
-      lines: parseLines(clause).map((line) => line.startsWith("ML") ? line : `ML${line}`),
+      lines: parseMetroLigeroLines(clause).map((line) => line.startsWith("ML") ? line : `ML${line}`),
       raw: clause,
     },
   ];
