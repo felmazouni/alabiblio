@@ -423,7 +423,7 @@ export function HomeRoute() {
           ) : (
             <MotionCarousel
               options={carouselOptions}
-              renderSlide={(center) => <LibraryCard center={center} density="compact" />}
+              renderSlide={(center) => <LibraryCard center={center} />}
               slides={topRanked}
             />
           )}

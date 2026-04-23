@@ -8,6 +8,7 @@ import {
   ExternalLink,
   MapPin,
   Navigation,
+  Pencil,
   Star,
   Train,
   Users,
@@ -16,11 +17,15 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { RatingStars, SubratingSegments } from "../components/LibraryCard";
 import { PublicChrome } from "../components/PublicChrome";
 import { cn } from "../lib/cn";
 import {
   fetchGoogleAuthConfig,
+  getSchedulePresentation,
   submitCenterRating,
+  todayRangeLabel,
+  type ScheduleWeekdayRow,
   useCenterRatings,
   usePublicCenterDetail,
 } from "../lib/publicCatalog";
@@ -86,41 +91,64 @@ function averageLabel(value: number | null): string {
 }
 
 function ScheduleRulesBlock({
-  rules,
+  rows,
+  showResolvedState,
 }: {
-  rules: Array<{ weekday: number; opensAt: string; closesAt: string }>;
+  rows: ScheduleWeekdayRow[];
+  showResolvedState: boolean;
 }) {
-  const labels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-  const grouped = labels.map((label, weekday) => ({
-    label,
-    entries: rules.filter((rule) => rule.weekday === weekday),
-  }));
-
   return (
     <div className="divide-y divide-border/40">
-      {grouped.map((group) => (
+      {rows.map((row) => (
         <div
           className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
-          key={group.label}
+          key={row.label}
         >
-          <span className="w-7 text-[12px] font-medium text-foreground">{group.label}</span>
+          <span className="w-7 text-[12px] font-medium text-foreground">{row.label}</span>
           <span className="flex-1 text-[12px] text-muted-foreground">
-            {group.entries.length > 0
-              ? group.entries.map((entry) => `${entry.opensAt}–${entry.closesAt}`).join(", ")
-              : "Cerrado"}
+            {row.status === "open"
+              ? row.entries.join(", ")
+              : row.status === "closed"
+                ? "Cerrado"
+                : "No informado"}
           </span>
-          <span
-            className={cn(
-              "size-1.5 rounded-full",
-              group.entries.length > 0
-                ? "bg-emerald-400 dark:bg-emerald-500"
-                : "bg-rose-400/50 dark:bg-rose-500/35",
-            )}
-          />
+          {showResolvedState ? (
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                row.status === "open"
+                  ? "bg-emerald-400 dark:bg-emerald-500"
+                  : row.status === "closed"
+                    ? "bg-rose-400/50 dark:bg-rose-500/35"
+                    : "bg-slate-300/90 dark:bg-slate-600/80",
+              )}
+            />
+          ) : null}
         </div>
       ))}
     </div>
   );
+}
+
+function normalizeInfoText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function shouldRenderScheduleNotes(notes: string | null, officialText: string | null): boolean {
+  if (!notes) {
+    return false;
+  }
+
+  if (!officialText) {
+    return true;
+  }
+
+  return !normalizeInfoText(officialText).includes(normalizeInfoText(notes));
 }
 
 function transportModeIcon(mode: TransportOption["mode"]) {
@@ -141,13 +169,13 @@ function transportModeIcon(mode: TransportOption["mode"]) {
 
 function transportModeColor(mode: TransportOption["mode"]) {
   switch (mode) {
-    case "metro":        return "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400";
-    case "cercanias":    return "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400";
-    case "metro_ligero": return "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400";
-    case "emt_bus":      return "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-400";
-    case "interurban_bus": return "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400";
-    case "bicimad":      return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400";
-    case "car":          return "bg-muted/45 text-muted-foreground";
+    case "metro":          return "border border-red-300/60 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-300";
+    case "cercanias":      return "border border-indigo-300/60 bg-indigo-100 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-950/40 dark:text-indigo-300";
+    case "metro_ligero":   return "border border-violet-300/60 bg-violet-100 text-violet-700 dark:border-violet-500/30 dark:bg-violet-950/40 dark:text-violet-300";
+    case "emt_bus":        return "border border-teal-300/60 bg-teal-100 text-teal-700 dark:border-teal-500/30 dark:bg-teal-950/40 dark:text-teal-300";
+    case "interurban_bus": return "border border-orange-300/60 bg-orange-100 text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/40 dark:text-orange-300";
+    case "bicimad":        return "border border-green-300/60 bg-green-100 text-green-700 dark:border-green-500/30 dark:bg-green-950/40 dark:text-green-300";
+    case "car":            return "border border-slate-200/70 bg-slate-100 text-slate-500 dark:border-slate-600/25 dark:bg-slate-800/40 dark:text-slate-400";
   }
 }
 
@@ -174,7 +202,6 @@ function loadGoogleScript(): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>(
       'script[src="https://accounts.google.com/gsi/client"]',
     );
-
     if (existing) {
       existing.addEventListener("load", () => resolve(), { once: true });
       existing.addEventListener("error", () => reject(new Error("google_script_failed")), {
@@ -191,6 +218,21 @@ function loadGoogleScript(): Promise<void> {
     script.onerror = () => reject(new Error("google_script_failed"));
     document.head.appendChild(script);
   });
+}
+
+function GoogleLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+    >
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.05 5.05 0 0 1-2.2 3.31v2.74h3.57c2.08-1.92 3.27-4.74 3.27-8.06Z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.99 7.28-2.69l-3.57-2.74c-.99.66-2.26 1.06-3.71 1.06-2.85 0-5.27-1.93-6.14-4.52H2.18v2.82A11 11 0 0 0 12 23Z" fill="#34A853"/>
+      <path d="M5.86 14.11a6.61 6.61 0 0 1 0-4.22V7.07H2.18a11 11 0 0 0 0 9.86l3.68-2.82Z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.2 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.07l3.68 2.82c.87-2.59 3.29-4.51 6.14-4.51Z" fill="#EA4335"/>
+    </svg>
+  );
 }
 
 function VoteStarsRow({
@@ -225,21 +267,6 @@ function VoteStarsRow({
         ))}
       </div>
     </div>
-  );
-}
-
-function GoogleLogo({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      viewBox="0 0 24 24"
-    >
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.05 5.05 0 0 1-2.2 3.31v2.74h3.57c2.08-1.92 3.27-4.74 3.27-8.06Z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.99 7.28-2.69l-3.57-2.74c-.99.66-2.26 1.06-3.71 1.06-2.85 0-5.27-1.93-6.14-4.52H2.18v2.82A11 11 0 0 0 12 23Z" fill="#34A853"/>
-      <path d="M5.86 14.11a6.61 6.61 0 0 1 0-4.22V7.07H2.18a11 11 0 0 0 0 9.86l3.68-2.82Z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.2 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.07l3.68 2.82c.87-2.59 3.29-4.51 6.14-4.51Z" fill="#EA4335"/>
-    </svg>
   );
 }
 
@@ -437,6 +464,12 @@ export function CenterDetailRoute() {
     };
   }, [ratingsData?.item, center?.ratingAverage, center?.ratingCount]);
 
+  const hasUserVote = Boolean(ratingsData?.item?.userVote);
+  const schedulePresentation = useMemo(
+    () => (center ? getSchedulePresentation(center) : null),
+    [center],
+  );
+
   const submitVote = async () => {
     if (!slug || !googleIdToken) {
       setVoteError("Inicia sesion con Google para votar.");
@@ -501,10 +534,10 @@ export function CenterDetailRoute() {
                 <span
                   className={cn(
                     "rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
-                    statusBadge(center.headlineStatus),
+                    statusBadge(schedulePresentation?.statusLabel ?? center.headlineStatus),
                   )}
                 >
-                  {center.headlineStatus}
+                  {schedulePresentation?.statusLabel ?? center.headlineStatus}
                 </span>
               </div>
 
@@ -532,7 +565,7 @@ export function CenterDetailRoute() {
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <Clock className="size-3.5" />
-                  <span className="font-medium text-foreground">{center.scheduleLabel}</span>
+                  <span className="font-medium text-foreground">{schedulePresentation?.todayLabel ?? todayRangeLabel(center) ?? center.scheduleLabel}</span>
                 </span>
                 {center.capacityOrigin !== "not_available" && center.capacityValue !== null ? (
                   <span className="inline-flex items-center gap-1.5">
@@ -593,70 +626,57 @@ export function CenterDetailRoute() {
                 <h2 className="text-[11px] font-medium text-muted-foreground">
                   Valoraciones
                 </h2>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+                {ratingSummary.ratingCount > 0 && ratingSummary.ratingAverage !== null ? (
+                  <div className="flex items-end gap-4">
+                    <span className="text-[2.35rem] font-bold leading-none tracking-tight text-foreground">
+                      {ratingSummary.ratingAverage.toFixed(1)}
+                    </span>
+                    <div className="flex flex-col gap-1.5 pb-1">
+                      <RatingStars value={ratingSummary.ratingAverage ?? 0} size="size-[1.05rem]" />
+                      <span className="text-[12px] text-muted-foreground">
+                        {ratingSummary.ratingCount} {ratingSummary.ratingCount === 1 ? "opinión" : "opiniones"}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-[16px] border border-border/60 bg-muted/20 px-3.5 py-3">
+                    <div className="flex items-center gap-2">
+                      <RatingStars value={0} size="size-[1rem]" />
+                      <span className="text-[12px] font-medium text-foreground">Sin opiniones</span>
+                    </div>
+                    <p className="mt-1.5 text-[12px] text-muted-foreground">
+                      Sé el primero en valorar este centro.
+                    </p>
+                  </div>
+                )}
                 <button
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-semibold text-foreground transition hover:bg-muted/45"
+                  className="inline-flex items-center gap-1.5 rounded-[11px] border border-border/60 bg-card px-3.5 py-2 text-[12px] font-semibold text-foreground shadow-[0_1px_5px_rgba(15,23,42,0.08)] transition hover:bg-muted/55 hover:text-primary dark:shadow-none"
                   onClick={() => setIsVoteModalOpen(true)}
                   type="button"
                 >
-                  {!googleIdToken ? (
+                  {!hasUserVote ? (
                     <GoogleLogo className="size-4" />
                   ) : (
-                    <Star className="size-3.5" />
+                    <Pencil className="size-3.5" />
                   )}
-                  {!googleIdToken ? "Opinar con Google" : "Opinar"}
+                  {hasUserVote ? "Editar mi valoración" : "Valorar con Google"}
                 </button>
               </div>
 
-              {ratingSummary.ratingCount > 0 && ratingSummary.ratingAverage !== null ? (
-                <div className="mt-2 flex items-end gap-3">
-                  <p className="text-[1.7rem] font-semibold leading-none text-foreground">
-                    {ratingSummary.ratingAverage.toFixed(1)}
-                  </p>
-                  <p className="pb-0.5 text-[12px] text-muted-foreground">{ratingSummary.ratingCount} votos</p>
-                  <span className="inline-flex pb-0.5">
-                    {[1, 2, 3, 4, 5].map((score) => (
-                      <Star
-                        className={cn(
-                          "size-4",
-                          (ratingSummary.ratingAverage ?? 0) >= score
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-muted-foreground/30",
-                        )}
-                        key={score}
-                      />
-                    ))}
-                  </span>
-                </div>
-              ) : (
-                <div className="mt-2 rounded-xl border border-border bg-muted/25 px-3 py-2.5">
-                  <div className="flex items-center gap-1 text-muted-foreground/35">
-                    {Array.from({ length: 5 }).map((_, index) => (
-                      <Star className="size-4" key={index} />
-                    ))}
-                  </div>
-                  <p className="mt-1 text-[12px] text-muted-foreground">
-                    Sin valoraciones. Se el primero en opinar.
-                  </p>
-                </div>
-              )}
-
               {ratingSummary.ratingCount > 0 && ratingSummary.attributes ? (
-                <div className="mt-4 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
+                <div className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2">
                   {ratingLabels.map((key) => {
                     const val = ratingSummary.attributes![key] ?? null;
-                    const pct = val !== null ? Math.max(0, Math.min(100, (val / 5) * 100)) : 0;
                     return (
-                      <div className="flex items-center gap-3" key={key}>
-                        <span className="w-20 shrink-0 text-[12px] text-muted-foreground">
+                      <div className="grid grid-cols-[5.25rem_auto_2rem] items-center gap-x-3.5" key={key}>
+                        <span className="text-[12px] text-muted-foreground">
                           {ratingLabelText[key]}
                         </span>
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70">
-                          <div
-                            className="h-full rounded-full bg-emerald-500"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <span className="w-8 shrink-0 text-right text-[12px] font-semibold text-foreground">
+                        <SubratingSegments value={val} />
+                        <span className="text-right text-[12px] font-semibold text-foreground">
                           {val !== null ? val.toFixed(1) : "—"}
                         </span>
                       </div>
@@ -721,20 +741,65 @@ export function CenterDetailRoute() {
               <h2 className="mb-4 text-[11px] font-medium text-muted-foreground">
                 Horario
               </h2>
-              {(center.schedule.confidence === "low" || center.schedule.needsManualReview) ? (
-                <div className="mb-3 rounded-lg border border-amber-200/60 bg-amber-50/50 px-2.5 py-2 text-[11px] text-amber-800 dark:border-amber-600/25 dark:bg-amber-950/15 dark:text-amber-300">
-                  Horario pendiente de revisión manual. Los datos pueden no ser exactos.
+              <div className="rounded-xl border border-border/60 bg-muted/18 px-3.5 py-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="size-4 text-muted-foreground" />
+                  <span className="text-[13px] font-semibold text-foreground">
+                    {schedulePresentation?.todayLabel ?? todayRangeLabel(center) ?? center.scheduleLabel}
+                  </span>
+                </div>
+                {center.schedule.specialScheduleActive ? (
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Hay un horario especial activo para este centro.
+                  </p>
+                ) : null}
+              </div>
+              {schedulePresentation ? (
+                <div
+                  className={cn(
+                    "mt-3 rounded-lg border px-3 py-2 text-[11px]",
+                    schedulePresentation.validationTone === "warning"
+                      ? "border-amber-200/60 bg-amber-50/60 text-amber-800 dark:border-amber-600/25 dark:bg-amber-950/15 dark:text-amber-300"
+                      : schedulePresentation.validationTone === "provisional"
+                        ? "border-border/60 bg-muted/20 text-muted-foreground"
+                        : "border-emerald-200/60 bg-emerald-50/60 text-emerald-800 dark:border-emerald-600/25 dark:bg-emerald-950/15 dark:text-emerald-300",
+                  )}
+                >
+                  <p className="font-medium uppercase tracking-[0.08em] text-[10px] opacity-75">
+                    Estado de validación
+                  </p>
+                  <p className="mt-1 text-[12px] font-semibold">
+                    {schedulePresentation.validationLabel}
+                  </p>
+                  {schedulePresentation.validationHelpText ? (
+                    <p className="mt-1.5 text-[11px] font-normal leading-4 opacity-90">
+                      {schedulePresentation.validationHelpText}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
-              {center.schedule.displayText || center.schedule.rawText ? (
-                <p className="mb-3 text-[13px] text-muted-foreground">
-                  {center.schedule.displayText ?? center.schedule.rawText}
-                </p>
+              {schedulePresentation?.canRenderWeeklyTable ? (
+                <div className="mt-4">
+                  <p className="mb-2 text-[10.5px] font-medium text-muted-foreground">
+                    Tabla semanal
+                  </p>
+                  <ScheduleRulesBlock
+                    rows={schedulePresentation.weeklyRows}
+                    showResolvedState={!schedulePresentation.weeklyRowsArePartial}
+                  />
+                </div>
               ) : null}
-              {center.schedule.rules.length > 0 ? (
-                <ScheduleRulesBlock rules={center.schedule.rules} />
+              {schedulePresentation?.officialText ? (
+                <div className="mt-4 border-t border-border/50 pt-3">
+                  <p className="text-[10.5px] font-medium text-muted-foreground">
+                    Texto oficial
+                  </p>
+                  <p className="mt-1.5 text-[13px] text-muted-foreground">
+                    {schedulePresentation.officialText}
+                  </p>
+                </div>
               ) : null}
-              {center.schedule.notesUnparsed ? (
+              {shouldRenderScheduleNotes(center.schedule.notesUnparsed, schedulePresentation?.officialText ?? null) ? (
                 <p className="mt-3 text-[12px] text-muted-foreground">
                   {center.schedule.notesUnparsed}
                 </p>

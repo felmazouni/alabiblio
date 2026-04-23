@@ -1,4 +1,5 @@
 import { LibraryCard } from "../components/LibraryCard";
+import { MotionCarousel } from "../components/animate-ui/components/community/motion-carousel";
 import { PublicChrome } from "../components/PublicChrome";
 import { defaultPublicFilters, usePublicCatalog } from "../lib/publicCatalog";
 import { useUserLocation } from "../lib/userLocation";
@@ -33,11 +34,12 @@ export function TopOptionsRoute() {
             {error}
           </div>
         ) : (
-          <div className="space-y-3">
-            {items.map((item, index) => (
+          <MotionCarousel
+            renderSlide={(item, index) => (
               <LibraryCard center={{ ...item, rankingPosition: index + 1 }} key={item.id} />
-            ))}
-          </div>
+            )}
+            slides={items}
+          />
         )}
       </main>
     </PublicChrome>

@@ -3,3 +3,7 @@ export {
   getCenterDetailFromStore,
   getFiltersFromStore,
 } from "./catalogStore";
+export {
+  getCenterRatingsBySlug,
+  upsertCenterRatingBySlug,
+} from "./ratingsStore";

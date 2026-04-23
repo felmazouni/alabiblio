@@ -8,6 +8,11 @@ import { buildCallejeroAutocompleteResponse } from "./routes/publicCallejero";
 import { buildPublicCatalogResponse } from "./routes/publicCatalog";
 import { buildPublicCenterDetailResponse } from "./routes/publicCenterDetail";
 import { buildPublicFiltersResponse } from "./routes/publicFilters";
+import {
+  buildPublicCenterRatingsResponse,
+  buildPublicGoogleAuthConfigResponse,
+  buildSubmitPublicCenterRatingResponse,
+} from "./routes/publicRatings";
 
 function logRequest(
   request: Request,
@@ -75,6 +80,8 @@ export async function handleRequest(
       response = buildHealthResponse(env);
     } else if (request.method === "GET" && url.pathname === "/api/public/bootstrap") {
       response = buildPublicBootstrapResponse();
+    } else if (request.method === "GET" && url.pathname === "/api/public/auth/google/config") {
+      response = buildPublicGoogleAuthConfigResponse(env);
     } else if (request.method === "GET" && url.pathname === "/api/public/catalog") {
       response = await buildPublicCatalogResponse(env, catalogQuery, waitUntil);
     } else if (request.method === "GET" && url.pathname === "/api/public/transport/bicimad/availability") {
@@ -86,6 +93,24 @@ export async function handleRequest(
       response = await buildCallejeroAutocompleteResponse(q);
     } else if (request.method === "GET" && url.pathname === "/api/public/filters") {
       response = await buildPublicFiltersResponse(env, catalogQuery, waitUntil);
+    } else if (
+      request.method === "GET" &&
+      url.pathname.startsWith("/api/public/centers/") &&
+      url.pathname.endsWith("/ratings")
+    ) {
+      const slug = decodeURIComponent(
+        url.pathname.replace("/api/public/centers/", "").replace("/ratings", ""),
+      );
+      response = await buildPublicCenterRatingsResponse(env, slug, request);
+    } else if (
+      request.method === "POST" &&
+      url.pathname.startsWith("/api/public/centers/") &&
+      url.pathname.endsWith("/ratings")
+    ) {
+      const slug = decodeURIComponent(
+        url.pathname.replace("/api/public/centers/", "").replace("/ratings", ""),
+      );
+      response = await buildSubmitPublicCenterRatingResponse(env, slug, request);
     } else if (request.method === "GET" && url.pathname.startsWith("/api/public/centers/")) {
       const slug = decodeURIComponent(url.pathname.replace("/api/public/centers/", ""));
       response = await buildPublicCenterDetailResponse(env, slug, {

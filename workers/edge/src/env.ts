@@ -5,6 +5,7 @@ export interface AssetBinding {
 export interface EdgeEnv {
   APP_BASE_URL: string;
   APP_ENV: string;
+  GOOGLE_CLIENT_ID?: string;
   EMT_CLIENT_ID?: string;
   EMT_PASSKEY?: string;
   ASSETS?: AssetBinding;

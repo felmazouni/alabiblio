@@ -42,6 +42,19 @@ export function MotionCarousel<TSlide>({
     };
   }, [emblaApi]);
 
+  const totalSlides = slides.length;
+  const maxVisibleDots = 12;
+  const dotWindowStart = Math.max(
+    0,
+    Math.min(
+      selectedIndex - Math.floor(maxVisibleDots / 2),
+      Math.max(0, totalSlides - maxVisibleDots),
+    ),
+  );
+  const visibleDots = slides
+    .map((_, index) => index)
+    .slice(dotWindowStart, dotWindowStart + maxVisibleDots);
+
   return (
     <div className={cn("space-y-2", className)}>
       <div className="overflow-hidden" ref={emblaRef}>
@@ -58,8 +71,12 @@ export function MotionCarousel<TSlide>({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {slides.map((_, index) => (
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-[11px] text-muted-foreground">
+            {selectedIndex + 1}/{totalSlides}
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {visibleDots.map((index) => (
             <button
               aria-label={`Ir a slide ${index + 1}`}
               className={cn(
@@ -72,7 +89,8 @@ export function MotionCarousel<TSlide>({
               onClick={() => emblaApi?.scrollTo(index)}
               type="button"
             />
-          ))}
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5">

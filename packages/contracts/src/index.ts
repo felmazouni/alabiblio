@@ -138,6 +138,7 @@ export interface CenterCatalogItem {
   sourceCode: string;
   ratingAverage: number | null;
   ratingCount: number;
+  ratingAttributes: CenterRatingAverages;
   schedule: ScheduleSummary;
   ratingOrigin: DataOrigin;
   headlineStatus: "Abierta" | "Cerrada" | "Revision manual";
@@ -220,6 +221,43 @@ export interface PublicCenterDetailResponse {
   generatedAt: string;
   sourceMode: "d1" | "live";
   item: PublicCenterDetail;
+}
+
+export interface CenterRatingVoteInput {
+  silence: number;
+  wifi: number;
+  cleanliness: number;
+  plugs: number;
+  temperature: number;
+  lighting: number;
+}
+
+export interface CenterRatingVote extends CenterRatingVoteInput {
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CenterRatingAverages {
+  silence: number | null;
+  wifi: number | null;
+  cleanliness: number | null;
+  plugs: number | null;
+  temperature: number | null;
+  lighting: number | null;
+}
+
+export interface CenterRatingsSummary {
+  centerId: string;
+  ratingAverage: number | null;
+  ratingCount: number;
+  attributes: CenterRatingAverages;
+  userVote: CenterRatingVote | null;
+}
+
+export interface PublicCenterRatingsResponse {
+  generatedAt: string;
+  sourceMode: "d1" | "live";
+  item: CenterRatingsSummary;
 }
 
 export interface PublicFiltersResponse {

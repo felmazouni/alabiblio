@@ -19,6 +19,7 @@
   ],
   "vars": {
     "APP_ENV": "preview",
-    "APP_BASE_URL": "https://alabiblio-preview.ttefmb.workers.dev"
+    "APP_BASE_URL": "https://alabiblio-preview.ttefmb.workers.dev",
+    "GOOGLE_CLIENT_ID": ""
   }
 }

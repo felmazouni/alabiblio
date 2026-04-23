@@ -1,13 +1,17 @@
 import type {
+  CenterRatingVoteInput,
   PublicCatalogQuery,
   PublicCatalogResponse,
   PublicCenterDetailResponse,
+  PublicCenterRatingsResponse,
   PublicFiltersResponse,
 } from "@alabiblio/contracts";
 import {
   getCatalogFromStore,
   getCenterDetailFromStore,
+  getCenterRatingsBySlug,
   getFiltersFromStore,
+  upsertCenterRatingBySlug,
 } from "@alabiblio/infrastructure";
 
 export const officialSources = {
@@ -60,4 +64,21 @@ export async function loadPublicFilters(
     },
     query,
   );
+}
+
+export async function loadPublicCenterRatings(
+  slug: string,
+  database?: unknown,
+  userId?: string,
+): Promise<PublicCenterRatingsResponse | null> {
+  return getCenterRatingsBySlug(database, slug, userId);
+}
+
+export async function submitPublicCenterRating(
+  slug: string,
+  vote: CenterRatingVoteInput,
+  userId: string,
+  database?: unknown,
+): Promise<PublicCenterRatingsResponse | null> {
+  return upsertCenterRatingBySlug(database, slug, userId, vote);
 }

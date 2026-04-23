@@ -6,8 +6,8 @@
 - URL de produccion: `https://alabiblio.org` (runtime `alabiblio-prod` activo).
 - Base de datos preview: D1 `alabiblio-preview`
 - Centros publicados en preview: `115`
-  - Version desplegada (preview): `a46322c8`
-  - Version desplegada (produccion): `e518f850`
+  - Version desplegada (preview): `c1159744-d567-4ee8-9254-c263e4d2d5fc`
+  - Version desplegada (produccion): `6c28f173-23e8-4ab7-b3a6-b92b5083ff97`
 - Cierre Tramo 1 (ejecucion directa): normalizacion de etiquetas de zona, persistencia completa de filtros en URL y restauracion de contexto de listado (scroll + back) validadas en preview y promovidas a produccion.
 - Cierre Tramo 2 (ejecucion directa): rediseño premium transversal de filtros, cards, ratings y estados vacios con consistencia visual en light/dark y mobile/desktop, validado en preview y promovido a produccion.
 - Cierre Tramo 2B (refinado visual duro): LibraryCard reescrita a layout 2 areas (cuerpo compacto + footer de transporte); rating inline con estrellas y numero; subratings en grid 3 columnas con barras; aviso tira fina; headers de seccion sin uppercase ni letter-spacing en FiltersPanel y CenterDetailRoute; ScheduleRulesBlock con divide-y y dots de estado; SettingCard sin caja de icono pesada; equipamiento como chips pill; transporte en divide-y limpio. Typecheck y build limpios. Preview (92e1f820) y produccion (8151e33d) verificadas.
@@ -116,6 +116,14 @@
 - CenterDetailRoute reescrita sin LibraryCard, sin `<details>`, sin datos tecnicos internos; transporte inline; horario, equipamiento y contacto siempre visibles.
 - Typecheck limpio en los 3 tramos. Build limpio. Deploy preview (f6008638) y produccion (25bcb4aa) verificado.
 - Commits: 75c4aed (tramo 1), 5f230de (tramo 2), de6ebef (tramo 3).
+
+## Cierre trazable. Despliegue puntual de cards y smoke minimo en produccion (2026-04-23)
+
+- Version de produccion desplegada: `6c28f173-23e8-4ab7-b3a6-b92b5083ff97`.
+- Smoke minimo ejecutado sobre `alabiblio.org` con `200` en: `/api/health`, `/api/public/catalog` y `/api/public/centers/:slug`.
+- El aforo vuelve a estar visible en cards de listado/home con regla explicita: `Aforo · X plazas` cuando existe dato y `Aforo · No disponible` cuando no existe.
+- Verificacion visual en produccion confirmada en listado: San Juan Bautista muestra `Aforo · 277 plazas`; Pilares y Luis Gonzaga muestran `Aforo · No disponible`.
+- No se han detectado regresiones funcionales en esos endpoints minimos tras el despliegue de produccion.
 ## Cierre trazable. Bloque 6 API publica final y contratos estables (2026-04-20)
 
 - Contrato backend/UI alineado 1:1 para filtros y ordenaciones reales de catalogo.

@@ -156,6 +156,12 @@ interface StoredCenterRow {
   source_code: string;
   rating_average: number | null;
   rating_count: number;
+  rating_silence_average: number | null;
+  rating_wifi_average: number | null;
+  rating_cleanliness_average: number | null;
+  rating_plugs_average: number | null;
+  rating_temperature_average: number | null;
+  rating_lighting_average: number | null;
   schedule_text_raw: string | null;
   schedule_summary_text: string | null;
   schedule_confidence: ScheduleSummary["confidence"];
@@ -190,6 +196,7 @@ interface BaseCenterRecord {
   sourceCode: string;
   ratingAverage: number | null;
   ratingCount: number;
+  ratingAttributes: CenterCatalogItem["ratingAttributes"];
   schedule: ScheduleSummary;
 }
 
@@ -350,6 +357,20 @@ const SCHEMA_STATEMENTS = [
     voter_fingerprint TEXT NOT NULL,
     created_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS center_attribute_votes (
+    id TEXT PRIMARY KEY,
+    center_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    silence INTEGER NOT NULL,
+    wifi INTEGER NOT NULL,
+    cleanliness INTEGER NOT NULL,
+    plugs INTEGER NOT NULL,
+    temperature INTEGER NOT NULL,
+    lighting INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(center_id, user_id)
+  )`,
   `CREATE TABLE IF NOT EXISTS center_transport_snapshots (
     center_id TEXT PRIMARY KEY,
     generated_at TEXT NOT NULL,
@@ -457,6 +478,8 @@ const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_schedule_rules_center ON center_schedule_rules(center_id)`,
   `CREATE INDEX IF NOT EXISTS idx_center_admin_users_center ON center_admin_users(center_id)`,
   `CREATE INDEX IF NOT EXISTS idx_center_rating_votes_center ON center_rating_votes(center_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_center_attribute_votes_center ON center_attribute_votes(center_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_center_attribute_votes_user ON center_attribute_votes(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_transport_options_center ON center_transport_options(center_id)`,
   `CREATE INDEX IF NOT EXISTS idx_transport_nodes_center ON center_transport_nodes(center_id)`,
   `CREATE INDEX IF NOT EXISTS idx_transport_relevance_center ON center_transport_relevance(center_id)`,
@@ -2136,6 +2159,14 @@ function enrichBaseRow(row: StoredCenterRow): BaseCenterRecord {
     sourceCode: row.source_code,
     ratingAverage: row.rating_average,
     ratingCount: row.rating_count,
+    ratingAttributes: {
+      silence: row.rating_silence_average,
+      wifi: row.rating_wifi_average,
+      cleanliness: row.rating_cleanliness_average,
+      plugs: row.rating_plugs_average,
+      temperature: row.rating_temperature_average,
+      lighting: row.rating_lighting_average,
+    },
     schedule,
   };
 }
@@ -2323,6 +2354,24 @@ async function readBaseCentersFromDatabase(database: D1LikeDatabase): Promise<Ba
         id, slug, kind, name, address_line, district, neighborhood, postal_code,
         latitude, longitude, phone, email, website_url, accessibility, wifi, open_air,
         capacity_value, services_text, transport_text, source_code, rating_average, rating_count,
+        (
+          SELECT ROUND(AVG(silence), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_silence_average,
+        (
+          SELECT ROUND(AVG(wifi), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_wifi_average,
+        (
+          SELECT ROUND(AVG(cleanliness), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_cleanliness_average,
+        (
+          SELECT ROUND(AVG(plugs), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_plugs_average,
+        (
+          SELECT ROUND(AVG(temperature), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_temperature_average,
+        (
+          SELECT ROUND(AVG(lighting), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_lighting_average,
         schedule_text_raw, schedule_summary_text, schedule_confidence, schedule_notes_unparsed,
         schedule_needs_review
       FROM centers`,
@@ -2342,6 +2391,24 @@ async function readBaseCenterBySlugFromDatabase(
         id, slug, kind, name, address_line, district, neighborhood, postal_code,
         latitude, longitude, phone, email, website_url, accessibility, wifi, open_air,
         capacity_value, services_text, transport_text, source_code, rating_average, rating_count,
+        (
+          SELECT ROUND(AVG(silence), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_silence_average,
+        (
+          SELECT ROUND(AVG(wifi), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_wifi_average,
+        (
+          SELECT ROUND(AVG(cleanliness), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_cleanliness_average,
+        (
+          SELECT ROUND(AVG(plugs), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_plugs_average,
+        (
+          SELECT ROUND(AVG(temperature), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_temperature_average,
+        (
+          SELECT ROUND(AVG(lighting), 1) FROM center_attribute_votes votes WHERE votes.center_id = centers.id
+        ) AS rating_lighting_average,
         schedule_text_raw, schedule_summary_text, schedule_confidence, schedule_notes_unparsed,
         schedule_needs_review
       FROM centers
@@ -2411,6 +2478,14 @@ function toBaseCenterRecord(center: NormalizedCenter): BaseCenterRecord {
     sourceCode: center.sourceCode,
     ratingAverage: null,
     ratingCount: 0,
+    ratingAttributes: {
+      silence: null,
+      wifi: null,
+      cleanliness: null,
+      plugs: null,
+      temperature: null,
+      lighting: null,
+    },
     schedule: center.schedule,
   };
 }
