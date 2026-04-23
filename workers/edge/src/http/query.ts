@@ -45,8 +45,7 @@ function parseTransportModes(value: string | null): TransportMode[] | undefined 
         entry === "metro_ligero" ||
         entry === "emt_bus" ||
         entry === "interurban_bus" ||
-        entry === "bicimad" ||
-        entry === "car",
+        entry === "bicimad",
     );
 
   return transportModes.length > 0 ? transportModes : undefined;

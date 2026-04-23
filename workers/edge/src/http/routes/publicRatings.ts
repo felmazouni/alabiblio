@@ -12,6 +12,8 @@ interface GoogleTokenInfo {
   exp?: string;
 }
 
+const GOOGLE_TOKENINFO_TIMEOUT_MS = 5000;
+
 function extractBearerToken(request: Request): string | null {
   const header = request.headers.get("authorization") ?? "";
   if (!header.toLowerCase().startsWith("bearer ")) {
@@ -28,10 +30,24 @@ async function verifyGoogleIdToken(
 ): Promise<string> {
   const url = new URL("https://oauth2.googleapis.com/tokeninfo");
   url.searchParams.set("id_token", idToken);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GOOGLE_TOKENINFO_TIMEOUT_MS);
 
-  const response = await fetch(url.toString(), {
-    headers: { accept: "application/json" },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      headers: { accept: "application/json" },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    throw new Error(
+      error instanceof Error && error.name === "AbortError"
+        ? "google_token_timeout"
+        : "google_token_invalid",
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error("google_token_invalid");
@@ -58,7 +74,15 @@ async function verifyGoogleIdToken(
     throw new Error("google_token_expired");
   }
 
-  return payload.sub;
+  const hashed = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`alabiblio-google-sub:${payload.sub}`),
+  );
+  const userId = [...new Uint8Array(hashed)]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+
+  return `google:${userId}`;
 }
 
 function parseVoteInput(value: unknown): CenterRatingVoteInput | null {

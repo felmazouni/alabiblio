@@ -77,7 +77,7 @@ export async function handleRequest(
     let response: Response;
 
     if (request.method === "GET" && url.pathname === "/api/health") {
-      response = buildHealthResponse(env);
+      response = await buildHealthResponse(env);
     } else if (request.method === "GET" && url.pathname === "/api/public/bootstrap") {
       response = buildPublicBootstrapResponse();
     } else if (request.method === "GET" && url.pathname === "/api/public/auth/google/config") {
