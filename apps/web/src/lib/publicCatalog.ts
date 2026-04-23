@@ -13,6 +13,8 @@ import type {
 import { useEffect, useMemo, useState } from "react";
 import type { UserLocation } from "./userLocation";
 
+export type TimeSlot = "morning" | "afternoon" | "evening";
+
 export interface PublicFiltersState {
   query: string;
   kinds: CenterKind[];
@@ -26,6 +28,8 @@ export interface PublicFiltersState {
   withSer: boolean;
   radiusMeters: number;
   sort: SortMode;
+  weekdays: number[];
+  timeSlot: TimeSlot | null;
 }
 
 export const defaultPublicFilters: PublicFiltersState = {
@@ -41,6 +45,8 @@ export const defaultPublicFilters: PublicFiltersState = {
   withSer: false,
   radiusMeters: 120000,
   sort: "relevance",
+  weekdays: [],
+  timeSlot: null,
 };
 
 const FILTER_PARAM_KEYS = [
@@ -59,6 +65,8 @@ const FILTER_PARAM_KEYS = [
   "with_ser",
   "radius_m",
   "sort",
+  "days",
+  "time_slot",
 ] as const;
 
 const ALLOWED_KINDS: CenterKind[] = ["library", "study_room"];
@@ -131,6 +139,16 @@ export function parsePublicFiltersFromSearchParams(
     ? (sortRaw as SortMode)
     : defaultPublicFilters.sort;
 
+  const weekdaysRaw = readCsvParams(searchParams, ["days"]);
+  const weekdays = weekdaysRaw
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+  const timeSlotRaw = (searchParams.get("time_slot") ?? "").trim();
+  const timeSlot: TimeSlot | null =
+    timeSlotRaw === "morning" || timeSlotRaw === "afternoon" || timeSlotRaw === "evening"
+      ? timeSlotRaw
+      : null;
+
   return {
     query,
     kinds,
@@ -144,6 +162,8 @@ export function parsePublicFiltersFromSearchParams(
     withSer,
     radiusMeters,
     sort,
+    weekdays,
+    timeSlot,
   };
 }
 
@@ -192,6 +212,14 @@ export function writePublicFiltersToSearchParams(
   }
 
   params.set("sort", filters.sort);
+
+  if (filters.weekdays.length > 0) {
+    params.set("days", [...filters.weekdays].sort((a, b) => a - b).join(","));
+  }
+
+  if (filters.timeSlot) {
+    params.set("time_slot", filters.timeSlot);
+  }
 
   return params;
 }

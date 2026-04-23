@@ -139,6 +139,18 @@ function transportModeIcon(mode: TransportOption["mode"]) {
   }
 }
 
+function transportModeColor(mode: TransportOption["mode"]) {
+  switch (mode) {
+    case "metro":        return "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400";
+    case "cercanias":    return "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400";
+    case "metro_ligero": return "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400";
+    case "emt_bus":      return "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-400";
+    case "interurban_bus": return "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400";
+    case "bicimad":      return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400";
+    case "car":          return "bg-muted/45 text-muted-foreground";
+  }
+}
+
 function statusBadge(status: string) {
   if (status === "Abierta") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-600/40 dark:bg-emerald-950/45 dark:text-emerald-200";
@@ -671,7 +683,10 @@ export function CenterDetailRoute() {
                           className="flex items-start gap-3 py-2.5 first:pt-0"
                           key={option.id}
                         >
-                          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted/45 text-muted-foreground">
+                        <div className={cn(
+                            "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
+                            transportModeColor(option.mode),
+                          )}>
                             <Icon className="size-3.5" />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -706,12 +721,19 @@ export function CenterDetailRoute() {
               <h2 className="mb-4 text-[11px] font-medium text-muted-foreground">
                 Horario
               </h2>
+              {(center.schedule.confidence === "low" || center.schedule.needsManualReview) ? (
+                <div className="mb-3 rounded-lg border border-amber-200/60 bg-amber-50/50 px-2.5 py-2 text-[11px] text-amber-800 dark:border-amber-600/25 dark:bg-amber-950/15 dark:text-amber-300">
+                  Horario pendiente de revisión manual. Los datos pueden no ser exactos.
+                </div>
+              ) : null}
               {center.schedule.displayText || center.schedule.rawText ? (
                 <p className="mb-3 text-[13px] text-muted-foreground">
                   {center.schedule.displayText ?? center.schedule.rawText}
                 </p>
               ) : null}
-              <ScheduleRulesBlock rules={center.schedule.rules} />
+              {center.schedule.rules.length > 0 ? (
+                <ScheduleRulesBlock rules={center.schedule.rules} />
+              ) : null}
               {center.schedule.notesUnparsed ? (
                 <p className="mt-3 text-[12px] text-muted-foreground">
                   {center.schedule.notesUnparsed}
@@ -776,7 +798,7 @@ export function CenterDetailRoute() {
 
         {isVoteModalOpen ? (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4">
-            <div className="w-full max-w-[560px] rounded-[22px] border border-border bg-card p-4 shadow-[0_28px_80px_rgba(2,6,23,0.4)]">
+            <div className="w-full max-w-[480px] rounded-[22px] border border-border bg-card p-4 shadow-[0_28px_80px_rgba(2,6,23,0.4)]">
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <h3 className="text-[1rem] font-semibold text-foreground">Tu valoracion</h3>
@@ -798,22 +820,14 @@ export function CenterDetailRoute() {
               ) : null}
 
               {googleAuthEnabled && !googleIdToken ? (
-                <div className="mb-3 rounded-xl border border-border bg-muted/25 px-3 py-3">
-                  <p className="mb-2 text-[12px] text-muted-foreground">
-                    Inicia sesion con Google para votar.
+                <div className="mb-3 rounded-xl border border-border bg-muted/20 px-3 py-4">
+                  <p className="mb-3 text-center text-[12px] text-muted-foreground">
+                    Accede con Google para enviar tu voto.
                   </p>
-                  <button
-                    className="mb-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-[13px] font-semibold text-foreground transition hover:bg-muted/40"
-                    onClick={requestGoogleSignIn}
-                    type="button"
-                  >
-                    <GoogleLogo className="size-4" />
-                    Continuar con Google
-                  </button>
-                  <div ref={googleButtonHostRef} />
+                  <div ref={googleButtonHostRef} className="flex justify-center" />
                   {!isGoogleReady ? (
-                    <p className="mt-2 text-[11px] text-muted-foreground">
-                      Si no se abre Google, pulsa de nuevo el boton.
+                    <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                      Cargando Google Sign-In...
                     </p>
                   ) : null}
                 </div>

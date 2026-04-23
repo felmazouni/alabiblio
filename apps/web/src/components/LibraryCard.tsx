@@ -38,6 +38,18 @@ function modeIcon(mode: TransportOption["mode"]) {
   }
 }
 
+function modeColor(mode: TransportOption["mode"]): { chip: string; icon: string } {
+  switch (mode) {
+    case "metro":        return { chip: "bg-red-50 text-red-600 border-red-200/60 dark:bg-red-950/30 dark:text-red-400 dark:border-red-500/25",       icon: "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400" };
+    case "cercanias":    return { chip: "bg-blue-50 text-blue-600 border-blue-200/60 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-500/25",   icon: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400" };
+    case "metro_ligero": return { chip: "bg-purple-50 text-purple-600 border-purple-200/60 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-500/25", icon: "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400" };
+    case "emt_bus":      return { chip: "bg-cyan-50 text-cyan-700 border-cyan-200/60 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-500/25",   icon: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-400" };
+    case "interurban_bus": return { chip: "bg-amber-50 text-amber-700 border-amber-200/60 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-500/25", icon: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" };
+    case "bicimad":      return { chip: "bg-emerald-50 text-emerald-700 border-emerald-200/60 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-500/25", icon: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" };
+    case "car":          return { chip: "bg-card text-muted-foreground border-border/55",                                                               icon: "bg-muted/45 text-muted-foreground" };
+  }
+}
+
 function statusBadge(status: PublicCenterPresentation["headlineStatus"]) {
   if (status === "Abierta") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-600/40 dark:bg-emerald-950/45 dark:text-emerald-200";
@@ -219,7 +231,7 @@ export function LibraryCard({
                 to={`/centros/${center.slug}`}
               >
                 <ExternalLink className="size-3" />
-                Ver
+                Ver detalle
               </Link>
             </div>
 
@@ -365,7 +377,10 @@ export function LibraryCard({
               const Icon = modeIcon(option.mode);
               return (
                 <span
-                  className="inline-flex items-center gap-1 rounded-full border border-border/55 bg-card px-2 py-0.5 text-[10px] font-medium text-foreground"
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    modeColor(option.mode).chip,
+                  )}
                   key={option.id}
                 >
                   <Icon className="size-2.5" />
@@ -426,7 +441,10 @@ export function LibraryCard({
                         : null;
                       return (
                         <div className="flex items-start gap-3 px-4 py-3" key={option.id}>
-                          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted/45 text-muted-foreground">
+                        <div className={cn(
+                            "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
+                            modeColor(option.mode).icon,
+                          )}>
                             <Icon className="size-3.5" />
                           </div>
                           <div className="min-w-0 flex-1">
